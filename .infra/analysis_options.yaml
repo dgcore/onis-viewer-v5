@@ -1,0 +1,228 @@
+# Static analysis configuration for ONIS Viewer
+# Strict rules to ensure code quality
+
+include: package:flutter_lints/flutter.yaml
+
+linter:
+  rules:
+    # === NAMING AND STYLE ===
+    # Variable and function names
+    camel_case_types: true                    # Classes in PascalCase
+    camel_case_extensions: true               # Extensions in PascalCase
+    camel_case_library_names: true            # Library names in snake_case
+    camel_case_constants: true                # Constants in camelCase
+    constant_identifier_names: true           # Constant identifiers in UPPER_CASE
+    library_names: true                       # Library names in snake_case
+    non_constant_identifier_names: true       # Non-constant identifiers in camelCase
+    package_api_docs: true                    # API documentation for packages
+    package_names: true                       # Package names in snake_case
+    package_prefixed_library_names: true      # Package-prefixed library names
+    prefer_single_quotes: true                # Prefer single quotes
+    slash_for_doc_comments: true              # Use /// for documentation
+    
+    # === FORMATTING ===
+    # Spacing and indentation
+    directives_ordering: true                 # Directive ordering (import, export, part)
+    lines_longer_than_80_chars: false        # Lines longer than 80 characters
+    no_leading_underscores_for_library_prefixes: true  # No underscore for prefixes
+    no_leading_underscores_for_local_identifiers: true # No underscore for local identifiers
+    no_leading_underscores_for_private_identifiers: true # No underscore for private identifiers
+    prefer_single_quotes: true                # Prefer single quotes
+    sort_child_properties_last: true         # Child properties last
+    sort_constructors_first: true            # Constructors first
+    sort_unnamed_constructors_first: true    # Unnamed constructors first
+    
+    # === CODE QUALITY ===
+    # Best practices
+    always_declare_return_types: true        # Always declare return types
+    always_put_control_body_on_new_line: true # Control body on new line
+    always_put_required_named_parameters_first: true # Required named parameters first
+    always_require_non_null_named_parameters: true # Non-null named parameters required
+    always_specify_types: true               # Always specify types
+    annotate_overrides: true                 # Annotate overrides
+    avoid_annotating_with_dynamic: true      # Avoid dynamic annotations
+    avoid_bool_literals_in_conditional_expressions: true # Avoid boolean literals in conditions
+    avoid_catches_without_on_clauses: true   # Avoid catch without on
+    avoid_catching_errors: true              # Avoid catching errors
+    avoid_classes_with_only_static_methods: true # Avoid classes with only static methods
+    avoid_double_and_int_checks: true        # Avoid double/int checks
+    avoid_empty_else: true                   # Avoid empty else
+    avoid_equals_and_hash_code_on_mutable_classes: true # Avoid equals/hashCode on mutable classes
+    avoid_escaping_inner_quotes: true        # Avoid escaping inner quotes
+    avoid_field_initializers_in_const_classes: true # Avoid field initializers in const classes
+    avoid_function_literals_in_foreach_calls: true # Avoid function literals in foreach calls
+    avoid_implementing_value_types: true     # Avoid implementing value types
+    avoid_init_to_null: true                 # Avoid initialization to null
+    avoid_multiple_declarations_per_line: true # Avoid multiple declarations per line
+    avoid_null_checks_in_equality_operators: true # Avoid null checks in equality operators
+    avoid_positional_boolean_parameters: true # Avoid positional boolean parameters
+    avoid_print: true                        # Avoid print() (use logger)
+    avoid_private_typedef_functions: true    # Avoid private typedef functions
+    avoid_redundant_argument_values: true    # Avoid redundant argument values
+    avoid_relative_lib_imports: true         # Avoid relative lib imports
+    avoid_renaming_method_parameters: true   # Avoid renaming method parameters
+    avoid_return_types_on_setters: true      # Avoid return types on setters
+    avoid_returning_null_for_future: true    # Avoid returning null for Future
+    avoid_returning_null_for_void: true      # Avoid returning null for void
+    avoid_returning_null_when_invailable: true # Avoid returning null when invalid
+    avoid_returning_this: true               # Avoid returning this
+    avoid_returning_widgets: true            # Avoid returning widgets
+    avoid_setters_without_getters: true      # Avoid setters without getters
+    avoid_shadowing_type_parameters: true    # Avoid shadowing type parameters
+    avoid_single_cascade_in_expression_statements: true # Avoid single cascade in expression statements
+    avoid_slow_async_io: true                # Avoid slow async I/O
+    avoid_type_to_string: true               # Avoid type.toString()
+    avoid_types_as_parameter_names: true     # Avoid types as parameter names
+    avoid_unnecessary_containers: true       # Avoid unnecessary containers
+    avoid_unused_constructor_parameters: true # Avoid unused constructor parameters
+    avoid_void_async: true                   # Avoid void async
+    await_only_futures: true                 # Await only on Futures
+    cancel_subscriptions: true               # Cancel subscriptions
+    close_sinks: true                        # Close sinks
+    comment_references: true                 # Comment references
+    control_flow_in_finally: true            # Control flow in finally
+    curly_braces_in_flow_control_structures: true # Curly braces in flow control structures
+    depend_on_referenced_packages: true      # Depend on referenced packages
+    deprecated_consistency: true             # Deprecation consistency
+    directives_ordering: true                # Directive ordering
+    empty_catches: true                      # Empty catches
+    empty_constructor_bodies: true           # Empty constructor bodies
+    empty_statements: true                   # Empty statements
+    exhaustive_cases: true                   # Exhaustive cases
+    file_names: true                         # File names
+    hash_and_equals: true                    # Hash and equals
+    implementation_imports: true             # Implementation imports
+    invariant_booleans: true                 # Invariant booleans
+    iterable_contains_unrelated_type: true   # Contains with unrelated type
+    list_remove_unrelated_type: true        # Remove with unrelated type
+    literal_only_boolean_expressions: true   # Literal-only boolean expressions
+    missing_whitespace_between_adjacent_strings: true # Missing whitespace between adjacent strings
+    no_adjacent_strings_in_list: true        # No adjacent strings in list
+    no_duplicate_case_values: true           # No duplicate case values
+    no_logic_in_create_state: true           # No logic in createState
+    no_runtimeType_toString: true            # No runtimeType.toString()
+    no_self_assignments: true                # No self assignments
+    no_throw_errors: true                    # No throw errors
+    null_check_on_nullable_type_parameter: true # Null check on nullable type parameter
+    null_closures: true                      # Null closures
+    omit_local_variable_types: true          # Omit local variable types
+    one_member_abstracts: true               # One-member abstracts
+    only_throw_errors: true                  # Only throw errors
+    overridden_fields: true                  # Overridden fields
+    package_api_docs: true                   # Package API documentation
+    package_names: true                      # Package names
+    package_prefixed_library_names: true     # Package-prefixed library names
+    parameter_assignments: true              # Parameter assignments
+    prefer_adjacent_string_concatenation: true # Prefer adjacent string concatenation
+    prefer_asserts_in_initializer_lists: true # Prefer asserts in initializer lists
+    prefer_asserts_with_message: true        # Prefer asserts with message
+    prefer_collection_literals: true         # Prefer collection literals
+    prefer_conditional_expressions: true     # Prefer conditional expressions
+    prefer_const_constructors: true          # Prefer const constructors
+    prefer_const_constructors_in_immutables: true # Prefer const constructors in immutables
+    prefer_const_declarations: true          # Prefer const declarations
+    prefer_const_literals_to_create_immutables: true # Prefer const literals to create immutables
+    prefer_constructors_over_static_methods: true # Prefer constructors over static methods
+    prefer_contains: true                    # Prefer contains
+    prefer_equal_for_default_values: true    # Prefer == for default values
+    prefer_expression_function_bodies: true  # Prefer expression function bodies
+    prefer_final_fields: true                # Prefer final fields
+    prefer_final_in_for_each: true           # Prefer final in forEach
+    prefer_final_locals: true                # Prefer final locals
+    prefer_for_elements_to_map_fromIterable: true # Prefer for_elements to map.fromIterable
+    prefer_foreach: true                     # Prefer forEach
+    prefer_function_declarations_over_variables: true # Prefer function declarations over variables
+    prefer_generic_function_type_aliases: true # Prefer generic function type aliases
+    prefer_if_elements_to_conditional_expressions: true # Prefer if_elements to conditional expressions
+    prefer_if_null_operators: true           # Prefer if_null operators
+    prefer_initializing_formals: true        # Prefer initializing formals
+    prefer_inlined_adds: true                # Prefer inlined adds
+    prefer_int_literals: true                # Prefer int literals
+    prefer_interpolation_to_compose_strings: true # Prefer interpolation to string composition
+    prefer_is_empty: true                    # Prefer isEmpty
+    prefer_is_not_empty: true                # Prefer isNotEmpty
+    prefer_is_not_operator: true             # Prefer is! operator
+    prefer_iterable_whereType: true          # Prefer whereType on Iterable
+    prefer_mixin: true                       # Prefer mixin
+    prefer_null_aware_operators: true        # Prefer null-aware operators
+    prefer_single_quotes: true               # Prefer single quotes
+    prefer_spread_collections: true          # Prefer spread collections
+    prefer_typing_uninitialized_variables: true # Prefer typing uninitialized variables
+    provide_deprecation_message: true        # Provide deprecation message
+    recursive_getters: true                  # Recursive getters
+    slash_for_doc_comments: true             # Use /// for documentation
+    sort_child_properties_last: true        # Sort child properties last
+    sort_constructors_first: true           # Sort constructors first
+    sort_unnamed_constructors_first: true   # Sort unnamed constructors first
+    test_types_in_equals: true              # Test types in equals
+    throw_in_finally: true                  # Throw in finally
+    type_annotate_public_apis: true         # Annotate public APIs
+    type_init_formals: true                 # Initialize type formals
+    unawaited_futures: true                 # Unawaited futures
+    unnecessary_await_in_return: true       # Unnecessary await in return
+    unnecessary_brace_in_string_interps: true # Unnecessary braces in string interpolations
+    unnecessary_const: true                 # Unnecessary const
+    unnecessary_getters_setters: true       # Unnecessary getters/setters
+    unnecessary_lambdas: true               # Unnecessary lambdas
+    unnecessary_late: true                  # Unnecessary late
+    unnecessary_new: true                   # Unnecessary new
+    unnecessary_null_aware_assignments: true # Unnecessary null-aware assignments
+    unnecessary_null_checks: true           # Unnecessary null checks
+    unnecessary_null_in_if_null_operators: true # Unnecessary null in if_null operators
+    unnecessary_nullable_for_final_variable_declarations: true # Unnecessary nullable for final variable declarations
+    unnecessary_overrides: true             # Unnecessary overrides
+    unnecessary_parenthesis: true           # Unnecessary parentheses
+    unnecessary_raw_strings: true           # Unnecessary raw strings
+    unnecessary_statements: true            # Unnecessary statements
+    unnecessary_string_escapes: true        # Unnecessary string escapes
+    unnecessary_string_interpolations: true # Unnecessary string interpolations
+    unnecessary_this: true                  # Unnecessary this
+    unrelated_type_equality_checks: true    # Unrelated type equality checks
+    unsafe_html: true                       # Unsafe HTML
+    use_build_context_synchronously: true   # Use BuildContext synchronously
+    use_decorated_box: true                 # Use DecoratedBox
+    use_full_hex_values_for_flutter_colors: true # Use full hex values for Flutter colors
+    use_function_type_syntax_for_parameters: true # Use function type syntax for parameters
+    use_if_null_to_convert_nulls_to_bools: true # Use if_null to convert nulls to bools
+    use_is_even_rather_than_modulo: true    # Use isEven rather than modulo
+    use_key_in_widget_constructors: true    # Use key in widget constructors
+    use_late_for_private_fields_and_variables: true # Use late for private fields and variables
+    use_named_constants: true               # Use named constants
+    use_raw_strings: true                   # Use raw strings
+    use_rethrow_when_possible: true         # Use rethrow when possible
+    use_setters_to_change_properties: true  # Use setters to change properties
+    use_string_buffers: true                # Use StringBuffers
+    use_test_throws_matchers: true          # Use test throws matchers
+    use_to_and_as_if_applicable: true       # Use to and as if applicable
+    use_void_async: true                    # Use void async
+    valid_regexps: true                     # Valid regexps
+    void_checks: true                       # Void checks
+
+analyzer:
+  exclude:
+    - "**/*.g.dart"
+    - "**/*.freezed.dart"
+    - "**/generated_plugin_registrant.dart"
+    - "build/**"
+    - ".dart_tool/**"
+    - "native/**"  # Exclude C++ code from Dart analysis
+  
+  errors:
+    # Treat certain warnings as errors
+    invalid_annotation_target: error
+    missing_required_param: error
+    missing_return: error
+    must_be_immutable: error
+    must_call_super: error
+    non_constant_identifier_names: error
+    prefer_const_constructors: error
+    prefer_const_declarations: error
+    prefer_final_fields: error
+    prefer_final_locals: error
+    sort_child_properties_last: error
+    sort_constructors_first: error
+    sort_unnamed_constructors_first: error
+    type_annotate_public_apis: error
+    unnecessary_const: error
+    unnecessary_new: error
+    use_key_in_widget_constructors: error 
