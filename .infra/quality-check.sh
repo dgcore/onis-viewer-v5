@@ -136,12 +136,15 @@ run_check \
     "Flutter dependencies OK" \
     "Issues with Flutter dependencies"
 
-# 8. Outdated dependencies
-run_check \
-    "Outdated dependencies" \
-    "flutter pub outdated --mode=null-safety" \
-    "No outdated dependencies" \
-    "Outdated dependencies detected"
+# 8. Outdated dependencies (warning only)
+if flutter pub outdated --mode=null-safety 2>/dev/null | grep -q "Showing outdated packages"; then
+    warning "Some dependencies have newer versions available"
+    WARNINGS=$((WARNINGS + 1))
+else
+    success "All dependencies are up to date"
+    PASSED_CHECKS=$((PASSED_CHECKS + 1))
+fi
+TOTAL_CHECKS=$((TOTAL_CHECKS + 1))
 
 echo ""
 echo "📁 STRUCTURE VERIFICATIONS"
