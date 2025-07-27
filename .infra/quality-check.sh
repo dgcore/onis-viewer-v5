@@ -73,26 +73,44 @@ run_check \
     "Dart code properly formatted" \
     "Dart code poorly formatted - run 'dart format .'"
 
-# 2. Dart static analysis
-run_check \
-    "Dart static analysis" \
-    "dart analyze" \
-    "Dart static analysis OK" \
-    "Issues detected by Dart static analysis"
+# 2. Dart static analysis (for Flutter apps)
+if [ -d "apps/onis_viewer" ]; then
+    run_check \
+        "Dart static analysis" \
+        "cd apps/onis_viewer && flutter analyze" \
+        "Dart static analysis OK" \
+        "Issues detected by Dart static analysis"
+else
+    success "No Flutter app found, skipping Dart analysis"
+    PASSED_CHECKS=$((PASSED_CHECKS + 1))
+fi
+TOTAL_CHECKS=$((TOTAL_CHECKS + 1))
 
 # 3. Flutter tests
-run_check \
-    "Flutter tests" \
-    "flutter test --no-pub" \
-    "Flutter tests OK" \
-    "Flutter tests failed"
+if [ -d "apps/onis_viewer" ]; then
+    run_check \
+        "Flutter tests" \
+        "cd apps/onis_viewer && flutter test" \
+        "Flutter tests OK" \
+        "Flutter tests failed"
+else
+    success "No Flutter app found, skipping Flutter tests"
+    PASSED_CHECKS=$((PASSED_CHECKS + 1))
+fi
+TOTAL_CHECKS=$((TOTAL_CHECKS + 1))
 
 # 4. Flutter compilation
-run_check \
-    "Flutter compilation" \
-    "flutter build macos --debug" \
-    "Flutter compilation OK" \
-    "Flutter compilation failed"
+if [ -d "apps/onis_viewer" ]; then
+    run_check \
+        "Flutter compilation" \
+        "cd apps/onis_viewer && flutter build macos --debug" \
+        "Flutter compilation OK" \
+        "Flutter compilation failed"
+else
+    success "No Flutter app found, skipping Flutter compilation"
+    PASSED_CHECKS=$((PASSED_CHECKS + 1))
+fi
+TOTAL_CHECKS=$((TOTAL_CHECKS + 1))
 
 echo ""
 echo "⚙️  C++ VERIFICATIONS"
@@ -100,13 +118,13 @@ echo "-------------------"
 
 # 5. C++ formatting
 if command -v clang-format &> /dev/null; then
-    CPP_FILES=$(find native/ -name "*.cpp" -o -name "*.h" 2>/dev/null || true)
+    CPP_FILES=$(find shared/cpp/ apps/onis_site_server/ -name "*.cpp" -o -name "*.h" 2>/dev/null || true)
     if [ -n "$CPP_FILES" ]; then
         run_check \
             "C++ formatting" \
-            "clang-format --dry-run --Werror native/*.cpp native/*.h" \
+            "find shared/cpp/ apps/onis_site_server/ -name '*.cpp' -o -name '*.h' | xargs clang-format --dry-run --Werror" \
             "C++ code properly formatted" \
-            "C++ code poorly formatted - run 'clang-format -i native/*.cpp native/*.h'"
+            "C++ code poorly formatted - run 'find shared/cpp/ apps/onis_site_server/ -name \"*.cpp\" -o -name \"*.h\" | xargs clang-format -i'"
     else
         warning "No C++ files found"
     fi
@@ -130,18 +148,30 @@ echo "📦 DEPENDENCIES VERIFICATIONS"
 echo "------------------------------"
 
 # 7. Flutter dependencies
-run_check \
-    "Flutter dependencies" \
-    "flutter pub deps --style=compact" \
-    "Flutter dependencies OK" \
-    "Issues with Flutter dependencies"
+if [ -d "apps/onis_viewer" ]; then
+    run_check \
+        "Flutter dependencies" \
+        "cd apps/onis_viewer && flutter pub deps --style=compact" \
+        "Flutter dependencies OK" \
+        "Issues with Flutter dependencies"
+else
+    success "No Flutter app found, skipping Flutter dependencies"
+    PASSED_CHECKS=$((PASSED_CHECKS + 1))
+fi
+TOTAL_CHECKS=$((TOTAL_CHECKS + 1))
 
 # 8. Outdated dependencies (warning only)
-if flutter pub outdated --mode=null-safety 2>/dev/null | grep -q "Showing outdated packages"; then
-    warning "Some dependencies have newer versions available"
-    WARNINGS=$((WARNINGS + 1))
+if [ -d "apps/onis_viewer" ]; then
+    if cd apps/onis_viewer && flutter pub outdated --mode=null-safety 2>/dev/null | grep -q "Showing outdated packages"; then
+        warning "Some dependencies have newer versions available"
+        WARNINGS=$((WARNINGS + 1))
+    else
+        success "All dependencies are up to date"
+        PASSED_CHECKS=$((PASSED_CHECKS + 1))
+    fi
+    cd ../..
 else
-    success "All dependencies are up to date"
+    success "No Flutter app found, skipping dependency check"
     PASSED_CHECKS=$((PASSED_CHECKS + 1))
 fi
 TOTAL_CHECKS=$((TOTAL_CHECKS + 1))

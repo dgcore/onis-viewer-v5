@@ -18,8 +18,8 @@ add_executable(${BINARY_NAME} WIN32
 
 # Créer la bibliothèque C++ native
 add_library(onis_core SHARED
-  "../../native/onis_core.cpp"
-  "../../native/onis_core.h"
+  "../../../shared/cpp/onis_core/onis_core.cpp"
+  "../../../shared/cpp/onis_core/onis_core.h"
 )
 
 # Appliquer les paramètres standard à la bibliothèque native

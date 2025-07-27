@@ -3,8 +3,8 @@ project(onis_viewer_macos LANGUAGES CXX)
 
 # Créer la bibliothèque C++ native
 add_library(onis_core SHARED
-  "../../native/onis_core.cpp"
-  "../../native/onis_core.h"
+  "../../../shared/cpp/onis_core/onis_core.cpp"
+  "../../../shared/cpp/onis_core/onis_core.h"
 )
 
 # Paramètres de compilation pour macOS

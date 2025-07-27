@@ -1,115 +1,108 @@
-# ONIS Viewer - Flutter + FFI + C++
+# ONIS5 - Multi-Application Medical Imaging Platform
 
-This project is a reimplementation of ONIS Viewer using Flutter with FFI integration for native C++ code.
+ONIS5 is a comprehensive medical imaging platform that includes multiple applications sharing common C++ libraries and code.
 
-## Project Structure
+## 🏗️ Project Structure
 
 ```
-onis_viewer/
-├── lib/
-│   ├── main.dart              # Main Flutter application
-│   └── ffi/
-│       └── onis_ffi.dart      # FFI Dart <-> C++ bindings
-├── native/
-│   ├── onis_core.h            # Native C++ headers
-│   └── onis_core.cpp          # Native C++ implementation
-├── windows/                   # Windows configuration
-├── macos/                     # macOS configuration
-├── linux/                     # Linux configuration
-├── android/                   # Android configuration
-└── ios/                       # iOS configuration
+ONIS5/
+├── apps/                      # Applications
+│   ├── onis_viewer/           # Flutter-based medical image viewer
+│   └── onis_site_server/      # C++ server application (planned)
+├── libs/                      # External C++ libraries
+│   ├── dcmtk/                 # DICOM toolkit
+│   ├── boost/                 # Boost libraries
+│   ├── onis_core/             # ONIS core library
+│   └── cmake/                 # CMake configurations
+├── shared/                    # Shared code between applications
+│   ├── cpp/                   # Shared C++ code
+│   │   ├── onis_core/         # Core ONIS functionality
+│   │   ├── dicom/             # DICOM processing
+│   │   └── utils/             # Utility functions
+│   └── proto/                 # Protocol buffers (if needed)
+├── docs/                      # Documentation
+├── scripts/                   # Build and utility scripts
+└── .infra/                    # Quality infrastructure
 ```
 
-## Current Features
+## 🚀 Applications
 
-- ✅ Flutter <-> C++ FFI integration
-- ✅ Test of simple C++ functions (version, name, addition)
-- ✅ Modern Flutter user interface
-- ✅ Multi-platform support (desktop + mobile)
+### ONIS Viewer (Flutter)
+- **Location**: `apps/onis_viewer/`
+- **Type**: Cross-platform Flutter application
+- **Purpose**: Medical image viewing and analysis
+- **Platforms**: Desktop (Windows, macOS, Linux), Mobile (iOS, Android)
 
-## Planned Features
+### ONIS Site Server (C++)
+- **Location**: `apps/onis_site_server/` (planned)
+- **Type**: C++ server application
+- **Purpose**: Backend services for medical imaging
+- **Platforms**: Linux, Windows Server
 
-- 🔄 DICOM loading and visualization
-- 🔄 Image streaming
-- 🔄 Interactive annotations
-- 🔄 Hanging protocols
-- 🔄 Editing module
-- 🔄 Multi-source support
-- 🔄 OpenGL acceleration
+## 📚 Shared Libraries
 
-## Build and Run
+### External Libraries
+- **DCMTK**: DICOM toolkit for medical image processing
+- **Boost**: C++ utility libraries
+- **ONIS Core**: Custom core functionality
+
+### Shared Code
+- **ONIS Core**: Common C++ functionality used by all applications
+- **DICOM Processing**: Shared DICOM handling code
+- **Utilities**: Common utility functions
+
+## 🛠️ Development
 
 ### Prerequisites
+- Flutter SDK
+- C++ compiler (GCC, Clang, MSVC)
+- CMake 3.20+
+- Git
 
-- Flutter SDK (latest stable version)
-- CMake (for C++ compilation)
-- C++ compiler (Visual Studio on Windows, Xcode on macOS, GCC on Linux)
+### Building Applications
 
-### Build
-
+#### ONIS Viewer (Flutter)
 ```bash
-# In the project directory
+cd apps/onis_viewer
 flutter pub get
-flutter build windows  # or macos, linux, android, ios
+flutter build macos  # or windows, linux, ios, android
 ```
 
-### Run
-
+#### ONIS Site Server (C++)
 ```bash
-flutter run -d windows  # or macos, linux, android, ios
+cd apps/onis_site_server
+mkdir build && cd build
+cmake ..
+make
 ```
-
-## FFI Architecture
-
-The project uses FFI (Foreign Function Interface) to call C++ code from Flutter:
-
-1. **Native C++ code** (`native/`) : Contains critical functions (DICOM processing, acceleration, etc.)
-2. **FFI bindings** (`lib/ffi/`) : Dart interface to call C++ functions
-3. **Flutter application** (`lib/`) : User interface and business logic
-
-### FFI Usage Example
-
-```dart
-// Initialization
-OnisCore.initialize();
-
-// Call C++ functions
-String version = OnisCore.getVersion();
-String name = OnisCore.getName();
-int result = OnisCore.add(5, 3);
-```
-
-## Development
-
-### Adding a new C++ function
-
-1. Declare the function in `native/onis_core.h`
-2. Implement in `native/onis_core.cpp`
-3. Add the binding in `lib/ffi/onis_ffi.dart`
-4. Use in the Flutter application
-
-### Multi-platform support
-
-- **Desktop** : Direct compilation via CMake
-- **Mobile** : Integration via NDK (Android) and Xcode (iOS)
 
 ### Quality Assurance
+The project includes comprehensive quality infrastructure in `.infra/`:
+- Automated code formatting
+- Static analysis
+- Unit testing
+- Git hooks for quality enforcement
 
-The project includes a comprehensive quality infrastructure in the `.infra/` folder:
+## 📖 Documentation
 
-```bash
-# Install development environment
-./.infra/setup-dev-environment.sh
+- [Development Guide](apps/onis_viewer/DEVELOPMENT.md)
+- [Quality Infrastructure](.infra/README.md)
+- [Build Instructions](apps/onis_viewer/COMPILE_AND_RUN.md)
 
-# Install Git hooks
-./.infra/install-git-hooks.sh
+## 🤝 Contributing
 
-# Run quality checks
-./.infra/quality-check.sh
-```
+1. Create a feature branch: `git checkout -b feature/new-feature`
+2. Make your changes
+3. Run quality checks: `./.infra/quality-check.sh`
+4. Commit with conventional commits: `git commit -m "feat: add new feature"`
+5. Create a Pull Request
 
-See `.infra/README.md` for detailed quality guidelines and `QUALITY_SUMMARY.md` for a complete overview.
+## 📄 License
 
-## License
+[Add your license information here]
 
-© 2024 - Based on original ONIS Viewer
+## 🔗 Links
+
+- [ONIS Viewer Documentation](apps/onis_viewer/README.md)
+- [Quality Infrastructure](.infra/README.md)
+- [Development Guide](apps/onis_viewer/DEVELOPMENT.md) 
