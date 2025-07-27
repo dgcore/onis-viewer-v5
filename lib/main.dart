@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'ffi/onis_ffi.dart';
+import 'api/ov_api.dart';
 
 void main() {
   runApp(const OnisViewerApp());
@@ -41,6 +42,7 @@ class _OnisViewerHomePageState extends State<OnisViewerHomePage> {
   void initState() {
     super.initState();
     _initializeFFI();
+    _initializeAPI();
   }
 
   void _initializeFFI() {
@@ -70,6 +72,15 @@ class _OnisViewerHomePageState extends State<OnisViewerHomePage> {
       setState(() {
         _result = -1;
       });
+    }
+  }
+
+  void _initializeAPI() async {
+    try {
+      await OVApi().initialize();
+      // API initialized successfully
+    } catch (e) {
+      // API initialization error: $e
     }
   }
 
@@ -112,6 +123,39 @@ class _OnisViewerHomePageState extends State<OnisViewerHomePage> {
                           child: const Text('Recalculer'),
                         ),
                       ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Test API Singleton',
+                      style: Theme.of(context).textTheme.headlineSmall,
+                    ),
+                    const SizedBox(height: 16),
+                    FutureBuilder<Map<String, String>>(
+                      future: Future.value(OVApi().getInfo()),
+                      builder: (context, snapshot) {
+                        if (snapshot.hasData) {
+                          final info = snapshot.data!;
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('API Name: ${info['name']}'),
+                              Text('API Version: ${info['version']}'),
+                              Text('API Status: ${info['status']}'),
+                            ],
+                          );
+                        }
+                        return const Text('Loading API info...');
+                      },
                     ),
                   ],
                 ),
