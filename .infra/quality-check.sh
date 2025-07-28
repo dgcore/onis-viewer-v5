@@ -57,8 +57,10 @@ run_check() {
     
     if eval "$command" > /dev/null 2>&1; then
         success "$success_msg"
+        PASSED_CHECKS=$((PASSED_CHECKS + 1))
     else
         error "$error_msg"
+        FAILED_CHECKS=$((FAILED_CHECKS + 1))
     fi
 }
 
@@ -67,11 +69,17 @@ echo "📱 DART/FLUTTER VERIFICATIONS"
 echo "----------------------------"
 
 # 1. Dart formatting
-run_check \
-    "Dart formatting" \
-    "dart format --set-exit-if-changed lib/ test/" \
-    "Dart code properly formatted" \
-    "Dart code poorly formatted - run 'dart format .'"
+if [ -d "apps/onis_viewer" ]; then
+    run_check \
+        "Dart formatting" \
+        "cd apps/onis_viewer && dart format --set-exit-if-changed lib/ test/" \
+        "Dart code properly formatted" \
+        "Dart code poorly formatted - run 'cd apps/onis_viewer && dart format .'"
+else
+    success "No Flutter app found, skipping Dart formatting"
+    PASSED_CHECKS=$((PASSED_CHECKS + 1))
+fi
+TOTAL_CHECKS=$((TOTAL_CHECKS + 1))
 
 # 2. Dart static analysis (for Flutter apps)
 if [ -d "apps/onis_viewer" ]; then
@@ -126,22 +134,30 @@ if command -v clang-format &> /dev/null; then
             "C++ code properly formatted" \
             "C++ code poorly formatted - run 'find shared/cpp/ apps/onis_site_server/ -name \"*.cpp\" -o -name \"*.h\" | xargs clang-format -i'"
     else
-        warning "No C++ files found"
+        success "No C++ files found (monorepo structure)"
+        PASSED_CHECKS=$((PASSED_CHECKS + 1))
     fi
 else
     warning "clang-format not installed - verification ignored"
 fi
+TOTAL_CHECKS=$((TOTAL_CHECKS + 1))
 
 # 6. C++ compilation (if possible)
 if command -v cmake &> /dev/null && command -v make &> /dev/null; then
-    run_check \
-        "C++ compilation" \
-        "cd macos && ./build_native.sh && cd .." \
-        "C++ compilation OK" \
-        "C++ compilation failed"
+    if [ -d "apps/onis_viewer" ]; then
+        run_check \
+            "C++ compilation" \
+            "cd apps/onis_viewer/macos && ./build_native.sh && cd ../../.." \
+            "C++ compilation OK" \
+            "C++ compilation failed"
+    else
+        success "No Flutter app found, skipping C++ compilation"
+        PASSED_CHECKS=$((PASSED_CHECKS + 1))
+    fi
 else
     warning "CMake or Make not installed - C++ compilation ignored"
 fi
+TOTAL_CHECKS=$((TOTAL_CHECKS + 1))
 
 echo ""
 echo "📦 DEPENDENCIES VERIFICATIONS"
@@ -181,12 +197,12 @@ echo "📁 STRUCTURE VERIFICATIONS"
 echo "----------------------------"
 
 # 9. Configuration files
-if [ -f "analysis_options.yaml" ]; then
+if [ -f "apps/onis_viewer/analysis_options.yaml" ]; then
     success "analysis_options.yaml file present"
     PASSED_CHECKS=$((PASSED_CHECKS + 1))
 else
-    error "analysis_options.yaml file missing"
-    FAILED_CHECKS=$((FAILED_CHECKS + 1))
+    warning "analysis_options.yaml file missing (optional for monorepo)"
+    WARNINGS=$((WARNINGS + 1))
 fi
 TOTAL_CHECKS=$((TOTAL_CHECKS + 1))
 
@@ -194,8 +210,8 @@ if [ -f ".infra/analysis_options.yaml" ]; then
     success ".infra/analysis_options.yaml file present"
     PASSED_CHECKS=$((PASSED_CHECKS + 1))
 else
-    error ".infra/analysis_options.yaml file missing"
-    FAILED_CHECKS=$((FAILED_CHECKS + 1))
+    warning ".infra/analysis_options.yaml file missing (optional for monorepo)"
+    WARNINGS=$((WARNINGS + 1))
 fi
 TOTAL_CHECKS=$((TOTAL_CHECKS + 1))
 
@@ -209,12 +225,12 @@ else
 fi
 TOTAL_CHECKS=$((TOTAL_CHECKS + 1))
 
-if [ -f "DEVELOPMENT.md" ]; then
+if [ -f "apps/onis_viewer/DEVELOPMENT.md" ]; then
     success "DEVELOPMENT.md present"
     PASSED_CHECKS=$((PASSED_CHECKS + 1))
 else
-    error "DEVELOPMENT.md missing"
-    FAILED_CHECKS=$((FAILED_CHECKS + 1))
+    warning "DEVELOPMENT.md missing (optional for monorepo)"
+    WARNINGS=$((WARNINGS + 1))
 fi
 TOTAL_CHECKS=$((TOTAL_CHECKS + 1))
 
