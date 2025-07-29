@@ -1,65 +1,4 @@
-# Miscellaneous
-*.class
-*.log
-*.pyc
-*.swp
-.DS_Store
-.atom/
-.build/
-.buildlog/
-.history
-.svn/
-.swiftpm/
-migrate_working_dir/
-
-# IntelliJ related
-*.iml
-*.ipr
-*.iws
-.idea/
-
-# The .vscode folder contains launch configuration and tasks you configure in
-# VS Code which you may wish to be included in version control, so this line
-# is commented out by default.
-#.vscode/
-
-# Flutter/Dart/Pub related
-**/doc/api/
-**/ios/Flutter/.last_build_id
-.dart_tool/
-.flutter-plugins
-.flutter-plugins-dependencies
-.packages
-.pub-cache/
-.pub/
-/build/
-
-# Symbolication related
-app.*.symbols
-
-# Obfuscation related
-app.*.map.json
-
-# Android Studio will place build artifacts here
-/android/app/debug
-/android/app/profile
-/android/app/release
-
-# FVM
-.fvm/
-
-# Environment files
-.env
-.env.local
-.env.production
-.env.staging
-
-# Secrets and configuration files
-secrets.json
-config.json
-*.key
-*.pem
-*.p12
+# ONIS5 Root .gitignore
 
 # Build artifacts
 build/
@@ -67,39 +6,82 @@ dist/
 *.dylib
 *.so
 *.dll
-macos/build_native/
+*.exe
+*.app
 
 # IDE specific files
 .vscode/settings.json
 .vscode/launch.json
 .vscode/tasks.json
 .vscode/extensions.json
+.idea/
+*.iml
+*.ipr
+*.iws
 
-# OS generated files
-Thumbs.db
-ehthumbs.db
-Desktop.ini
+# Environment files
+.env
+.env.local
+.env.production
+secrets.json
+config.json
 
 # Temporary files
 *.tmp
 *.temp
-*.bak
 *.swp
 *.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
 
 # Logs
 *.log
 logs/
 
-# Coverage reports
-coverage/
-*.lcov
-
 # Dependencies
 node_modules/
 vendor/
 
-# Generated files
-*.g.dart
-*.freezed.dart
-generated_plugin_registrant.dart
+# Flutter specific (for apps/onis_viewer)
+apps/onis_viewer/.dart_tool/
+apps/onis_viewer/build/
+apps/onis_viewer/.flutter-plugins
+apps/onis_viewer/.flutter-plugins-dependencies
+apps/onis_viewer/.packages
+apps/onis_viewer/pubspec.lock
+
+# C++ specific
+*.o
+*.obj
+*.a
+*.lib
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
+
+# External libraries (will be downloaded/installed)
+libs/dcmtk/
+libs/boost/
+
+# Documentation builds
+docs/_build/
+docs/build/
+
+# Test artifacts
+coverage/
+*.gcov
+*.gcda
+*.gcno
+
+# Backup files
+*.bak
+*.backup 

@@ -44,10 +44,16 @@ fi
 # 2. Dart static analysis
 echo "🔍 Dart static analysis..."
 if command -v dart &> /dev/null; then
-    if ! dart analyze; then
-        error "Dart static analysis detected issues"
+    if [ -d "apps/onis_viewer" ]; then
+        if ! cd apps/onis_viewer && dart analyze; then
+            error "Dart static analysis detected issues"
+            exit 1
+        fi
+        cd ../..
+        success "Dart static analysis OK"
+    else
+        success "No Flutter app found, skipping Dart analysis"
     fi
-    success "Dart static analysis OK"
 else
     warning "Dart not found, static analysis ignored"
 fi
@@ -78,10 +84,16 @@ fi
 # 4. Test verification
 echo "🧪 Test verification..."
 if command -v flutter &> /dev/null; then
-    if ! flutter test --no-pub; then
-        error "Tests failed"
+    if [ -d "apps/onis_viewer" ]; then
+        if ! cd apps/onis_viewer && flutter test; then
+            error "Tests failed"
+            exit 1
+        fi
+        cd ../..
+        success "Tests OK"
+    else
+        success "No Flutter app found, skipping tests"
     fi
-    success "Tests OK"
 else
     warning "Flutter not found, test verification ignored"
 fi
@@ -89,11 +101,17 @@ fi
 # 5. Compilation verification
 echo "🔨 Compilation verification..."
 if command -v flutter &> /dev/null; then
-    # Check that project compiles
-    if ! flutter build macos --debug; then
-        error "Compilation failed"
+    if [ -d "apps/onis_viewer" ]; then
+        # Check that project compiles
+        if ! cd apps/onis_viewer && flutter build macos --debug; then
+            error "Compilation failed"
+            exit 1
+        fi
+        cd ../..
+        success "Compilation OK"
+    else
+        success "No Flutter app found, skipping compilation"
     fi
-    success "Compilation OK"
 else
     warning "Flutter not found, compilation verification ignored"
 fi
@@ -101,10 +119,15 @@ fi
 # 6. Dependencies verification
 echo "📦 Dependencies verification..."
 if command -v flutter &> /dev/null; then
-    if ! flutter pub deps --style=compact | grep -q "✓"; then
-        warning "Some dependencies might have issues"
+    if [ -d "apps/onis_viewer" ]; then
+        if ! cd apps/onis_viewer && flutter pub deps --style=compact | grep -q "✓"; then
+            warning "Some dependencies might have issues"
+        fi
+        cd ../..
+        success "Dependencies OK"
+    else
+        success "No Flutter app found, skipping dependencies check"
     fi
-    success "Dependencies OK"
 else
     warning "Flutter not found, dependencies verification ignored"
 fi
