@@ -164,7 +164,7 @@ fi
 # Run tests
 if command -v flutter &> /dev/null; then
     if ! flutter test --no-pub > /dev/null 2>&1; then
-        echo "❌ Tests failed. Please fix tests before pushing."
+        echo "❌ Tests failed3. Please fix tests before pushing."
         exit 1
     fi
     echo "✅ Tests passed"

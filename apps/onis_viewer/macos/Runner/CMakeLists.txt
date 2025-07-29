@@ -1,19 +1,27 @@
-cmake_minimum_required(VERSION 3.14)
-project(onis_viewer_macos LANGUAGES CXX)
+cmake_minimum_required(VERSION 3.20)
+project(runner LANGUAGES CXX)
 
-# Créer la bibliothèque C++ native
+set(BINARY_NAME "onis_viewer")
+
+# Add the shared C++ library
 add_library(onis_core SHARED
-  "../../../shared/cpp/onis_core/onis_core.cpp"
-  "../../../shared/cpp/onis_core/onis_core.h"
+  ../../../shared/cpp/onis_core/onis_core.cpp
+  ../../../shared/cpp/onis_core/onis_core.h
 )
 
-# Paramètres de compilation pour macOS
-target_compile_features(onis_core PUBLIC cxx_std_17)
-target_compile_options(onis_core PRIVATE -Wall -Wextra)
-
-# Définir le nom de sortie de la bibliothèque
 set_target_properties(onis_core PROPERTIES
-  LIBRARY_OUTPUT_NAME "onis_core"
-  PREFIX "lib"
-  SUFFIX ".dylib"
-) 
+  VERSION 5.0.0
+  SOVERSION 5
+  OUTPUT_NAME "onis_core"
+)
+
+target_include_directories(onis_core PUBLIC
+  ../../../shared/cpp/onis_core
+)
+
+target_compile_definitions(onis_core PRIVATE
+  ONIS_CORE_EXPORTS
+)
+
+# Link the shared library to the main executable
+target_link_libraries(${BINARY_NAME} PRIVATE onis_core) 

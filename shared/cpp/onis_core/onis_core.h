@@ -14,6 +14,9 @@ int onis_add(int a, int b);
 // Fonction pour obtenir le nom du logiciel
 const char *onis_get_name();
 
+// Fonction pour tester la connexion FFI
+int test_connection();
+
 #ifdef __cplusplus
 }
 #endif

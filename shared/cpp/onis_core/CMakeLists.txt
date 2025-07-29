@@ -1,4 +1,6 @@
 # ONIS Core Library CMakeLists.txt
+cmake_minimum_required(VERSION 3.20)
+project(onis_core VERSION 5.0.0)
 
 set(ONIS_CORE_SOURCES
     onis_core.cpp
@@ -23,7 +25,8 @@ set_target_properties(onis_core PROPERTIES
 
 # Include directories
 target_include_directories(onis_core PUBLIC
-    ${CMAKE_CURRENT_SOURCE_DIR}
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
+    $<INSTALL_INTERFACE:include/onis_core>
 )
 
 # Compiler definitions

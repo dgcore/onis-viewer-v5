@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
-import 'ffi/onis_ffi.dart';
+
 import 'api/ov_api.dart';
+import 'ffi/onis_ffi.dart';
 
 void main() {
   runApp(const OnisViewerApp());
@@ -14,73 +15,49 @@ class OnisViewerApp extends StatelessWidget {
     return MaterialApp(
       title: 'ONIS Viewer',
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
+        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
         useMaterial3: true,
       ),
-      home: const OnisViewerHomePage(title: 'ONIS Viewer - Test FFI'),
+      home: const OnisViewerHomePage(),
     );
   }
 }
 
 class OnisViewerHomePage extends StatefulWidget {
-  const OnisViewerHomePage({super.key, required this.title});
-
-  final String title;
+  const OnisViewerHomePage({super.key});
 
   @override
   State<OnisViewerHomePage> createState() => _OnisViewerHomePageState();
 }
 
 class _OnisViewerHomePageState extends State<OnisViewerHomePage> {
-  String _version = 'Non initialisé';
-  String _name = 'Non initialisé';
-  int _result = 0;
-  final int _a = 5;
-  final int _b = 3;
+  String _ffiStatus = 'Initializing...';
+  String _apiInfo = '';
 
   @override
   void initState() {
     super.initState();
-    _initializeFFI();
-    _initializeAPI();
+    _initializeApp();
   }
 
-  void _initializeFFI() {
+  Future<void> _initializeApp() async {
+    // Initialize OVApi
+    final api = OVApi();
+    setState(() {
+      _apiInfo = 'API: ${api.name} v${api.version}';
+    });
+
+    // Test FFI connection
     try {
-      OnisCore.initialize();
+      final ffi = OnisFFI();
+      final result = await ffi.testConnection();
       setState(() {
-        _version = OnisCore.getVersion();
-        _name = OnisCore.getName();
-        _result = OnisCore.add(_a, _b);
+        _ffiStatus = result;
       });
     } catch (e) {
       setState(() {
-        _version = 'Erreur: $e';
-        _name = 'Erreur: $e';
-        _result = -1;
+        _ffiStatus = 'FFI Error: $e';
       });
-    }
-  }
-
-  void _testAddition() {
-    try {
-      final result = OnisCore.add(_a, _b);
-      setState(() {
-        _result = result;
-      });
-    } catch (e) {
-      setState(() {
-        _result = -1;
-      });
-    }
-  }
-
-  void _initializeAPI() async {
-    try {
-      await OVApi().initialize();
-      // API initialized successfully
-    } catch (e) {
-      // API initialization error: $e
     }
   }
 
@@ -89,98 +66,30 @@ class _OnisViewerHomePageState extends State<OnisViewerHomePage> {
     return Scaffold(
       appBar: AppBar(
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        title: Text(widget.title),
+        title: const Text('ONIS Viewer - Test FFI'),
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
+      body: Center(
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.center,
           children: <Widget>[
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Test d\'intégration FFI C++',
-                      style: Theme.of(context).textTheme.headlineSmall,
-                    ),
-                    const SizedBox(height: 16),
-                    Text('Nom du logiciel: $_name'),
-                    Text('Version: $_version'),
-                    const SizedBox(height: 16),
-                    Text(
-                      'Test d\'addition:',
-                      style: Theme.of(context).textTheme.titleMedium,
-                    ),
-                    Row(
-                      children: [
-                        Text('$_a + $_b = $_result'),
-                        const SizedBox(width: 16),
-                        ElevatedButton(
-                          onPressed: _testAddition,
-                          child: const Text('Recalculer'),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
+            const Text(
+              'Welcome to ONIS Viewer',
+              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
             ),
-            const SizedBox(height: 16),
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Test API Singleton',
-                      style: Theme.of(context).textTheme.headlineSmall,
-                    ),
-                    const SizedBox(height: 16),
-                    FutureBuilder<Map<String, String>>(
-                      future: Future.value(OVApi().getInfo()),
-                      builder: (context, snapshot) {
-                        if (snapshot.hasData) {
-                          final info = snapshot.data!;
-                          return Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text('API Name: ${info['name']}'),
-                              Text('API Version: ${info['version']}'),
-                              Text('API Status: ${info['status']}'),
-                            ],
-                          );
-                        }
-                        return const Text('Loading API info...');
-                      },
-                    ),
-                  ],
-                ),
-              ),
+            const SizedBox(height: 20),
+            Text(
+              _apiInfo,
+              style: const TextStyle(fontSize: 16),
             ),
-            const SizedBox(height: 16),
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Prochaines étapes',
-                      style: Theme.of(context).textTheme.headlineSmall,
-                    ),
-                    const SizedBox(height: 16),
-                    const Text('• Implémenter le chargement DICOM'),
-                    const Text('• Ajouter la visualisation d\'images'),
-                    const Text('• Intégrer les annotations'),
-                    const Text('• Ajouter le streaming'),
-                    const Text('• Implémenter les hanging protocols'),
-                  ],
-                ),
-              ),
+            const SizedBox(height: 10),
+            Text(
+              'FFI Status: $_ffiStatus',
+              style: const TextStyle(fontSize: 16),
+            ),
+            const SizedBox(height: 30),
+            const Text(
+              'This is a test application for ONIS Viewer v5',
+              style: TextStyle(fontSize: 14, color: Colors.grey),
             ),
           ],
         ),

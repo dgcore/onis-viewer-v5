@@ -10,3 +10,5 @@ const char *onis_get_version() { return VERSION; }
 int onis_add(int a, int b) { return a + b; }
 
 const char *onis_get_name() { return NAME; }
+
+int test_connection() { return 0; } // 0 = success

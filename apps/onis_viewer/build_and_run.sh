@@ -1,9 +1,9 @@
 #!/bin/bash
 
-# Comprehensive build script for ONIS Viewer
+# Build and run script for ONIS Viewer
 set -e
 
-echo "🚀 Building ONIS Viewer (Flutter + Native C++)..."
+echo "🚀 Building and running ONIS Viewer..."
 
 # Get the script directory
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -22,9 +22,9 @@ flutter build macos --debug
 echo "📦 Step 3: Copying native library to app bundle..."
 cp macos/build_native/libonis_core.dylib build/macos/Build/Products/Debug/onis_viewer.app/Contents/MacOS/
 
-# Ensure the library is properly signed
+# Verify signing
 echo "🔐 Step 4: Verifying code signing..."
 codesign --verify --verbose=4 build/macos/Build/Products/Debug/onis_viewer.app/Contents/MacOS/libonis_core.dylib
 
-echo "✅ ONIS Viewer build complete!"
-echo "🎯 You can now run the app with: flutter run -d macos" 
+echo "✅ Build complete! Starting the app..."
+flutter run -d macos 

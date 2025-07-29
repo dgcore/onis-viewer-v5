@@ -16,15 +16,6 @@ add_executable(${BINARY_NAME} WIN32
   "runner.exe.manifest"
 )
 
-# Créer la bibliothèque C++ native
-add_library(onis_core SHARED
-  "../../../shared/cpp/onis_core/onis_core.cpp"
-  "../../../shared/cpp/onis_core/onis_core.h"
-)
-
-# Appliquer les paramètres standard à la bibliothèque native
-apply_standard_settings(onis_core)
-
 # Apply the standard set of build settings. This can be removed for applications
 # that need different build settings.
 apply_standard_settings(${BINARY_NAME})
@@ -43,9 +34,7 @@ target_compile_definitions(${BINARY_NAME} PRIVATE "NOMINMAX")
 # dependencies here.
 target_link_libraries(${BINARY_NAME} PRIVATE flutter flutter_wrapper_app)
 target_link_libraries(${BINARY_NAME} PRIVATE "dwmapi.lib")
-target_link_libraries(${BINARY_NAME} PRIVATE onis_core)
 target_include_directories(${BINARY_NAME} PRIVATE "${CMAKE_SOURCE_DIR}")
-target_include_directories(${BINARY_NAME} PRIVATE "${CMAKE_SOURCE_DIR}/../../native")
 
 # Run the Flutter tool portions of the build. This must not be removed.
 add_dependencies(${BINARY_NAME} flutter_assemble)
