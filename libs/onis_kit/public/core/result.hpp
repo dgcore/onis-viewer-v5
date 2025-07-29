@@ -1,0 +1,197 @@
+
+#pragma once
+
+#include <string>
+
+#include "./types.hpp"
+
+namespace dgc {
+
+#define EOS_NONE 0
+#define EOS_PARAM 1
+#define EOS_CANCELED 2
+#define EOS_MEMORY 3
+#define EOS_PERMISSION 4
+#define EOS_NOT_AVAILABLE 5
+
+#define EOS_NETWORK_RECEIVE 17
+#define EOS_NETWORK_CLOSED 19
+#define EOS_NETWORK_CONNECTION 20
+#define EOS_NETWORK_SSL 21
+#define EOS_NETWORK_SEND 22
+#define EOS_NETWORK_UNKNOWN_CMD 23
+#define EOS_NETWORK_DATAGRAM 24
+#define EOS_URL_RESOLVE 25
+
+#define EOS_TARGET_NETWORK_CONNECTION 32
+
+// Database:
+#define EOS_DB_CONNECTION 50
+#define EOS_DB_QUERY 51
+#define EOS_DB_NULL 52
+#define EOS_DB_VALUE 53
+#define EOS_DB_VALUE_LENGTH 54
+#define EOS_DB_TRANSACTION 55
+#define EOS_DB_TRANSACTION_COMMIT 56
+#define EOS_DB_CONSISTENCY 57
+#define EOS_DB_UPDATE 58
+
+// others:
+#define EOS_UNKNOWN 100
+#define EOS_INTERNAL 101
+#define EOS_RESOURCE 103
+#define EOS_NOSUPPORT 104
+#define EOS_NOT_FOUND 105
+#define EOS_ALL_FAILED 106
+#define EOS_SOME_FAILURE 107
+#define EOS_DUPLICATE 108
+#define EOS_BUSY 109
+#define EOS_OVERFLOW 110
+
+// Timeout:
+#define EOS_TIMEOUT 400
+// Session:
+#define EOS_INVALID_USER 500
+#define EOS_INVALID_SESSION 502
+#define EOS_TARGET_PERMISSION 505
+#define EOS_SESSION_EXCEEDED_LIMIT 506
+#define EOS_INVALID_CSRF 508
+
+// File:
+#define EOS_MEDIA 524
+#define EOS_NO_FILE 525
+#define EOS_FILE_WRITE 526
+#define EOS_FILE_READ 527
+#define EOS_FILE_OPEN 528
+#define EOS_FILE_FORMAT 529
+#define EOS_FILE_CREATE 530
+#define EOS_FILE_MISSING 531
+#define EOS_FILE_CONVERSION 532
+#define EOS_INVALID_STREAM 533
+#define EOS_FILE_RENAME 534
+#define EOS_FILE_COPY 535
+#define EOS_FILE_MOVE 536
+#define EOS_FILE_SIZE 537
+#define EOS_END_OF_FILE 538
+#define EOS_FILE_DELETE 539
+
+#define EOS_INPUT_CHARSET 550
+
+// Directory:
+#define EOS_DIR_CREATE 550
+#define EOS_DIR_DELETE 551
+#define EOS_DIR_RENAME 552
+#define EOS_DIR_OPEN 553
+
+// Anonymize:
+#define EOS_TAG_VALUE_INVALID_WITH_DEFAULT_REPERTOIRE 600
+#define EOS_TAG_NAME_CONFLICT 601
+#define EOS_TAG_INSERT 602
+#define EOS_TAG_NO_COMPATIBLE_REPERTOIRE 603
+#define EOS_TAG_UNSUPPORTED_REPERTOIRE 604
+#define EOS_ANONYMIZE_TAG 610
+
+// Dicom file:
+#define EOS_INVALID_DCM 700
+#define EOS_MISSING_SOP_UID 701
+#define EOS_MISSING_SERIES_UID 702
+#define EOS_MISSING_STUDY_UID 703
+#define EOS_MISSING_MODALITY 704
+#define EOS_MISSING_PATIENT_ID 705
+
+#define EOS_EXTRACT_FRAME 706
+#define EOS_CHANGE_TRANSFER 708
+#define EOS_SOPCLASS_NOT_SUPPORTED 709
+#define EOS_FAILED_TO_STORE 710
+#define EOS_CONFLICT 712
+#define EOS_ADD_DICOM_DIR 714
+#define EOS_CREATE_DICOM_DIR 715
+#define EOS_WRITE_DICOM_DIR 716
+#define EOS_CREATE_DICOM_FILE 717
+#define EOS_DCM_CHARSET 718
+
+// Dicom network:
+#define EOS_AE_REJECTION 800
+#define EOS_DESTINATION 801
+
+// Image:
+#define EOS_INVALID_PALETTE 900
+#define EOS_INVALID_IMAGE 901
+#define EOS_FAILED_TO_EXTRACT_IMAGE 902
+#define EOS_NO_IMAGE 903
+
+#define EOS_CIRCULAR 999
+
+// zip:
+#define EOS_ZIP_CREATE 1001
+#define EOS_ZIP_ADD_FILE 1002
+#define EOS_ZIP_SOURCE_FILE 1003
+
+// Camera and plan:
+#define EOS_MISSING_RECORDING_PLAN 2000
+#define EOS_NOT_CAPTURING 2021
+#define EOS_START_PLAYING 2050
+#define EOS_START_STREAMING 2060
+#define EOS_SIGNAL_LOST 2061
+
+// Exam:
+#define EOS_EXAM_MISSING 2100
+#define EOS_WRONG_EXAM 2101
+#define EOS_NO_EXAM_SESSION 2102
+#define EOS_ALREADY_RECORDING 2103
+#define EOS_START_RECORDING 2104
+
+// RS232
+#define EOS_RS232 2150
+
+// requests:
+#define EOS_INVALID_REQUEST 2200
+#define EOS_NOT_READY 2201
+#define EOS_MEDIA_CLOSED 2202
+
+// decoding:
+#define EOS_DECODING 2400
+#define EOS_SEEK 2401
+
+// encoding
+#define EOS_CAPACITY_OVER 2500
+#define EOS_FRAME_RATE_CONFLICT 2501
+#define EOS_ENCODING 2502
+
+// usb:
+#define EOS_USB_DRIVE_NOT_FOUND 2600
+#define EOS_USB_MULTIPLE_DRIVES 2601
+#define EOS_USB_UNMOUNT_FAILED 2602
+
+// RESPONSE STATUS:
+#define OSRSP_SUCCESS 0
+#define OSRSP_FAILURE 1
+#define OSRSP_REFUSED 2
+#define OSRSP_WARNING 3
+#define OSRSP_CANCELED 4
+#define OSRSP_PENDING 5
+#define OSRSP_PENDING_WARNING 6
+#define OSRSP_PENDING_OPERATION 7
+#define OSRSP_WAITING 8
+
+struct result {
+  // Constructor:
+  result();
+
+  // Destructor:
+  ~result();
+
+  // Properties:
+  b32 good() const;
+  b32 bad() const;
+
+  // Operations:
+  void set(s32 status, s32 reason, const std::string &info, b32 force);
+
+  // Members:
+  s32 status;
+  s32 reason;
+  std::string info;
+};
+
+} // namespace dgc

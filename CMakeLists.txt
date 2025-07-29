@@ -41,6 +41,11 @@ if(BUILD_ONIS_CORE)
     add_subdirectory(shared/cpp/onis_core)
 endif()
 
+# Add onis_kit library
+if(EXISTS "${CMAKE_SOURCE_DIR}/libs/onis_kit")
+    add_subdirectory(libs/onis_kit)
+endif()
+
 # Add applications
 if(EXISTS "${CMAKE_SOURCE_DIR}/apps/onis_site_server")
     add_subdirectory(apps/onis_site_server)

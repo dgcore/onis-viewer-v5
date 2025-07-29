@@ -1,0 +1,37 @@
+#pragma once
+
+#define S32_MAX 2147483647
+#define S32_MIN INT_MIN
+#define F32_MAX 3.402823466e+38F
+#define F32_MIN 1.175494351e-38F
+#define F64_MAX 1.7976931348623158e+308
+#define F64_MIN 2.2250738585072014e-308
+#define U64_MAX 0xFFFFFFFFFFFFFFFF
+
+#define OSRED 0
+#define OSGREEN 1
+#define OSBLUE 2
+#define OSALPHA 3
+
+// Result status constants
+#define OSRSP_SUCCESS 0
+#define OSRSP_FAILURE 1
+
+// Boolean constants
+#define OSTRUE 1
+#define OSFALSE 0
+
+namespace dgc {
+typedef unsigned char u8;
+typedef signed char s8;
+typedef char c8;
+typedef unsigned short u16;
+typedef signed short s16;
+typedef unsigned int u32;
+typedef signed int s32;
+typedef unsigned long long int u64;
+typedef signed long long int s64;
+typedef float f32;
+typedef double f64;
+typedef unsigned int b32;
+} // namespace dgc
