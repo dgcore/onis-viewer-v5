@@ -8,18 +8,14 @@
 #define F64_MIN 2.2250738585072014e-308
 #define U64_MAX 0xFFFFFFFFFFFFFFFF
 
-#define OSRED 0
-#define OSGREEN 1
-#define OSBLUE 2
-#define OSALPHA 3
+#define OS_RED 0
+#define OS_GREEN 1
+#define OS_BLUE 2
+#define OS_ALPHA 3
 
 // Result status constants
 #define OSRSP_SUCCESS 0
 #define OSRSP_FAILURE 1
-
-// Boolean constants
-#define OSTRUE 1
-#define OSFALSE 0
 
 namespace dgc {
 typedef unsigned char u8;
@@ -33,5 +29,4 @@ typedef unsigned long long int u64;
 typedef signed long long int s64;
 typedef float f32;
 typedef double f64;
-typedef unsigned int b32;
-} // namespace dgc
+}  // namespace dgc

@@ -182,11 +182,10 @@ struct result {
   ~result();
 
   // Properties:
-  b32 good() const;
-  b32 bad() const;
+  bool good() const;
 
   // Operations:
-  void set(s32 status, s32 reason, const std::string &info, b32 force);
+  void set(s32 status, s32 reason, const std::string& info, bool force);
 
   // Members:
   s32 status;
@@ -194,4 +193,4 @@ struct result {
   std::string info;
 };
 
-} // namespace dgc
+}  // namespace dgc
