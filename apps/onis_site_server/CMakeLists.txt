@@ -16,16 +16,15 @@ endif()
 # Add the shared C++ library first
 add_subdirectory(${CMAKE_SOURCE_DIR}/../../shared/cpp/onis_core ${CMAKE_BINARY_DIR}/onis_core)
 
+# Add the onis_kit library
+add_subdirectory(${CMAKE_SOURCE_DIR}/../../libs/onis_kit ${CMAKE_BINARY_DIR}/onis_kit)
+
 # Source files
 set(SERVER_SOURCES
     src/main.cpp
-    src/server.cpp
-    src/dicom_handler.cpp
 )
 
 set(SERVER_HEADERS
-    include/server.h
-    include/dicom_handler.h
 )
 
 # Create executable
@@ -36,13 +35,14 @@ add_executable(onis_site_server
 
 # Include directories
 target_include_directories(onis_site_server PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}/include
     ${CMAKE_SOURCE_DIR}/shared/cpp
+    ${CMAKE_SOURCE_DIR}/libs/onis_kit/public
 )
 
 # Link libraries
 target_link_libraries(onis_site_server PRIVATE
     onis_core
+    onis_kit
     # Add other libraries as needed:
     # ${DCMTK_LIBRARIES}
     # ${BOOST_LIBRARIES}
