@@ -6,15 +6,15 @@
 // tree, read text, and verify that the values of widget properties are correct.
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:onis_viewer/main.dart';
+import 'package:onis_viewer/app/onis_viewer_app.dart';
 
 void main() {
   testWidgets('ONIS Viewer app smoke test', (WidgetTester tester) async {
     // Build our app and trigger a frame.
     await tester.pumpWidget(const OnisViewerApp());
 
-    // Verify that our app shows the welcome message.
-    expect(find.text('Welcome to ONIS Viewer'), findsOneWidget);
-    expect(find.text('ONIS Viewer - Test FFI'), findsOneWidget);
+    // Verify that our app shows the loading screen initially.
+    expect(find.text('ONIS Viewer'), findsOneWidget);
+    expect(find.text('Initializing...'), findsOneWidget);
   });
 }
