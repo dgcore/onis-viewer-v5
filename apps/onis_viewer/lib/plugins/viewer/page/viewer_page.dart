@@ -34,17 +34,13 @@ class _ViewerPageState extends BasePageState<ViewerPage> {
 
   @override
   Widget buildPageContent() {
-    return Column(
-      children: [
-        // Viewer toolbar
-        _buildToolbar(),
+    return _buildContent();
+  }
 
-        // Viewer content
-        Expanded(
-          child: _buildContent(),
-        ),
-      ],
-    );
+  @override
+  Widget? buildPageHeader() {
+    // Return the viewer toolbar as the custom page header
+    return _buildToolbar();
   }
 
   /// Build the viewer toolbar
