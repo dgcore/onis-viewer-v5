@@ -118,6 +118,13 @@ abstract class BasePageState<T extends BasePage> extends State<T>
 
   /// Build the page header/toolbar
   Widget _buildPageHeader() {
+    // Allow pages to override the entire header
+    final customHeader = buildPageHeader();
+    if (customHeader != null) {
+      return customHeader;
+    }
+
+    // Default header implementation
     return Container(
       height: 60,
       color: OnisViewerConstants.surfaceColor,
@@ -271,6 +278,9 @@ abstract class BasePageState<T extends BasePage> extends State<T>
 
   /// Build the main page content
   Widget buildPageContent();
+
+  /// Build a custom page header widget (override to provide custom header)
+  Widget? buildPageHeader() => null;
 
   /// Build toolbar items for the page header
   List<Widget> buildToolbarItems() => [];

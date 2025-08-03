@@ -114,4 +114,50 @@ class DatabaseController {
     debugPrint('Show database settings');
     // In a real implementation, this would show settings dialog
   }
+
+  // Toolbar action methods
+  void quit() {
+    debugPrint('Quit action');
+    // In a real implementation, this would quit the application
+  }
+
+  void openPreferences() {
+    debugPrint('Open preferences action');
+    // In a real implementation, this would open preferences dialog
+  }
+
+  void importData() {
+    debugPrint('Import data action');
+    // In a real implementation, this would import data
+  }
+
+  void exportData() {
+    debugPrint('Export data action');
+    // In a real implementation, this would export data
+  }
+
+  void transferData() {
+    debugPrint('Transfer data action');
+    // In a real implementation, this would transfer data
+  }
+
+  void createCD() {
+    debugPrint('Create CD action');
+    // In a real implementation, this would create a CD
+  }
+
+  void openDatabaseFromToolbar() {
+    debugPrint('Open database action');
+    // In a real implementation, this would open a database
+  }
+
+  void search() {
+    debugPrint('Search action');
+    // In a real implementation, this would open search dialog
+  }
+
+  void stop() {
+    debugPrint('Stop action');
+    // In a real implementation, this would stop current operation
+  }
 }

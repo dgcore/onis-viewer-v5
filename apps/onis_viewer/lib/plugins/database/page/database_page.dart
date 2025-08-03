@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../core/constants.dart';
 import '../../../pages/base/base_page.dart';
 import '../database_plugin.dart';
+import '../ui/database_toolbar.dart';
 import 'database_controller.dart';
 
 /// Database management page
@@ -34,58 +35,20 @@ class _DatabasePageState extends BasePageState<DatabasePage> {
 
   @override
   Widget buildPageContent() {
-    return Column(
-      children: [
-        // Database toolbar
-        _buildToolbar(),
-
-        // Database content
-        Expanded(
-          child: _buildContent(),
-        ),
-      ],
-    );
+    return _buildContent();
   }
 
-  /// Build the database toolbar
-  Widget _buildToolbar() {
-    return Container(
-      height: 50,
-      color: OnisViewerConstants.surfaceColor,
-      padding: const EdgeInsets.symmetric(
-        horizontal: OnisViewerConstants.paddingMedium,
-      ),
-      child: Row(
-        children: [
-          // Add database button
-          ElevatedButton.icon(
-            onPressed: _controller.addDatabase,
-            icon: const Icon(Icons.add),
-            label: const Text('Add Database'),
-          ),
-          const SizedBox(width: OnisViewerConstants.marginMedium),
-
-          // Refresh button
-          ElevatedButton.icon(
-            onPressed: _controller.refreshDatabases,
-            icon: const Icon(Icons.refresh),
-            label: const Text('Refresh'),
-          ),
-          const SizedBox(width: OnisViewerConstants.marginMedium),
-
-          // Search field
-          Expanded(
-            child: TextField(
-              onChanged: _controller.searchDatabases,
-              decoration: const InputDecoration(
-                hintText: 'Search databases...',
-                prefixIcon: Icon(Icons.search),
-                border: OutlineInputBorder(),
-              ),
-            ),
-          ),
-        ],
-      ),
+  @override
+  Widget? buildPageHeader() {
+    // Return the database toolbar as the custom page header
+    return DatabaseToolbar(
+      onPreferences: () => _controller.openPreferences(),
+      onImport: () => _controller.importData(),
+      onExport: () => _controller.exportData(),
+      onTransfer: () => _controller.transferData(),
+      onOpen: () => _controller.openDatabaseFromToolbar(),
+      selectedLocation: 'Local computer',
+      onSearch: () => _controller.search(),
     );
   }
 
