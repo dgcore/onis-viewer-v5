@@ -3,7 +3,9 @@ import 'package:flutter/material.dart';
 import '../../../core/constants.dart';
 import '../../../pages/base/base_page.dart';
 import '../database_plugin.dart';
+import '../ui/database_source_bar.dart';
 import '../ui/database_toolbar.dart';
+import '../ui/resizable_source_bar.dart';
 import 'database_controller.dart';
 
 /// Database management page
@@ -56,60 +58,29 @@ class _DatabasePageState extends BasePageState<DatabasePage> {
   Widget _buildContent() {
     return Row(
       children: [
-        // Database list (left panel)
-        Container(
-          width: 300,
-          color: OnisViewerConstants.surfaceColor,
-          child: _buildDatabaseList(),
+        // Resizable source bar (left panel)
+        ResizableSourceBar(
+          initialWidth: 300,
+          minWidth: 250,
+          maxWidth: 500,
+          child: DatabaseSourceBar(
+            controller: _controller,
+            selectedSource: null, // TODO: Add selected source tracking
+            onSourceSelected: (source) {
+              // TODO: Handle source selection
+            },
+            onAddSource: () {
+              // TODO: Handle add source
+            },
+            onRefreshSources: () {
+              // TODO: Handle refresh sources
+            },
+          ),
         ),
 
         // Database details (right panel)
         Expanded(
           child: _buildDatabaseDetails(),
-        ),
-      ],
-    );
-  }
-
-  /// Build the database list
-  Widget _buildDatabaseList() {
-    return Column(
-      children: [
-        // List header
-        Container(
-          height: 40,
-          color: OnisViewerConstants.tabBarColor,
-          padding: const EdgeInsets.symmetric(
-            horizontal: OnisViewerConstants.paddingMedium,
-          ),
-          child: const Row(
-            children: [
-              Text(
-                'Databases',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: OnisViewerConstants.textColor,
-                ),
-              ),
-            ],
-          ),
-        ),
-
-        // Database list
-        Expanded(
-          child: ListView.builder(
-            itemCount: _controller.databases.length,
-            itemBuilder: (context, index) {
-              final database = _controller.databases[index];
-              return ListTile(
-                leading: const Icon(Icons.storage),
-                title: Text(database.name),
-                subtitle: Text(database.path),
-                selected: _controller.selectedDatabase == database,
-                onTap: () => _controller.selectDatabase(database),
-              );
-            },
-          ),
         ),
       ],
     );
