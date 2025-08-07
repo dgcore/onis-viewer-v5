@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../models/study.dart';
+
 /// Database model
 class Database {
   final String id;
@@ -20,14 +22,19 @@ class Database {
 }
 
 /// Controller for database operations
-class DatabaseController {
+class DatabaseController extends ChangeNotifier {
   final List<Database> _databases = [];
+  final List<Study> _studies = [];
   Database? _selectedDatabase;
+  final List<Study> _selectedStudies = []; // Changed from final to mutable
   String _searchQuery = '';
 
   // Getters
   List<Database> get databases => _databases;
+  List<Study> get studies => _studies;
   Database? get selectedDatabase => _selectedDatabase;
+  List<Study> get selectedStudies =>
+      _selectedStudies; // Changed from Study? to List<Study>
   String get searchQuery => _searchQuery;
 
   /// Initialize the controller
@@ -59,11 +66,73 @@ class DatabaseController {
         size: '5.2 GB',
       ),
     ]);
+
+    // Auto-select the first database
+    if (_databases.isNotEmpty) {
+      _selectedDatabase = _databases.first;
+      debugPrint('Auto-selected database: ${_selectedDatabase!.name}');
+    }
+
+    // Load sample studies for demonstration
+    _studies.addAll([
+      Study(
+        id: 'ST001',
+        name: 'John Doe',
+        sex: 'M',
+        birthDate: DateTime(1985, 3, 15),
+        patientId: 'P001',
+        studyDate: '2024-01-15',
+        modality: 'CT',
+        status: 'Completed',
+      ),
+      Study(
+        id: 'ST002',
+        name: 'Jane Smith',
+        sex: 'F',
+        birthDate: DateTime(1990, 7, 22),
+        patientId: 'P002',
+        studyDate: '2024-01-16',
+        modality: 'MRI',
+        status: 'In Progress',
+      ),
+      Study(
+        id: 'ST003',
+        name: 'Bob Johnson',
+        sex: 'M',
+        birthDate: DateTime(1978, 11, 8),
+        patientId: 'P003',
+        studyDate: '2024-01-17',
+        modality: 'X-Ray',
+        status: 'Completed',
+      ),
+      Study(
+        id: 'ST004',
+        name: 'Alice Brown',
+        sex: 'F',
+        birthDate: DateTime(1995, 4, 12),
+        patientId: 'P004',
+        studyDate: '2024-01-18',
+        modality: 'Ultrasound',
+        status: 'Scheduled',
+      ),
+      Study(
+        id: 'ST005',
+        name: 'Charlie Wilson',
+        sex: 'M',
+        birthDate: DateTime(1982, 9, 30),
+        patientId: 'P005',
+        studyDate: '2024-01-19',
+        modality: 'CT',
+        status: 'Completed',
+      ),
+    ]);
   }
 
   /// Dispose the controller
+  @override
   Future<void> dispose() async {
     // Clean up resources
+    super.dispose();
   }
 
   /// Add a new database
@@ -89,6 +158,24 @@ class DatabaseController {
   void selectDatabase(Database database) {
     _selectedDatabase = database;
     debugPrint('Selected database: ${database.name}');
+  }
+
+  /// Select a study
+  void selectStudy(Study study) {
+    _selectedStudies.clear();
+    _selectedStudies.add(study);
+    debugPrint('Selected study: ${study.name}');
+    notifyListeners();
+  }
+
+  /// Select multiple studies
+  void selectStudies(List<Study> studies) {
+    _selectedStudies.clear();
+    _selectedStudies.addAll(studies);
+    debugPrint(
+        'Selected ${studies.length} studies: ${studies.map((s) => s.name).join(', ')}');
+    // Force a rebuild by notifying listeners
+    notifyListeners();
   }
 
   /// Open a database
