@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../../core/constants.dart';
 import '../../../pages/base/base_page.dart';
@@ -6,6 +7,7 @@ import '../database_plugin.dart';
 import '../ui/database_source_bar.dart';
 import '../ui/database_toolbar.dart';
 import '../ui/resizable_source_bar.dart';
+import '../ui/study_list_view.dart';
 import 'database_controller.dart';
 
 /// Database management page
@@ -23,6 +25,9 @@ class DatabasePage extends BasePage {
 
 class _DatabasePageState extends BasePageState<DatabasePage> {
   late DatabaseController _controller;
+  bool _isCtrlPressed = false;
+  bool _isShiftPressed = false;
+  final FocusNode _keyboardFocusNode = FocusNode();
 
   @override
   Future<void> initializePage() async {
@@ -37,7 +42,48 @@ class _DatabasePageState extends BasePageState<DatabasePage> {
 
   @override
   Widget buildPageContent() {
-    return _buildContent();
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, child) {
+        return Focus(
+          focusNode: _keyboardFocusNode,
+          autofocus: true,
+          onKeyEvent: (node, event) {
+            if (event is KeyDownEvent) {
+              if (event.logicalKey == LogicalKeyboardKey.controlLeft ||
+                  event.logicalKey == LogicalKeyboardKey.controlRight ||
+                  event.logicalKey == LogicalKeyboardKey.metaLeft ||
+                  event.logicalKey == LogicalKeyboardKey.metaRight) {
+                setState(() {
+                  _isCtrlPressed = true;
+                });
+              } else if (event.logicalKey == LogicalKeyboardKey.shiftLeft ||
+                  event.logicalKey == LogicalKeyboardKey.shiftRight) {
+                setState(() {
+                  _isShiftPressed = true;
+                });
+              }
+            } else if (event is KeyUpEvent) {
+              if (event.logicalKey == LogicalKeyboardKey.controlLeft ||
+                  event.logicalKey == LogicalKeyboardKey.controlRight ||
+                  event.logicalKey == LogicalKeyboardKey.metaLeft ||
+                  event.logicalKey == LogicalKeyboardKey.metaRight) {
+                setState(() {
+                  _isCtrlPressed = false;
+                });
+              } else if (event.logicalKey == LogicalKeyboardKey.shiftLeft ||
+                  event.logicalKey == LogicalKeyboardKey.shiftRight) {
+                setState(() {
+                  _isShiftPressed = false;
+                });
+              }
+            }
+            return KeyEventResult.handled;
+          },
+          child: _buildContent(),
+        );
+      },
+    );
   }
 
   @override
@@ -78,6 +124,9 @@ class _DatabasePageState extends BasePageState<DatabasePage> {
           ),
         ),
 
+        // Spacing between source bar and study list
+        const SizedBox(width: OnisViewerConstants.paddingMedium),
+
         // Database details (right panel)
         Expanded(
           child: _buildDatabaseDetails(),
@@ -88,111 +137,22 @@ class _DatabasePageState extends BasePageState<DatabasePage> {
 
   /// Build the database details panel
   Widget _buildDatabaseDetails() {
-    final selectedDb = _controller.selectedDatabase;
-
-    if (selectedDb == null) {
-      return const Center(
-        child: Text(
-          'Select a database to view details',
-          style: TextStyle(
-            color: OnisViewerConstants.textSecondaryColor,
-            fontSize: 16,
-          ),
-        ),
-      );
-    }
-
-    return Padding(
-      padding: const EdgeInsets.all(OnisViewerConstants.paddingMedium),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Database header
-          Text(
-            selectedDb.name,
-            style: const TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-              color: OnisViewerConstants.textColor,
-            ),
-          ),
-          const SizedBox(height: OnisViewerConstants.marginMedium),
-
-          // Database info
-          _buildInfoCard('Path', selectedDb.path),
-          const SizedBox(height: OnisViewerConstants.marginSmall),
-          _buildInfoCard('Type', selectedDb.type),
-          const SizedBox(height: OnisViewerConstants.marginSmall),
-          _buildInfoCard('Status', selectedDb.status),
-          const SizedBox(height: OnisViewerConstants.marginSmall),
-          _buildInfoCard('Size', selectedDb.size),
-
-          const SizedBox(height: OnisViewerConstants.marginLarge),
-
-          // Actions
-          Row(
-            children: [
-              ElevatedButton.icon(
-                onPressed: () => _controller.openDatabase(selectedDb),
-                icon: const Icon(Icons.open_in_new),
-                label: const Text('Open'),
-              ),
-              const SizedBox(width: OnisViewerConstants.marginMedium),
-              ElevatedButton.icon(
-                onPressed: () => _controller.exportDatabase(selectedDb),
-                icon: const Icon(Icons.download),
-                label: const Text('Export'),
-              ),
-              const SizedBox(width: OnisViewerConstants.marginMedium),
-              ElevatedButton.icon(
-                onPressed: () => _controller.deleteDatabase(selectedDb),
-                icon: const Icon(Icons.delete),
-                label: const Text('Delete'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.red,
-                  foregroundColor: Colors.white,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  /// Build an info card
-  Widget _buildInfoCard(String label, String value) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(OnisViewerConstants.paddingMedium),
-      decoration: BoxDecoration(
-        color: OnisViewerConstants.surfaceColor,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: OnisViewerConstants.tabButtonColor,
-          width: 1,
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label,
-            style: const TextStyle(
-              fontSize: 12,
-              color: OnisViewerConstants.textSecondaryColor,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            value,
-            style: const TextStyle(
-              fontSize: 14,
-              color: OnisViewerConstants.textColor,
-            ),
-          ),
-        ],
-      ),
+    // Always show the study list, but with different header based on selection
+    return StudyListView(
+      studies: _controller.studies,
+      selectedStudies: _controller.selectedStudies,
+      onStudySelected: (study) => _controller.selectStudy(study),
+      onStudiesSelected: (studies) => _controller.selectStudies(studies),
+      isCtrlPressed: _isCtrlPressed,
+      isShiftPressed: _isShiftPressed,
+      onRefreshStudies: () {
+        // TODO: Implement refresh studies
+        debugPrint('Refresh studies');
+      },
+      onAddStudy: () {
+        // TODO: Implement add study
+        debugPrint('Add study');
+      },
     );
   }
 

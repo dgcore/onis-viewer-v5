@@ -40,6 +40,7 @@ dependencies:
 
   # Path utilities for plugin management
   path: ^1.9.0
+  flutter_advanced_table: ^1.1.5
 
 dev_dependencies:
   flutter_test:
