@@ -7,6 +7,7 @@ import 'package:path/path.dart' as path;
 import '../../core/constants.dart';
 import '../../core/plugin_interface.dart';
 import '../../plugins/database/database_plugin.dart';
+import '../../plugins/sources/site-server/site_server_plugin.dart';
 import '../../plugins/viewer/viewer_plugin.dart';
 
 /// Observer interface for plugin manager changes
@@ -79,6 +80,11 @@ class PluginManager {
       final viewerPlugin = ViewerPlugin();
       await registerPlugin(viewerPlugin);
       _builtinPlugins.add(viewerPlugin);
+
+      // Site Server plugin
+      final siteServerPlugin = SiteServerPlugin();
+      await registerPlugin(siteServerPlugin);
+      _builtinPlugins.add(siteServerPlugin);
 
       debugPrint(
           'Built-in plugins initialized: ${_builtinPlugins.length} plugins');
