@@ -1,9 +1,14 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../../api/core/ov_api_core.dart';
 import '../../../core/constants.dart';
+import '../../../core/database_source.dart';
 import '../../../pages/base/base_page.dart';
 import '../database_plugin.dart';
+import '../public/database_api.dart';
 import '../ui/database_source_bar.dart';
 import '../ui/database_toolbar.dart';
 import '../ui/resizable_source_bar.dart';
@@ -28,16 +33,24 @@ class _DatabasePageState extends BasePageState<DatabasePage> {
   bool _isCtrlPressed = false;
   bool _isShiftPressed = false;
   final FocusNode _keyboardFocusNode = FocusNode();
+  DatabaseApi? _dbApi;
+  StreamSubscription<DatabaseSource?>? _selectionSub;
 
   @override
   Future<void> initializePage() async {
     _controller = DatabaseController();
     await _controller.initialize();
+    _dbApi = OVApi().plugins.getPublicApi<DatabaseApi>('onis_database_plugin');
+    _selectionSub = _dbApi?.onSelectionChanged.listen((_) {
+      if (!mounted) return;
+      setState(() {});
+    });
   }
 
   @override
   Future<void> disposePage() async {
     await _controller.dispose();
+    await _selectionSub?.cancel();
   }
 
   @override
@@ -110,10 +123,9 @@ class _DatabasePageState extends BasePageState<DatabasePage> {
           minWidth: 250,
           maxWidth: 500,
           child: DatabaseSourceBar(
-            controller: _controller,
-            selectedSource: null, // TODO: Add selected source tracking
+            selectedSource: null,
             onSourceSelected: (source) {
-              // TODO: Handle source selection
+              _dbApi?.selectSourceByUid(source.uid);
             },
             onAddSource: () {
               // TODO: Handle add source
@@ -184,6 +196,23 @@ class _DatabasePageState extends BasePageState<DatabasePage> {
 
   @override
   String getPageStatus() {
-    return 'Database: ${_controller.selectedDatabase?.name ?? 'None selected'}';
+    final dbApi =
+        OVApi().plugins.getPublicApi<DatabaseApi>('onis_database_plugin');
+    final selected = dbApi?.selectedSource;
+    if (selected == null) {
+      return 'Database: None selected';
+    }
+    final path = _buildSourcePath(selected);
+    return 'Database: $path';
+  }
+
+  String _buildSourcePath(DatabaseSource source) {
+    final segments = <String>[];
+    DatabaseSource? current = source;
+    while (current != null) {
+      segments.insert(0, current.name);
+      current = current.parent;
+    }
+    return segments.join(' > ');
   }
 }

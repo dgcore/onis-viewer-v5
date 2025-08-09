@@ -1,12 +1,10 @@
 import 'package:flutter/material.dart';
 
+import '../../../api/core/ov_api_core.dart';
 import '../../../core/constants.dart';
 import '../../../core/database_source.dart';
-import '../page/database_controller.dart';
 
-/// Database source bar that displays database sources in a hierarchical structure
-class DatabaseSourceBar extends StatelessWidget {
-  final DatabaseController controller;
+class DatabaseSourceBar extends StatefulWidget {
   final DatabaseSource? selectedSource;
   final ValueChanged<DatabaseSource>? onSourceSelected;
   final VoidCallback? onAddSource;
@@ -14,7 +12,6 @@ class DatabaseSourceBar extends StatelessWidget {
 
   const DatabaseSourceBar({
     super.key,
-    required this.controller,
     this.selectedSource,
     this.onSourceSelected,
     this.onAddSource,
@@ -22,27 +19,53 @@ class DatabaseSourceBar extends StatelessWidget {
   });
 
   @override
+  State<DatabaseSourceBar> createState() => _DatabaseSourceBarState();
+}
+
+class _DatabaseSourceBarState extends State<DatabaseSourceBar> {
+  final OVApi _api = OVApi();
+  late final DatabaseSourceManager _manager;
+  final Set<String> _expanded = <String>{};
+  DatabaseSource? _selected;
+
+  @override
+  void initState() {
+    super.initState();
+    _manager = _api.sources;
+    _selected = widget.selectedSource;
+    _manager.addListener(_onManagerChanged);
+  }
+
+  @override
+  void didUpdateWidget(covariant DatabaseSourceBar oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Only override local selection if parent provides a non-null selection
+    if (widget.selectedSource != null && widget.selectedSource != _selected) {
+      _selected = widget.selectedSource;
+    }
+  }
+
+  void _onManagerChanged() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void dispose() {
+    _manager.removeListener(_onManagerChanged);
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Column(
       children: [
-        // Header
         _buildHeader(),
-
-        // Search bar
-        _buildSearchBar(),
-
-        // Sources tree
-        Expanded(
-          child: _buildSourcesTree(),
-        ),
-
-        // Footer actions
+        Expanded(child: _buildSourcesTree()),
         _buildFooter(),
       ],
     );
   }
 
-  /// Build the header section
   Widget _buildHeader() {
     return Container(
       height: 50,
@@ -77,7 +100,7 @@ class DatabaseSourceBar extends StatelessWidget {
             ),
           ),
           IconButton(
-            onPressed: onRefreshSources,
+            onPressed: widget.onRefreshSources,
             icon: const Icon(
               Icons.refresh,
               color: OnisViewerConstants.textSecondaryColor,
@@ -85,13 +108,10 @@ class DatabaseSourceBar extends StatelessWidget {
             ),
             tooltip: 'Refresh sources',
             padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(
-              minWidth: 32,
-              minHeight: 32,
-            ),
+            constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
           ),
           IconButton(
-            onPressed: onAddSource,
+            onPressed: widget.onAddSource,
             icon: const Icon(
               Icons.add,
               color: OnisViewerConstants.textSecondaryColor,
@@ -99,168 +119,98 @@ class DatabaseSourceBar extends StatelessWidget {
             ),
             tooltip: 'Add source',
             padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(
-              minWidth: 32,
-              minHeight: 32,
-            ),
+            constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
           ),
         ],
       ),
     );
   }
 
-  /// Build the search bar
-  Widget _buildSearchBar() {
-    return Container(
-      padding: const EdgeInsets.all(OnisViewerConstants.paddingMedium),
-      decoration: BoxDecoration(
-        color: OnisViewerConstants.surfaceColor,
-        border: Border(
-          bottom: BorderSide(
-            color: OnisViewerConstants.tabButtonColor,
-            width: 1,
-          ),
-        ),
-      ),
-      child: TextField(
-        decoration: InputDecoration(
-          hintText: 'Search sources...',
-          hintStyle: const TextStyle(
-            color: OnisViewerConstants.textSecondaryColor,
-            fontSize: 14,
-          ),
-          prefixIcon: const Icon(
-            Icons.search,
-            color: OnisViewerConstants.textSecondaryColor,
-            size: 18,
-          ),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(8),
-            borderSide: BorderSide(
-              color: OnisViewerConstants.tabButtonColor,
-            ),
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(8),
-            borderSide: BorderSide(
-              color: OnisViewerConstants.tabButtonColor,
-            ),
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(8),
-            borderSide: BorderSide(
-              color: OnisViewerConstants.primaryColor,
-            ),
-          ),
-          contentPadding: const EdgeInsets.symmetric(
-            horizontal: OnisViewerConstants.paddingMedium,
-            vertical: OnisViewerConstants.paddingSmall,
-          ),
-        ),
-        style: const TextStyle(
-          color: OnisViewerConstants.textColor,
-          fontSize: 14,
-        ),
-        onChanged: (value) {
-          // TODO: Implement search functionality
-        },
-      ),
-    );
-  }
-
-  /// Build the sources tree
   Widget _buildSourcesTree() {
-    // TODO: Replace with actual DatabaseSourceManager data
-    // For now, using mock data
-    return ListView.builder(
+    final roots = _manager.rootSources;
+    if (roots.isEmpty) {
+      return const Center(
+        child: Text(
+          'No sources',
+          style: TextStyle(color: OnisViewerConstants.textSecondaryColor),
+        ),
+      );
+    }
+    return ListView(
       padding: EdgeInsets.zero,
-      itemCount: controller.databases.length,
-      itemBuilder: (context, index) {
-        final database = controller.databases[index];
-        return _buildSourceItem(database, 0);
-      },
+      children: [
+        for (final source in roots) _buildSourceNode(source, depth: 0),
+      ],
     );
   }
 
-  /// Build a source item
-  Widget _buildSourceItem(dynamic source, int depth) {
-    final isSelected = selectedSource?.uid == source.id;
-    final hasChildren =
-        source is Database && source.type == 'DICOM'; // Mock logic
+  Widget _buildSourceNode(DatabaseSource source, {required int depth}) {
+    final isSelected = _selected?.uid == source.uid;
+    final isExpanded = _expanded.contains(source.uid);
+    final hasChildren = source.subSources.isNotEmpty;
 
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         ListTile(
+          dense: true,
           contentPadding: EdgeInsets.only(
             left: OnisViewerConstants.paddingMedium + (depth * 20),
             right: OnisViewerConstants.paddingMedium,
           ),
-          leading: Icon(
-            _getSourceIcon(source),
-            color: isSelected
-                ? OnisViewerConstants.primaryColor
-                : OnisViewerConstants.textSecondaryColor,
-            size: 20,
-          ),
+          leading: hasChildren
+              ? IconButton(
+                  iconSize: 18,
+                  padding: EdgeInsets.zero,
+                  visualDensity: VisualDensity.compact,
+                  onPressed: () {
+                    setState(() {
+                      if (isExpanded) {
+                        _expanded.remove(source.uid);
+                      } else {
+                        _expanded.add(source.uid);
+                      }
+                    });
+                  },
+                  icon: Icon(
+                    isExpanded
+                        ? Icons.keyboard_arrow_down
+                        : Icons.keyboard_arrow_right,
+                    color: isSelected
+                        ? OnisViewerConstants.primaryColor
+                        : OnisViewerConstants.textSecondaryColor,
+                  ),
+                )
+              : const SizedBox(width: 18),
           title: Text(
             source.name,
             style: TextStyle(
               color: isSelected
                   ? OnisViewerConstants.primaryColor
                   : OnisViewerConstants.textColor,
-              fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+              fontWeight: isSelected ? FontWeight.w700 : FontWeight.normal,
               fontSize: 14,
             ),
           ),
-          subtitle: source is Database
-              ? Text(
-                  source.type,
-                  style: const TextStyle(
-                    color: OnisViewerConstants.textSecondaryColor,
-                    fontSize: 12,
-                  ),
-                )
-              : null,
           selected: isSelected,
+          selectedTileColor:
+              OnisViewerConstants.surfaceColor.withValues(alpha: 0.12),
           onTap: () {
-            if (source is Database) {
-              controller.selectDatabase(source);
-            }
-            // TODO: Handle DatabaseSource selection
+            setState(() {
+              _selected = source;
+            });
+            widget.onSourceSelected?.call(source);
           },
         ),
-
-        // Show children if expanded (mock implementation)
-        if (hasChildren && isSelected)
-          ...List.generate(
-              2,
-              (index) => _buildSourceItem(
-                    _MockSubSource('Sub-source ${index + 1}'),
-                    depth + 1,
-                  )),
+        if (hasChildren && isExpanded)
+          for (final child in source.subSources)
+            _buildSourceNode(child, depth: depth + 1),
       ],
     );
   }
 
-  /// Get the appropriate icon for a source
-  IconData _getSourceIcon(dynamic source) {
-    if (source is Database) {
-      switch (source.type) {
-        case 'DICOM':
-          return Icons.medical_services;
-        case 'SQLite':
-          return Icons.storage;
-        case 'PostgreSQL':
-          return Icons.dns;
-        default:
-          return Icons.folder;
-      }
-    }
-    return Icons.folder;
-  }
-
-  /// Build the footer section
   Widget _buildFooter() {
+    final total = _manager.allSources.length;
     return Container(
       height: 40,
       padding: const EdgeInsets.symmetric(
@@ -284,7 +234,7 @@ class DatabaseSourceBar extends StatelessWidget {
           ),
           const SizedBox(width: OnisViewerConstants.marginSmall),
           Text(
-            '${controller.databases.length} sources',
+            '$total sources',
             style: const TextStyle(
               color: OnisViewerConstants.textSecondaryColor,
               fontSize: 12,
@@ -294,10 +244,4 @@ class DatabaseSourceBar extends StatelessWidget {
       ),
     );
   }
-}
-
-/// Mock class for sub-sources (temporary)
-class _MockSubSource {
-  final String name;
-  _MockSubSource(this.name);
 }

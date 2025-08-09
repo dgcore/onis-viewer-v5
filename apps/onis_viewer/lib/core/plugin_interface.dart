@@ -45,6 +45,10 @@ abstract class OnisViewerPlugin {
   /// Returns true if the plugin is properly configured
   bool get isValid => id.isNotEmpty && name.isNotEmpty && version.isNotEmpty;
 
+  /// Optional: a public API object that can be obtained via the PluginManager
+  /// Consumers can fetch it using getPublicApi<T>(pluginId)
+  Object? get publicApi => null;
+
   @override
   String toString() =>
       'OnisViewerPlugin(id: $id, name: $name, version: $version)';
