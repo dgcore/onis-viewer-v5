@@ -33,20 +33,27 @@ class SiteServerPlugin implements OnisViewerPlugin {
   Future<void> initialize() async {
     // Future: register source types, services, and any background tasks here
     debugPrint('SiteServerPlugin initialized');
+
     // Register two site server sources
     final api = OVApi();
 
-    SiteSource siteServerSource = SiteSource(
+    final siteServerSource = SiteSource(
         uid: 'site_server_1',
         name: 'Site Server 1',
         metadata: {'type': 'site_server', 'url': 'http://localhost:8080'});
     api.sources.registerSource(siteServerSource);
 
-    siteServerSource = SiteSource(
+    final partition = SiteSource(
+        uid: 'partition_1',
+        name: 'Partition 1',
+        metadata: {'type': 'site_server', 'url': 'http://localhost:8080'});
+    api.sources.registerSource(partition, parentUid: siteServerSource.uid);
+
+    final siteServerSource2 = SiteSource(
         uid: 'site_server_2',
         name: 'Site Server 2',
         metadata: {'type': 'site_server', 'url': 'http://localhost:8080'});
-    api.sources.registerSource(siteServerSource);
+    api.sources.registerSource(siteServerSource2);
 
     debugPrint('Registered 2 site server sources');
   }
@@ -67,4 +74,7 @@ class SiteServerPlugin implements OnisViewerPlugin {
         'description': description,
         'author': author,
       };
+
+  @override
+  Object? get publicApi => null;
 }

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:core';
 
 import 'package:flutter/foundation.dart';
@@ -12,7 +13,7 @@ class DatabaseSource extends ChangeNotifier {
   String _name;
 
   /// Weak reference to the parent source (null if root)
-  final WeakReference<DatabaseSource>? _parentRef;
+  WeakReference<DatabaseSource>? _parentRef;
 
   /// List of sub-sources
   final List<DatabaseSource> _subSources = [];
@@ -223,6 +224,16 @@ class DatabaseSource extends ChangeNotifier {
   String toString() {
     return 'DatabaseSource(uid: $uid, name: $name, parent: ${parent?.uid}, subSources: ${_subSources.length})';
   }*/
+
+  /// Internal: set or clear the parent weak reference
+  void _setParentInternal(DatabaseSource? parent) {
+    final currentParent = _parentRef?.target;
+    if (identical(currentParent, parent)) {
+      return;
+    }
+    _parentRef = parent != null ? WeakReference(parent) : null;
+    notifyListeners();
+  }
 }
 
 /// Manager class for handling database sources
@@ -232,6 +243,18 @@ class DatabaseSourceManager extends ChangeNotifier {
 
   /// All sources indexed by UID for quick lookup
   final Map<String, DatabaseSource> _sourcesByUid = {};
+
+  /// Streams for registration/unregistration events
+  final StreamController<DatabaseSource> _sourceRegisteredController =
+      StreamController<DatabaseSource>.broadcast();
+  final StreamController<DatabaseSource> _sourceUnregisteredController =
+      StreamController<DatabaseSource>.broadcast();
+
+  /// Stream getters
+  Stream<DatabaseSource> get onSourceRegistered =>
+      _sourceRegisteredController.stream;
+  Stream<DatabaseSource> get onSourceUnregistered =>
+      _sourceUnregisteredController.stream;
 
   /// Get all root sources
   List<DatabaseSource> get rootSources => List.unmodifiable(_rootSources);
@@ -323,6 +346,7 @@ class DatabaseSourceManager extends ChangeNotifier {
     if (source.parent == null) {
       _rootSources.add(source);
     }
+    _sourceRegisteredController.add(source);
     notifyListeners();
   }
 
@@ -336,6 +360,7 @@ class DatabaseSourceManager extends ChangeNotifier {
     }
 
     // Add to new parent
+    source._setParentInternal(parent);
     parent._addSubSourceInternal(source);
   }
 
@@ -352,8 +377,13 @@ class DatabaseSourceManager extends ChangeNotifier {
       // Remove all descendants as well
       for (final descendant in source.allDescendants) {
         _sourcesByUid.remove(descendant.uid);
+        descendant._setParentInternal(null);
       }
 
+      // Clear parent of the removed source
+      source._setParentInternal(null);
+
+      _sourceUnregisteredController.add(source);
       notifyListeners();
     }
   }
@@ -386,6 +416,13 @@ class DatabaseSourceManager extends ChangeNotifier {
     _rootSources.clear();
     _sourcesByUid.clear();
     notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    _sourceRegisteredController.close();
+    _sourceUnregisteredController.close();
+    super.dispose();
   }
 
   /// Get sources by metadata value

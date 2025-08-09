@@ -25,6 +25,9 @@ class PluginManager {
   final StreamController<String> _logController =
       StreamController<String>.broadcast();
 
+  // Public API registry (pluginId -> api object)
+  final Map<String, Object> _publicApis = {};
+
   // Stream controllers for reactive updates
   final StreamController<OnisViewerPlugin> _pluginLoadedController =
       StreamController<OnisViewerPlugin>.broadcast();
@@ -148,6 +151,12 @@ class PluginManager {
       // Register the plugin
       _loadedPlugins[plugin.id] = plugin;
 
+      // Capture public API if provided
+      final api = plugin.publicApi;
+      if (api != null) {
+        _publicApis[plugin.id] = api;
+      }
+
       // Page types are now registered directly by plugins with PageType.register()
 
       // Notify observers
@@ -185,6 +194,7 @@ class PluginManager {
 
         // Remove the plugin
         _loadedPlugins.remove(pluginId);
+        _publicApis.remove(pluginId);
 
         // Notify observers
         _notifyPluginUnloaded(pluginId);
@@ -213,6 +223,14 @@ class PluginManager {
   /// Get a plugin by ID
   OnisViewerPlugin? getPlugin(String pluginId) {
     return _loadedPlugins[pluginId];
+  }
+
+  /// Get a plugin public API by plugin ID and type
+  T? getPublicApi<T>(String pluginId) {
+    final api = _publicApis[pluginId];
+    if (api == null) return null;
+    if (api is T) return api as T;
+    return null;
   }
 
   /// Get plugin information
@@ -383,6 +401,7 @@ class PluginManager {
 
       // Clear observers
       _observers.clear();
+      _publicApis.clear();
 
       _log('PluginManager disposed');
     } catch (e) {

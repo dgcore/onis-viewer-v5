@@ -1,7 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
+import '../../../api/core/ov_api_core.dart';
 import '../../../core/constants.dart';
+import '../../../core/database_source.dart';
 import '../models/study.dart';
+import '../public/database_api.dart';
 import 'resizable_data_table.dart';
 
 /// Study list view using resizable data table
@@ -36,6 +41,25 @@ class _StudyListViewState extends State<StudyListView> {
   int? _sortColumnIndex;
   bool _sortAscending = true;
 
+  DatabaseApi? _dbApi;
+  StreamSubscription<DatabaseSource?>? _selectionSub;
+
+  @override
+  void initState() {
+    super.initState();
+    _dbApi = OVApi().plugins.getPublicApi<DatabaseApi>('onis_database_plugin');
+    _selectionSub = _dbApi?.onSelectionChanged.listen((_) {
+      if (!mounted) return;
+      setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _selectionSub?.cancel();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Column(
@@ -54,9 +78,9 @@ class _StudyListViewState extends State<StudyListView> {
   /// Build the header section
   Widget _buildHeader() {
     return Container(
-      height: 50,
       padding: const EdgeInsets.symmetric(
         horizontal: OnisViewerConstants.paddingMedium,
+        vertical: OnisViewerConstants.paddingSmall,
       ),
       decoration: BoxDecoration(
         color: OnisViewerConstants.tabBarColor,
@@ -68,6 +92,7 @@ class _StudyListViewState extends State<StudyListView> {
         ),
       ),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           const Icon(
             Icons.medical_services,
@@ -78,6 +103,7 @@ class _StudyListViewState extends State<StudyListView> {
           Expanded(
             child: Text(
               'Studies (${widget.studies.length})',
+              overflow: TextOverflow.ellipsis,
               style: const TextStyle(
                 fontWeight: FontWeight.bold,
                 color: OnisViewerConstants.textColor,

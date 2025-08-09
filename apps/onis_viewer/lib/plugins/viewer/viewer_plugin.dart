@@ -65,4 +65,7 @@ class ViewerPlugin implements OnisViewerPlugin {
         'description': description,
         'author': author,
       };
+
+  @override
+  Object? get publicApi => null;
 }
