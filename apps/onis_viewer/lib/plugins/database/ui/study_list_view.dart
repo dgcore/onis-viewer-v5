@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 import '../../../api/core/ov_api_core.dart';
 import '../../../core/constants.dart';
 import '../../../core/database_source.dart';
+import '../../sources/site-server/site_source.dart';
+import '../../sources/site-server/ui/site_server_login_panel.dart';
 import '../models/study.dart';
 import '../public/database_api.dart';
 import 'resizable_data_table.dart';
@@ -62,14 +64,17 @@ class _StudyListViewState extends State<StudyListView> {
 
   @override
   Widget build(BuildContext context) {
+    final selected = _dbApi?.selectedSource;
+    final shouldShowLogin = selected is SiteSource && !selected.isActive;
+
     return Column(
       children: [
         // Header
         _buildHeader(),
 
-        // Study table
+        // Content
         Expanded(
-          child: _buildStudyTable(),
+          child: shouldShowLogin ? _buildLoginPanel() : _buildStudyTable(),
         ),
       ],
     );
@@ -92,7 +97,6 @@ class _StudyListViewState extends State<StudyListView> {
         ),
       ),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           const Icon(
             Icons.medical_services,
@@ -141,6 +145,27 @@ class _StudyListViewState extends State<StudyListView> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildLoginPanel() {
+    return SiteServerLoginPanel(
+      onLogin: () {
+        final selected = _dbApi?.selectedSource;
+        if (selected is SiteSource) {
+          // For now, just mark as active to simulate a successful login
+          setState(() {
+            selected.isActive = true;
+          });
+        }
+      },
+      onShowProperties: () {
+        // TODO: Show properties dialog/page for the site server
+        // Placeholder: Snackbar
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Show Site Server properties')),
+        );
+      },
     );
   }
 
