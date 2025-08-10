@@ -22,7 +22,7 @@ class OnisTabBar extends StatelessWidget {
     return SizedBox(
       height: OnisViewerConstants.tabButtonHeight,
       child: Row(
-        mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: MainAxisAlignment.center,
         children: availablePages.map((pageType) {
           final isSelected = currentPage == pageType;
           return Padding(

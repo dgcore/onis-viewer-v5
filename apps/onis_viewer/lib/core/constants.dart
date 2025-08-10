@@ -15,8 +15,8 @@ class OnisViewerConstants {
   static const double minWindowHeight = 600.0;
 
   // UI dimensions
-  static const double statusBarHeight = 50.0;
-  static const double tabButtonHeight = 40.0;
+  static const double statusBarHeight = 30.0;
+  static const double tabButtonHeight = 30.0;
   static const double tabButtonWidth = 120.0;
   static const double windowControlSize = 30.0;
   static const double windowTitleBarHeight = 32.0;
