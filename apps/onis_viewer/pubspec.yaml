@@ -41,6 +41,7 @@ dependencies:
   # Path utilities for plugin management
   path: ^1.9.0
   flutter_advanced_table: ^1.1.5
+  flutter_secure_storage: ^9.2.2
 
 dev_dependencies:
   flutter_test:

@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:core';
 
-import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 
 /// Represents a database source with hierarchical structure
 /// Each source can have sub-sources and maintains a weak reference to its parent
@@ -98,87 +98,15 @@ class DatabaseSource extends ChangeNotifier {
     }
   }
 
-  /// Remove a sub-source by its UID
-  /*void removeSubSourceByUid(String uid) {
-    _subSources.removeWhere((source) => source.uid == uid);
-    notifyListeners();
-  }*/
+  /// Optional UI panel for authentication/login when the source is inactive
+  /// Default is null; plugins can override to provide a custom panel.
+  /// When provided and [isActive] is false, the application may render this
+  /// panel instead of the normal content area.
+  Widget? buildLoginPanel(BuildContext context) => null;
 
-  /// Find a sub-source by its UID
-  /*DatabaseSource? findSubSourceByUid(String uid) {
-    return _subSources.where((source) => source.uid == uid).firstOrNull;
-  }*/
-
-  /// Add metadata to this source
-  /*void setMetadata(String key, dynamic value) {
-    _metadata[key] = value;
-    notifyListeners();
-  }
-
-  /// Get metadata value by key
-  dynamic getMetadata(String key) {
-    return _metadata[key];
-  }
-
-  /// Remove metadata by key
-  void removeMetadata(String key) {
-    if (_metadata.remove(key) != null) {
-      notifyListeners();
-    }
-  }*/
-
-  /// Get the root source (traverse up the hierarchy)
-  /*DatabaseSource get root {
-    DatabaseSource current = this;
-    while (current.parent != null) {
-      current = current.parent!;
-    }
-    return current;
-  }
-
-  /// Get the depth of this source in the hierarchy (0 for root)
-  int get depth {
-    int depth = 0;
-    DatabaseSource? current = parent;
-    while (current != null) {
-      depth++;
-      current = current.parent;
-    }
-    return depth;
-  }
-
-  /// Get the full path of this source (from root to this source)
-  List<DatabaseSource> get path {
-    final path = <DatabaseSource>[];
-    DatabaseSource? current = this;
-    while (current != null) {
-      path.insert(0, current);
-      current = current.parent;
-    }
-    return path;
-  }
-
-  /// Get the full path as a string (using names)
-  String get pathString {
-    return path.map((source) => source.name).join(' > ');
-  }
-
-  /// Check if this source is a descendant of the given source
-  bool isDescendantOf(DatabaseSource ancestor) {
-    DatabaseSource? current = parent;
-    while (current != null) {
-      if (current == ancestor) {
-        return true;
-      }
-      current = current.parent;
-    }
-    return false;
-  }
-
-  /// Check if this source is an ancestor of the given source
-  bool isAncestorOf(DatabaseSource descendant) {
-    return descendant.isDescendantOf(this);
-  }*/
+  /// Optional UI panel for connection/properties (e.g., URL, instance name)
+  /// Default is null; plugins can override to provide a custom panel.
+  Widget? buildConnectionPanel(BuildContext context) => null;
 
   /// Get all descendants of this source (recursive)
   List<DatabaseSource> get allDescendants {
@@ -188,6 +116,16 @@ class DatabaseSource extends ChangeNotifier {
       descendants.addAll(subSource.allDescendants);
     }
     return descendants;
+  }
+
+  /// Internal: set or clear the parent weak reference
+  void _setParentInternal(DatabaseSource? parent) {
+    final currentParent = _parentRef?.target;
+    if (identical(currentParent, parent)) {
+      return;
+    }
+    _parentRef = parent != null ? WeakReference(parent) : null;
+    notifyListeners();
   }
 
   /// Get all sources in the subtree (including this source)
@@ -224,16 +162,6 @@ class DatabaseSource extends ChangeNotifier {
   String toString() {
     return 'DatabaseSource(uid: $uid, name: $name, parent: ${parent?.uid}, subSources: ${_subSources.length})';
   }*/
-
-  /// Internal: set or clear the parent weak reference
-  void _setParentInternal(DatabaseSource? parent) {
-    final currentParent = _parentRef?.target;
-    if (identical(currentParent, parent)) {
-      return;
-    }
-    _parentRef = parent != null ? WeakReference(parent) : null;
-    notifyListeners();
-  }
 }
 
 /// Manager class for handling database sources
