@@ -394,25 +394,24 @@ class _SiteServerLoginPanelState extends State<SiteServerLoginPanel>
           mainAxisSize: MainAxisSize.min,
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            if (isLoading) ...[
+            if (isLoading)
               SizedBox(
-                width: 16,
-                height: 16,
+                width: 20,
+                height: 20,
                 child: CircularProgressIndicator(
                   strokeWidth: 2,
                   valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
                 ),
+              )
+            else
+              Text(
+                label,
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.3,
+                ),
               ),
-              const SizedBox(width: 10),
-            ],
-            Text(
-              label,
-              style: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 0.3,
-              ),
-            ),
           ],
         ),
       ),

@@ -3,6 +3,9 @@ import 'dart:core';
 
 import 'package:flutter/widgets.dart';
 
+// Note: SiteSource import removed to avoid circular dependency
+// We'll use runtime type checking instead
+
 /// Represents a database source with hierarchical structure
 /// Each source can have sub-sources and maintains a weak reference to its parent
 class DatabaseSource extends ChangeNotifier {
@@ -316,6 +319,39 @@ class DatabaseSourceManager extends ChangeNotifier {
     }
   }
 
+  /// Remove a source from the manager, disconnecting it first if needed
+  /// Returns a Future that completes when the source is fully removed
+  Future<void> removeSourceWithDisconnect(DatabaseSource source) async {
+    // Check if source needs disconnection
+    if (source.isActive) {
+      try {
+        // Use dynamic casting to avoid circular dependency
+        final dynamic dynamicSource = source;
+        if (dynamicSource.disconnect != null) {
+          await dynamicSource.disconnect();
+        } else {
+          debugPrint(
+              'Disconnect not implemented for source type ${source.runtimeType}');
+        }
+      } catch (e) {
+        // Log error but continue with removal
+        debugPrint('Failed to disconnect source ${source.uid}: $e');
+      }
+    }
+
+    // Now remove the source
+    removeSource(source);
+  }
+
+  /// Remove a source by UID, disconnecting it first if needed
+  /// Returns a Future that completes when the source is fully removed
+  Future<void> removeSourceByUidWithDisconnect(String uid) async {
+    final source = _sourcesByUid[uid];
+    if (source != null) {
+      await removeSourceWithDisconnect(source);
+    }
+  }
+
   /// Remove a source by UID
   /*void removeSourceByUid(String uid) {
     final source = _sourcesByUid[uid];
@@ -344,6 +380,36 @@ class DatabaseSourceManager extends ChangeNotifier {
     _rootSources.clear();
     _sourcesByUid.clear();
     notifyListeners();
+  }
+
+  /// Clean exit: disconnect all active sources before clearing
+  /// Returns a Future that completes when all sources are properly disconnected
+  Future<void> cleanExit() async {
+    final activeSources =
+        _sourcesByUid.values.where((source) => source.isActive).toList();
+
+    // Disconnect all active sources concurrently
+    final disconnectFutures = activeSources.map((source) async {
+      try {
+        // Use dynamic casting to avoid circular dependency
+        final dynamic dynamicSource = source;
+        if (dynamicSource.disconnect != null) {
+          await dynamicSource.disconnect();
+        } else {
+          debugPrint(
+              'Disconnect not implemented for source type ${source.runtimeType}');
+        }
+      } catch (e) {
+        debugPrint(
+            'Failed to disconnect source ${source.uid} during clean exit: $e');
+      }
+    });
+
+    // Wait for all disconnections to complete
+    await Future.wait(disconnectFutures);
+
+    // Now clear all sources
+    clear();
   }
 
   @override
