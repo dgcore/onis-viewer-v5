@@ -206,10 +206,15 @@ class _DatabasePageState extends BasePageState<DatabasePage> {
       username: username,
       isDisconnecting: isDisconnecting,
       onDisconnect: () {
+        debugPrint('Disconnect button clicked');
         if (selected is SiteSource) {
+          debugPrint('Selected source is SiteSource, calling disconnect');
           selected.disconnect().catchError((error) {
             debugPrint('Disconnect failed: $error');
           });
+        } else {
+          debugPrint(
+              'Selected source is not SiteSource: ${selected.runtimeType}');
         }
       },
     );

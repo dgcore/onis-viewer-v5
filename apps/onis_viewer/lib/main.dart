@@ -1,6 +1,6 @@
-import 'package:flutter/material.dart';
+import "package:flutter/material.dart";
 
-import 'app/onis_viewer_app.dart';
+import "app/onis_viewer_app.dart";
 
 void main() {
   runApp(const OnisViewerApp());

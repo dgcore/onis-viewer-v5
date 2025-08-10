@@ -45,10 +45,20 @@ class OVApi {
 
   /// Dispose the API and all modules
   Future<void> dispose() async {
-    // Dispose modules (they will handle their own stream disposal)
     await _pageManager.dispose();
     await _pluginManager.dispose();
-
+    // await _basePluginManager.dispose(); // Removed
     debugPrint('OVApi disposed');
+  }
+
+  /// Clean exit: disconnect all sources before disposing
+  /// This should be called during application shutdown
+  Future<void> cleanExit() async {
+    try {
+      await _databaseSourceManager.cleanExit();
+      debugPrint('OVApi clean exit completed');
+    } catch (e) {
+      debugPrint('Error during OVApi clean exit: $e');
+    }
   }
 }

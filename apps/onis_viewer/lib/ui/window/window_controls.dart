@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../core/constants.dart';
+import '../../app/onis_viewer_app.dart';
 
 /// Window control buttons (minimize, maximize, close)
 class WindowControls extends StatelessWidget {
@@ -95,8 +96,12 @@ class WindowControls extends StatelessWidget {
 
   /// Close the window
   void _closeWindow() {
-    // In a real implementation, this would close the application
-    // For now, we'll just log the action
-    debugPrint('Close window');
+    debugPrint('Close window button clicked - triggering clean exit');
+    // Directly trigger clean exit and wait for completion
+    OnisViewerApp.quitWithCleanExit().then((_) {
+      debugPrint('Clean exit completed from close button');
+    }).catchError((error) {
+      debugPrint('Error during clean exit from close button: $error');
+    });
   }
 }

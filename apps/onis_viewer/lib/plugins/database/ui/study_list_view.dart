@@ -47,7 +47,41 @@ class _StudyListViewState extends State<StudyListView> {
 
         // Study table
         Expanded(
-          child: _buildStudyTable(),
+          child: Stack(
+            children: [
+              _buildStudyTable(),
+              // Overlay to block interactions when disconnecting
+              if (widget.isDisconnecting)
+                Container(
+                  color: Colors.black.withOpacity(0.3),
+                  child: Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        SizedBox(
+                          width: 150,
+                          child: Container(
+                            margin: EdgeInsets.symmetric(vertical: 8.0),
+                            padding: EdgeInsets.all(4.0),
+                            decoration: BoxDecoration(
+                              color: OnisViewerConstants.surfaceColor,
+                              border: Border.all(
+                                color: OnisViewerConstants.primaryColor,
+                                width: 1.0,
+                              ),
+                              borderRadius: BorderRadius.circular(4.0),
+                            ),
+                            child: LinearProgressIndicator(
+                              color: OnisViewerConstants.primaryColor,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+            ],
+          ),
         ),
       ],
     );
@@ -61,7 +95,9 @@ class _StudyListViewState extends State<StudyListView> {
         vertical: OnisViewerConstants.paddingSmall,
       ),
       decoration: BoxDecoration(
-        color: OnisViewerConstants.tabBarColor,
+        color: widget.isDisconnecting
+            ? OnisViewerConstants.tabBarColor.withOpacity(0.5)
+            : OnisViewerConstants.tabBarColor,
         border: Border(
           bottom: BorderSide(
             color: OnisViewerConstants.tabButtonColor,
@@ -81,9 +117,11 @@ class _StudyListViewState extends State<StudyListView> {
             child: Text(
               'Studies (${widget.studies.length})',
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
+              style: TextStyle(
                 fontWeight: FontWeight.bold,
-                color: OnisViewerConstants.textColor,
+                color: widget.isDisconnecting
+                    ? OnisViewerConstants.textSecondaryColor
+                    : OnisViewerConstants.textColor,
                 fontSize: 16,
               ),
             ),
@@ -99,7 +137,22 @@ class _StudyListViewState extends State<StudyListView> {
             const SizedBox(width: 8),
           ],
           IconButton(
-            onPressed: widget.isDisconnecting ? null : widget.onDisconnect,
+            // Debug: Log button state
+            onPressed: () {
+              debugPrint(
+                  'Disconnect button state - isDisconnecting: ${widget.isDisconnecting}');
+              if (widget.isDisconnecting) {
+                debugPrint('Button is disabled due to isDisconnecting');
+                return;
+              }
+              debugPrint('Disconnect IconButton pressed');
+              if (widget.onDisconnect != null) {
+                debugPrint('Calling onDisconnect callback');
+                widget.onDisconnect!();
+              } else {
+                debugPrint('onDisconnect callback is null');
+              }
+            },
             icon: widget.isDisconnecting
                 ? SizedBox(
                     width: 16,
@@ -155,22 +208,25 @@ class _StudyListViewState extends State<StudyListView> {
     return ResizableDataTable(
       studies: sortedStudies,
       selectedStudies: widget.selectedStudies,
-      onStudySelected: widget.onStudySelected,
-      onStudiesSelected: widget.onStudiesSelected,
+      onStudySelected: widget.isDisconnecting ? null : widget.onStudySelected,
+      onStudiesSelected:
+          widget.isDisconnecting ? null : widget.onStudiesSelected,
       isCtrlPressed: widget.isCtrlPressed,
       isShiftPressed: widget.isShiftPressed,
       sortColumnIndex: _sortColumnIndex,
       sortAscending: _sortAscending,
-      onSort: (columnIndex) {
-        setState(() {
-          if (_sortColumnIndex == columnIndex) {
-            _sortAscending = !_sortAscending;
-          } else {
-            _sortColumnIndex = columnIndex;
-            _sortAscending = true;
-          }
-        });
-      },
+      onSort: widget.isDisconnecting
+          ? null
+          : (columnIndex) {
+              setState(() {
+                if (_sortColumnIndex == columnIndex) {
+                  _sortAscending = !_sortAscending;
+                } else {
+                  _sortColumnIndex = columnIndex;
+                  _sortAscending = true;
+                }
+              });
+            },
     );
   }
 }
