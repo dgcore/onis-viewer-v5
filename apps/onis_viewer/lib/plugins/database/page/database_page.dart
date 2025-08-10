@@ -7,6 +7,7 @@ import '../../../api/core/ov_api_core.dart';
 import '../../../core/constants.dart';
 import '../../../core/database_source.dart';
 import '../../../pages/base/base_page.dart';
+import '../../sources/site-server/site_source.dart';
 import '../database_plugin.dart';
 import '../public/database_api.dart';
 import '../ui/database_source_bar.dart';
@@ -30,19 +31,32 @@ class DatabasePage extends BasePage {
 
 class _DatabasePageState extends BasePageState<DatabasePage> {
   late DatabaseController _controller;
+  final FocusNode _keyboardFocusNode = FocusNode();
   bool _isCtrlPressed = false;
   bool _isShiftPressed = false;
-  final FocusNode _keyboardFocusNode = FocusNode();
+
   DatabaseApi? _dbApi;
   StreamSubscription<DatabaseSource?>? _selectionSub;
+  DatabaseSource? _selectedSource;
+  VoidCallback? _sourceListener;
 
   @override
   Future<void> initializePage() async {
     _controller = DatabaseController();
     await _controller.initialize();
     _dbApi = OVApi().plugins.getPublicApi<DatabaseApi>('onis_database_plugin');
-    _selectionSub = _dbApi?.onSelectionChanged.listen((_) {
+    _selectionSub = _dbApi?.onSelectionChanged.listen((source) {
       if (!mounted) return;
+      // Remove listener from previous source
+      _selectedSource?.removeListener(_sourceListener!);
+      _selectedSource = source;
+      // Add listener to new source
+      if (source != null) {
+        _sourceListener = () {
+          if (mounted) setState(() {});
+        };
+        source.addListener(_sourceListener!);
+      }
       setState(() {});
     });
   }
@@ -51,6 +65,7 @@ class _DatabasePageState extends BasePageState<DatabasePage> {
   Future<void> disposePage() async {
     await _controller.dispose();
     await _selectionSub?.cancel();
+    _selectedSource?.removeListener(_sourceListener!);
   }
 
   @override
@@ -91,7 +106,7 @@ class _DatabasePageState extends BasePageState<DatabasePage> {
                 });
               }
             }
-            return KeyEventResult.handled;
+            return KeyEventResult.ignored;
           },
           child: _buildContent(),
         );
@@ -115,6 +130,14 @@ class _DatabasePageState extends BasePageState<DatabasePage> {
 
   /// Build the main content area
   Widget _buildContent() {
+    final selected = _dbApi?.selectedSource;
+    final loginPanel =
+        selected?.isActive == false ? selected?.buildLoginPanel(context) : null;
+
+    final rightPanel = selected == null
+        ? _buildNoSelectionPlaceholder()
+        : (loginPanel ?? _buildDatabaseDetails());
+
     return Row(
       children: [
         // Resizable source bar (left panel)
@@ -136,20 +159,43 @@ class _DatabasePageState extends BasePageState<DatabasePage> {
           ),
         ),
 
-        // Spacing between source bar and study list
+        // Spacing between source bar and right panel
         const SizedBox(width: OnisViewerConstants.paddingMedium),
 
-        // Database details (right panel)
-        Expanded(
-          child: _buildDatabaseDetails(),
-        ),
+        // Right panel
+        Expanded(child: rightPanel),
       ],
+    );
+  }
+
+  Widget _buildNoSelectionPlaceholder() {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: const [
+          Icon(Icons.folder_open_outlined,
+              size: 40, color: OnisViewerConstants.textSecondaryColor),
+          SizedBox(height: 8),
+          Text(
+            'No source selected',
+            style: TextStyle(
+              color: OnisViewerConstants.textSecondaryColor,
+              fontSize: 14,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
   /// Build the database details panel
   Widget _buildDatabaseDetails() {
     // Always show the study list, but with different header based on selection
+    final selected = _dbApi?.selectedSource;
+    final username = selected is SiteSource ? selected.currentUsername : null;
+    final isDisconnecting =
+        selected is SiteSource ? selected.isDisconnecting : false;
+
     return StudyListView(
       studies: _controller.studies,
       selectedStudies: _controller.selectedStudies,
@@ -157,13 +203,14 @@ class _DatabasePageState extends BasePageState<DatabasePage> {
       onStudiesSelected: (studies) => _controller.selectStudies(studies),
       isCtrlPressed: _isCtrlPressed,
       isShiftPressed: _isShiftPressed,
-      onRefreshStudies: () {
-        // TODO: Implement refresh studies
-        debugPrint('Refresh studies');
-      },
-      onAddStudy: () {
-        // TODO: Implement add study
-        debugPrint('Add study');
+      username: username,
+      isDisconnecting: isDisconnecting,
+      onDisconnect: () {
+        if (selected is SiteSource) {
+          selected.disconnect().catchError((error) {
+            debugPrint('Disconnect failed: $error');
+          });
+        }
       },
     );
   }

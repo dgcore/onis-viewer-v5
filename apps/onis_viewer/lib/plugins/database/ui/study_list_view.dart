@@ -1,14 +1,7 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 
-import '../../../api/core/ov_api_core.dart';
 import '../../../core/constants.dart';
-import '../../../core/database_source.dart';
-import '../../sources/site-server/site_source.dart';
-import '../../sources/site-server/ui/site_server_login_panel.dart';
 import '../models/study.dart';
-import '../public/database_api.dart';
 import 'resizable_data_table.dart';
 
 /// Study list view using resizable data table
@@ -20,8 +13,9 @@ class StudyListView extends StatefulWidget {
       onStudiesSelected; // New callback for multi-selection
   final bool isCtrlPressed; // Keyboard modifier state
   final bool isShiftPressed; // Keyboard modifier state
-  final VoidCallback? onAddStudy;
-  final VoidCallback? onRefreshStudies;
+  final String? username; // Current logged-in username
+  final VoidCallback? onDisconnect; // Disconnect callback
+  final bool isDisconnecting; // Whether currently disconnecting
 
   const StudyListView({
     super.key,
@@ -31,8 +25,9 @@ class StudyListView extends StatefulWidget {
     this.onStudiesSelected, // New callback
     this.isCtrlPressed = false,
     this.isShiftPressed = false,
-    this.onAddStudy,
-    this.onRefreshStudies,
+    this.username,
+    this.onDisconnect,
+    this.isDisconnecting = false,
   });
 
   @override
@@ -43,38 +38,16 @@ class _StudyListViewState extends State<StudyListView> {
   int? _sortColumnIndex;
   bool _sortAscending = true;
 
-  DatabaseApi? _dbApi;
-  StreamSubscription<DatabaseSource?>? _selectionSub;
-
-  @override
-  void initState() {
-    super.initState();
-    _dbApi = OVApi().plugins.getPublicApi<DatabaseApi>('onis_database_plugin');
-    _selectionSub = _dbApi?.onSelectionChanged.listen((_) {
-      if (!mounted) return;
-      setState(() {});
-    });
-  }
-
-  @override
-  void dispose() {
-    _selectionSub?.cancel();
-    super.dispose();
-  }
-
   @override
   Widget build(BuildContext context) {
-    final selected = _dbApi?.selectedSource;
-    final shouldShowLogin = selected is SiteSource && !selected.isActive;
-
     return Column(
       children: [
         // Header
         _buildHeader(),
 
-        // Content
+        // Study table
         Expanded(
-          child: shouldShowLogin ? _buildLoginPanel() : _buildStudyTable(),
+          child: _buildStudyTable(),
         ),
       ],
     );
@@ -115,28 +88,34 @@ class _StudyListViewState extends State<StudyListView> {
               ),
             ),
           ),
+          if (widget.username != null) ...[
+            Text(
+              'Logged in as: ${widget.username}',
+              style: const TextStyle(
+                color: OnisViewerConstants.textSecondaryColor,
+                fontSize: 12,
+              ),
+            ),
+            const SizedBox(width: 8),
+          ],
           IconButton(
-            onPressed: widget.onRefreshStudies,
-            icon: const Icon(
-              Icons.refresh,
-              color: OnisViewerConstants.textSecondaryColor,
-              size: 18,
-            ),
-            tooltip: 'Refresh studies',
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(
-              minWidth: 32,
-              minHeight: 32,
-            ),
-          ),
-          IconButton(
-            onPressed: widget.onAddStudy,
-            icon: const Icon(
-              Icons.add,
-              color: OnisViewerConstants.textSecondaryColor,
-              size: 18,
-            ),
-            tooltip: 'Add study',
+            onPressed: widget.isDisconnecting ? null : widget.onDisconnect,
+            icon: widget.isDisconnecting
+                ? SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: const AlwaysStoppedAnimation<Color>(
+                          OnisViewerConstants.textSecondaryColor),
+                    ),
+                  )
+                : const Icon(
+                    Icons.logout,
+                    color: OnisViewerConstants.textSecondaryColor,
+                    size: 18,
+                  ),
+            tooltip: widget.isDisconnecting ? 'Disconnecting...' : 'Disconnect',
             padding: EdgeInsets.zero,
             constraints: const BoxConstraints(
               minWidth: 32,
@@ -145,27 +124,6 @@ class _StudyListViewState extends State<StudyListView> {
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildLoginPanel() {
-    return SiteServerLoginPanel(
-      onLogin: () {
-        final selected = _dbApi?.selectedSource;
-        if (selected is SiteSource) {
-          // For now, just mark as active to simulate a successful login
-          setState(() {
-            selected.isActive = true;
-          });
-        }
-      },
-      onShowProperties: () {
-        // TODO: Show properties dialog/page for the site server
-        // Placeholder: Snackbar
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Show Site Server properties')),
-        );
-      },
     );
   }
 
