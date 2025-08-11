@@ -202,6 +202,16 @@ class _DatabasePageState extends BasePageState<DatabasePage> {
           debugPrint('No source selected for disconnect');
         }
       },
+      initialScrollPosition: selected != null
+          ? _controller.getScrollPositionForSource(selected.uid)
+          : 0.0,
+      onScrollPositionChanged: (position) {
+        debugPrint(
+            'Database page received scroll position: $position for source: ${selected?.uid}');
+        if (selected != null) {
+          _controller.saveScrollPositionForSource(selected.uid, position);
+        }
+      },
     );
   }
 

@@ -1,174 +1,139 @@
-import 'dart:math';
-
 import 'package:flutter/material.dart';
 
 import '../../../core/models/study.dart';
 
+/// Controller for database operations
 class DatabaseController extends ChangeNotifier {
-  // Studies per source: Map<sourceUid, List<Study>>
-  final Map<String, List<Study>> _studiesBySource = {};
-  // Selected studies per source: Map<sourceUid, List<Study>>
-  final Map<String, List<Study>> _selectedStudiesBySource = {};
-  // Scroll positions per source: Map<sourceUid, double>
-  final Map<String, double> _scrollPositionsBySource = {};
+  final List<Study> _studies = [];
+  final List<Study> _selectedStudies = [];
   String _searchQuery = '';
 
   // Getters
+  List<Study> get studies => _studies;
+  List<Study> get selectedStudies => _selectedStudies;
   String get searchQuery => _searchQuery;
 
-  List<Study> getStudiesForSource(String sourceUid) {
-    return _studiesBySource[sourceUid] ?? [];
-  }
-
-  List<Study> getSelectedStudiesForSource(String sourceUid) {
-    return _selectedStudiesBySource[sourceUid] ?? [];
-  }
-
-  double getScrollPositionForSource(String sourceUid) {
-    return _scrollPositionsBySource[sourceUid] ?? 0.0;
-  }
-
-  void saveScrollPositionForSource(String sourceUid, double position) {
-    _scrollPositionsBySource[sourceUid] = position;
-    debugPrint('Saved scroll position $position for source $sourceUid');
-  }
-
-  List<Study> get allStudies {
-    return _studiesBySource.values.expand((studies) => studies).toList();
-  }
-
-  int get totalStudyCount {
-    return _studiesBySource.values
-        .fold(0, (sum, studies) => sum + studies.length);
-  }
-
+  /// Initialize the controller
   Future<void> initialize() async {
-    // No dummy studies - studies will be loaded per source as needed
-    debugPrint('DatabaseController initialized');
+    // Load sample studies for demonstration
+    _studies.addAll([
+      Study(
+        id: 'ST001',
+        name: 'John Doe',
+        sex: 'M',
+        birthDate: DateTime(1985, 3, 15),
+        patientId: 'P001',
+        studyDate: '2024-01-15',
+        modality: 'CT',
+        status: 'Completed',
+      ),
+      Study(
+        id: 'ST002',
+        name: 'Jane Smith',
+        sex: 'F',
+        birthDate: DateTime(1990, 7, 22),
+        patientId: 'P002',
+        studyDate: '2024-01-16',
+        modality: 'MRI',
+        status: 'In Progress',
+      ),
+      Study(
+        id: 'ST003',
+        name: 'Bob Johnson',
+        sex: 'M',
+        birthDate: DateTime(1978, 11, 8),
+        patientId: 'P003',
+        studyDate: '2024-01-17',
+        modality: 'X-Ray',
+        status: 'Completed',
+      ),
+      Study(
+        id: 'ST004',
+        name: 'Alice Brown',
+        sex: 'F',
+        birthDate: DateTime(1995, 4, 12),
+        patientId: 'P004',
+        studyDate: '2024-01-18',
+        modality: 'Ultrasound',
+        status: 'Scheduled',
+      ),
+      Study(
+        id: 'ST005',
+        name: 'Charlie Wilson',
+        sex: 'M',
+        birthDate: DateTime(1982, 9, 30),
+        patientId: 'P005',
+        studyDate: '2024-01-19',
+        modality: 'CT',
+        status: 'Completed',
+      ),
+    ]);
   }
 
+  /// Dispose the controller
   @override
   Future<void> dispose() async {
+    // Clean up resources
     super.dispose();
   }
 
-  Future<void> loadStudiesForSource(String sourceUid) async {
-    debugPrint('Loading studies for source: $sourceUid');
-    _studiesBySource[sourceUid] = [];
-    _selectedStudiesBySource[sourceUid] = [];
-    notifyListeners();
-  }
-
-  void clearStudiesForSource(String sourceUid) {
-    _studiesBySource.remove(sourceUid);
-    _selectedStudiesBySource.remove(sourceUid);
-    notifyListeners();
-  }
-
-  void addStudiesToSource(String sourceUid, List<Study> studies) {
-    if (!_studiesBySource.containsKey(sourceUid)) {
-      _studiesBySource[sourceUid] = [];
-    }
-    _studiesBySource[sourceUid]!.addAll(studies);
-    notifyListeners();
-  }
-
+  /// Search studies
   void searchStudies(String query) {
     _searchQuery = query;
     debugPrint('Search studies: $query');
+    // In a real implementation, this would filter the study list
   }
 
-  void selectStudy(String sourceUid, Study study) {
-    if (!_selectedStudiesBySource.containsKey(sourceUid)) {
-      _selectedStudiesBySource[sourceUid] = [];
-    }
-    _selectedStudiesBySource[sourceUid]!.clear();
-    _selectedStudiesBySource[sourceUid]!.add(study);
-    debugPrint('Selected study: ${study.name} for source: $sourceUid');
+  /// Select a study
+  void selectStudy(Study study) {
+    _selectedStudies.clear();
+    _selectedStudies.add(study);
+    debugPrint('Selected study: ${study.name}');
     notifyListeners();
   }
 
-  void selectStudies(String sourceUid, List<Study> studies) {
-    if (!_selectedStudiesBySource.containsKey(sourceUid)) {
-      _selectedStudiesBySource[sourceUid] = [];
-    }
-    _selectedStudiesBySource[sourceUid]!.clear();
-    _selectedStudiesBySource[sourceUid]!.addAll(studies);
-    debugPrint('Selected ${studies.length} studies for source: $sourceUid');
-    notifyListeners();
-  }
-
-  void clearSelectedStudies(String sourceUid) {
-    _selectedStudiesBySource[sourceUid]?.clear();
-    notifyListeners();
-  }
-
-  Future<void> onSearch(String sourceUid) async {
-    debugPrint('Searching studies for source: $sourceUid');
-    clearStudiesForSource(sourceUid);
-
-    final dummyStudies = <Study>[];
-    final modalities = ['CT', 'MRI', 'X-Ray', 'Ultrasound', 'PET'];
-    final statuses = ['Completed', 'In Progress', 'Scheduled', 'Cancelled'];
-    final sexes = ['M', 'F'];
-    final Random random = Random(DateTime.now().millisecondsSinceEpoch);
-
-    // Generate 500 studies with random patient IDs for realistic testing
-    for (int i = 1; i <= 500; i++) {
-      final modality = modalities[i % modalities.length];
-      final status = statuses[i % statuses.length];
-      final sex = sexes[i % sexes.length];
-      final birthYear = 1950 + (i % 50);
-      final birthMonth = 1 + (i % 12);
-      final birthDay = 1 + (i % 28);
-      final studyYear = 2020 + (i % 5);
-      final studyMonth = 1 + (i % 12);
-      final studyDay = 1 + (i % 28);
-
-      dummyStudies.add(Study(
-        id: 'ST_SEARCH_${i.toString().padLeft(3, '0')}',
-        name: 'Patient ${i.toString().padLeft(3, '0')}',
-        sex: sex,
-        birthDate: DateTime(birthYear, birthMonth, birthDay),
-        patientId: 'P${(100000 + random.nextInt(900000)).toString()}',
-        studyDate:
-            '$studyYear-${studyMonth.toString().padLeft(2, '0')}-${studyDay.toString().padLeft(2, '0')}',
-        modality: modality,
-        status: status,
-      ));
-    }
-
-    addStudiesToSource(sourceUid, dummyStudies);
+  /// Select multiple studies
+  void selectStudies(List<Study> studies) {
+    _selectedStudies.clear();
+    _selectedStudies.addAll(studies);
     debugPrint(
-        'Added ${dummyStudies.length} studies from search for source: $sourceUid');
+        'Selected ${studies.length} studies: ${studies.map((s) => s.name).join(', ')}');
+    notifyListeners();
   }
 
   // Toolbar action methods
   void openPreferences() {
     debugPrint('Open preferences action');
+    // In a real implementation, this would open preferences dialog
   }
 
   void importData() {
     debugPrint('Import data action');
+    // In a real implementation, this would import data
   }
 
   void exportData() {
     debugPrint('Export data action');
+    // In a real implementation, this would export data
   }
 
   void transferData() {
     debugPrint('Transfer data action');
+    // In a real implementation, this would transfer data
   }
 
   void openDatabaseFromToolbar() {
     debugPrint('Open database action');
+    // In a real implementation, this would open a database
   }
 
   void search() {
     debugPrint('Search action');
+    // In a real implementation, this would open search dialog
   }
 
   void showSettings() {
     debugPrint('Show database settings');
+    // In a real implementation, this would show settings dialog
   }
 }

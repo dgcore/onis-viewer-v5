@@ -15,6 +15,8 @@ class ResizableDataTable extends StatefulWidget {
   final int? sortColumnIndex;
   final bool sortAscending;
   final ValueChanged<int?>? onSort;
+  final double initialScrollPosition;
+  final ValueChanged<double>? onScrollPositionChanged;
 
   const ResizableDataTable({
     super.key,
@@ -25,6 +27,8 @@ class ResizableDataTable extends StatefulWidget {
     this.sortColumnIndex,
     this.sortAscending = true,
     this.onSort,
+    this.initialScrollPosition = 0.0,
+    this.onScrollPositionChanged,
   });
 
   @override
@@ -53,10 +57,15 @@ class _ResizableDataTableState extends State<ResizableDataTable>
 
   // Selection state
   Study? _lastSelectedStudy; // Track last selected study for range selection
+  late ScrollController _scrollController;
 
   @override
   void initState() {
     super.initState();
+    _scrollController =
+        ScrollController(initialScrollOffset: widget.initialScrollPosition);
+    _scrollController.addListener(_onScrollChanged);
+
     // Add listeners to filter controllers
     for (final controller in _filterControllers) {
       controller.addListener(_onFilterChanged);
@@ -68,12 +77,26 @@ class _ResizableDataTableState extends State<ResizableDataTable>
   @override
   void dispose() {
     // Dispose filter controllers
+    _scrollController.removeListener(_onScrollChanged);
+    _scrollController.dispose();
     for (final controller in _filterControllers) {
       controller.dispose();
     }
     // Remove global keyboard listener
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
+  }
+
+  @override
+  void didUpdateWidget(ResizableDataTable oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    // If the initial scroll position changed, update the scroll controller
+    if (oldWidget.initialScrollPosition != widget.initialScrollPosition) {
+      debugPrint(
+          'Restoring scroll position to: ${widget.initialScrollPosition}');
+      _scrollController.jumpTo(widget.initialScrollPosition);
+    }
   }
 
   @override
@@ -91,6 +114,11 @@ class _ResizableDataTableState extends State<ResizableDataTable>
     setState(() {
       // Trigger rebuild when filters change
     });
+  }
+
+  void _onScrollChanged() {
+    debugPrint('Scroll position changed: ${_scrollController.offset}');
+    widget.onScrollPositionChanged?.call(_scrollController.offset);
   }
 
   /// Get filtered studies based on current filter values
@@ -169,6 +197,7 @@ class _ResizableDataTableState extends State<ResizableDataTable>
               child: SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
                 child: SingleChildScrollView(
+                  controller: _scrollController,
                   child: SizedBox(
                     width: needsHorizontalScroll ? totalWidth : availableWidth,
                     child: Column(
