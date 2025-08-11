@@ -140,6 +140,20 @@ class DatabaseSource extends ChangeNotifier {
     // Default implementation - subclasses should override
   }
 
+  /// Get the current username for this source (if applicable)
+  /// Default implementation returns null
+  String? get currentUsername => null;
+
+  /// Check if this source is currently disconnecting
+  /// Default implementation returns false
+  bool get isDisconnecting => false;
+
+  /// Disconnect from this source
+  /// Default implementation returns a completed future
+  Future<void> disconnect() async {
+    // Default implementation - subclasses should override
+  }
+
   /// Get all descendants of this source (recursive)
   List<DatabaseSource> get allDescendants {
     final descendants = <DatabaseSource>[];
