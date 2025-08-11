@@ -1,4 +1,6 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../../core/constants.dart';
 import '../../../core/models/study.dart';
@@ -10,8 +12,6 @@ class ResizableDataTable extends StatefulWidget {
   final ValueChanged<Study>? onStudySelected;
   final ValueChanged<List<Study>>?
       onStudiesSelected; // New callback for multi-selection
-  final bool isCtrlPressed; // Keyboard modifier state
-  final bool isShiftPressed; // Keyboard modifier state
   final int? sortColumnIndex;
   final bool sortAscending;
   final ValueChanged<int?>? onSort;
@@ -22,8 +22,6 @@ class ResizableDataTable extends StatefulWidget {
     required this.selectedStudies, // Changed from optional to required
     this.onStudySelected,
     this.onStudiesSelected, // New callback
-    this.isCtrlPressed = false,
-    this.isShiftPressed = false,
     this.sortColumnIndex,
     this.sortAscending = true,
     this.onSort,
@@ -243,7 +241,7 @@ class _ResizableDataTableState extends State<ResizableDataTable>
           ),
 
           // Range selection indicator
-          if (widget.isShiftPressed)
+          /*if (widget.isShiftPressed)
             Container(
               padding: const EdgeInsets.symmetric(
                 horizontal: OnisViewerConstants.paddingMedium,
@@ -267,7 +265,7 @@ class _ResizableDataTableState extends State<ResizableDataTable>
                   ),
                 ),
               ),
-            ),
+            ),*/
         ],
       ),
     );
@@ -517,6 +515,9 @@ class _ResizableDataTableState extends State<ResizableDataTable>
   /// Handle row selection with keyboard modifiers
   void _handleRowSelection(Study study) {
     debugPrint('Row selection triggered for study: ${study.name}');
+    print("Shift pressed: $isShiftPressed");
+    print("Ctrl/Cmd pressed: $isCtrlOrCmdPressed");
+
     final currentSelection = List<Study>.from(widget.selectedStudies);
     final isCurrentlySelected = currentSelection.any((s) => s.id == study.id);
 
@@ -524,9 +525,9 @@ class _ResizableDataTableState extends State<ResizableDataTable>
     debugPrint('Is currently selected: $isCurrentlySelected');
     debugPrint('Multi-selection mode: $_multiSelectionMode');
     debugPrint(
-        'Ctrl pressed: ${widget.isCtrlPressed}, Shift pressed: ${widget.isShiftPressed}');
+        'Ctrl pressed: $isCtrlOrCmdPressed, Shift pressed: $isShiftPressed');
 
-    if (widget.isShiftPressed && _lastSelectedStudy != null) {
+    if (isShiftPressed && _lastSelectedStudy != null) {
       // Range selection mode (Shift + click)
       final lastIndex =
           _filteredStudies.indexWhere((s) => s.id == _lastSelectedStudy!.id);
@@ -544,7 +545,7 @@ class _ResizableDataTableState extends State<ResizableDataTable>
         debugPrint(
             'Range selection from index $startIndex to $endIndex (${currentSelection.length} studies)');
       }
-    } else if (_multiSelectionMode || widget.isCtrlPressed) {
+    } else if (_multiSelectionMode || isCtrlOrCmdPressed) {
       // Multi-selection mode (manual toggle or Ctrl/Cmd + click)
       if (isCurrentlySelected) {
         // Remove from selection
@@ -587,5 +588,21 @@ class _ResizableDataTableState extends State<ResizableDataTable>
   /// Format date for display
   String _formatDate(DateTime date) {
     return '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}';
+  }
+
+  bool get isShiftPressed =>
+      HardwareKeyboard.instance.logicalKeysPressed
+          .contains(LogicalKeyboardKey.shiftLeft) ||
+      HardwareKeyboard.instance.logicalKeysPressed
+          .contains(LogicalKeyboardKey.shiftRight);
+
+  bool get isCtrlOrCmdPressed {
+    final keys = HardwareKeyboard.instance.logicalKeysPressed;
+    final isMac = defaultTargetPlatform == TargetPlatform.macOS;
+    return isMac
+        ? keys.contains(LogicalKeyboardKey.metaLeft) ||
+            keys.contains(LogicalKeyboardKey.metaRight)
+        : keys.contains(LogicalKeyboardKey.controlLeft) ||
+            keys.contains(LogicalKeyboardKey.controlRight);
   }
 }

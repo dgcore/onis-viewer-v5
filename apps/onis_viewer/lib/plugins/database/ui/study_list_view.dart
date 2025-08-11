@@ -11,8 +11,6 @@ class StudyListView extends StatefulWidget {
   final ValueChanged<Study>? onStudySelected;
   final ValueChanged<List<Study>>?
       onStudiesSelected; // New callback for multi-selection
-  final bool isCtrlPressed; // Keyboard modifier state
-  final bool isShiftPressed; // Keyboard modifier state
   final String? username; // Current logged-in username
   final VoidCallback? onDisconnect; // Disconnect callback
   final bool isDisconnecting; // Whether currently disconnecting
@@ -23,8 +21,6 @@ class StudyListView extends StatefulWidget {
     required this.selectedStudies, // Changed from optional to required
     this.onStudySelected,
     this.onStudiesSelected, // New callback
-    this.isCtrlPressed = false,
-    this.isShiftPressed = false,
     this.username,
     this.onDisconnect,
     this.isDisconnecting = false,
@@ -218,8 +214,6 @@ class _StudyListViewState extends State<StudyListView> {
       onStudySelected: widget.isDisconnecting ? null : widget.onStudySelected,
       onStudiesSelected:
           widget.isDisconnecting ? null : widget.onStudiesSelected,
-      isCtrlPressed: widget.isCtrlPressed,
-      isShiftPressed: widget.isShiftPressed,
       sortColumnIndex: _sortColumnIndex,
       sortAscending: _sortAscending,
       onSort: widget.isDisconnecting

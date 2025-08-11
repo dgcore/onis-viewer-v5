@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import '../../../api/core/ov_api_core.dart';
 import '../../../core/constants.dart';
@@ -32,10 +31,6 @@ class DatabasePage extends BasePage {
 
 class _DatabasePageState extends BasePageState<DatabasePage> {
   late DatabaseController _controller;
-  final FocusNode _keyboardFocusNode = FocusNode();
-  bool _isCtrlPressed = false;
-  bool _isShiftPressed = false;
-
   DatabaseApi? _dbApi;
   StreamSubscription<DatabaseSource?>? _selectionSub;
   DatabaseSource? _selectedSource;
@@ -74,43 +69,7 @@ class _DatabasePageState extends BasePageState<DatabasePage> {
     return AnimatedBuilder(
       animation: _controller,
       builder: (context, child) {
-        return Focus(
-          focusNode: _keyboardFocusNode,
-          autofocus: true,
-          onKeyEvent: (node, event) {
-            if (event is KeyDownEvent) {
-              if (event.logicalKey == LogicalKeyboardKey.controlLeft ||
-                  event.logicalKey == LogicalKeyboardKey.controlRight ||
-                  event.logicalKey == LogicalKeyboardKey.metaLeft ||
-                  event.logicalKey == LogicalKeyboardKey.metaRight) {
-                setState(() {
-                  _isCtrlPressed = true;
-                });
-              } else if (event.logicalKey == LogicalKeyboardKey.shiftLeft ||
-                  event.logicalKey == LogicalKeyboardKey.shiftRight) {
-                setState(() {
-                  _isShiftPressed = true;
-                });
-              }
-            } else if (event is KeyUpEvent) {
-              if (event.logicalKey == LogicalKeyboardKey.controlLeft ||
-                  event.logicalKey == LogicalKeyboardKey.controlRight ||
-                  event.logicalKey == LogicalKeyboardKey.metaLeft ||
-                  event.logicalKey == LogicalKeyboardKey.metaRight) {
-                setState(() {
-                  _isCtrlPressed = false;
-                });
-              } else if (event.logicalKey == LogicalKeyboardKey.shiftLeft ||
-                  event.logicalKey == LogicalKeyboardKey.shiftRight) {
-                setState(() {
-                  _isShiftPressed = false;
-                });
-              }
-            }
-            return KeyEventResult.ignored;
-          },
-          child: _buildContent(),
-        );
+        return _buildContent();
       },
     );
   }
@@ -231,8 +190,6 @@ class _DatabasePageState extends BasePageState<DatabasePage> {
           _controller.selectStudies(selected.uid, studies);
         }
       },
-      isCtrlPressed: _isCtrlPressed,
-      isShiftPressed: _isShiftPressed,
       username: username,
       isDisconnecting: isDisconnecting,
       onDisconnect: () {
