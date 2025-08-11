@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:onis_viewer/core/models/study.dart';
 import 'package:onis_viewer/plugins/database/ui/study_list_view.dart';
-import 'package:onis_viewer/plugins/sources/site-server/site_source.dart';
 
 import '../../../api/core/ov_api_core.dart';
 import '../../../core/constants.dart';
@@ -165,9 +164,8 @@ class _DatabasePageState extends BasePageState<DatabasePage> {
   Widget _buildDatabaseDetails() {
     // Always show the study list, but with different header based on selection
     final selected = _dbApi?.selectedSource;
-    final username = selected is SiteSource ? selected.currentUsername : null;
-    final isDisconnecting =
-        selected is SiteSource ? selected.isDisconnecting : false;
+    final username = selected?.currentUsername;
+    final isDisconnecting = selected?.isDisconnecting ?? false;
 
     // Get studies for the current source
     final studies = selected != null
@@ -194,14 +192,14 @@ class _DatabasePageState extends BasePageState<DatabasePage> {
       isDisconnecting: isDisconnecting,
       onDisconnect: () {
         debugPrint('Disconnect button clicked');
-        if (selected is SiteSource) {
-          debugPrint('Selected source is SiteSource, calling disconnect');
+        if (selected != null) {
+          debugPrint(
+              'Calling disconnect on selected source: ${selected.runtimeType}');
           selected.disconnect().catchError((error) {
             debugPrint('Disconnect failed: $error');
           });
         } else {
-          debugPrint(
-              'Selected source is not SiteSource: ${selected.runtimeType}');
+          debugPrint('No source selected for disconnect');
         }
       },
     );
