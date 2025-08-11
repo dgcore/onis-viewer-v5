@@ -52,7 +52,6 @@ class _ResizableDataTableState extends State<ResizableDataTable>
   ];
 
   // Selection state
-  bool _multiSelectionMode = false; // Manual toggle for multi-selection
   Study? _lastSelectedStudy; // Track last selected study for range selection
 
   @override
@@ -138,19 +137,20 @@ class _ResizableDataTableState extends State<ResizableDataTable>
 
   @override
   Widget build(BuildContext context) {
-    return Expanded(
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final totalColumnWidth = _columnWidths.reduce((a, b) => a + b);
-          final resizeHandlesWidth = _columnWidths.length * 4.0;
-          const toggleButtonWidth = 80.0;
-          final totalWidth =
-              totalColumnWidth + resizeHandlesWidth + toggleButtonWidth;
-          final availableWidth = constraints.maxWidth;
-          final needsHorizontalScroll = totalWidth > availableWidth;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final totalColumnWidth = _columnWidths.reduce((a, b) => a + b);
+        final resizeHandlesWidth = _columnWidths.length * 4.0;
+        const toggleButtonWidth = 80.0;
+        final totalWidth =
+            totalColumnWidth + resizeHandlesWidth + toggleButtonWidth;
+        final availableWidth = constraints.maxWidth;
+        final needsHorizontalScroll = totalWidth > availableWidth;
 
-          return SingleChildScrollView(
-            child: SingleChildScrollView(
+        return Column(
+          children: [
+            // Sticky header and filter bar
+            SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               child: SizedBox(
                 width: needsHorizontalScroll ? totalWidth : availableWidth,
@@ -160,15 +160,29 @@ class _ResizableDataTableState extends State<ResizableDataTable>
                     _buildHeaderRow(),
                     // Filter bar
                     _buildFilterBar(),
-                    // Data rows
-                    ..._filteredStudies.map((study) => _buildDataRow(study)),
                   ],
                 ),
               ),
             ),
-          );
-        },
-      ),
+            // Scrollable data rows
+            Expanded(
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: SingleChildScrollView(
+                  child: SizedBox(
+                    width: needsHorizontalScroll ? totalWidth : availableWidth,
+                    child: Column(
+                      children: _filteredStudies
+                          .map((study) => _buildDataRow(study))
+                          .toList(),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -201,71 +215,6 @@ class _ResizableDataTableState extends State<ResizableDataTable>
           // Birth Date column header
           _buildHeaderCell('Birth Date', 3, isNumeric: false),
           _buildResizeHandle(3),
-
-          // Multi-selection toggle button
-          Container(
-            padding: const EdgeInsets.symmetric(
-              horizontal: OnisViewerConstants.paddingMedium,
-              vertical: OnisViewerConstants.paddingSmall,
-            ),
-            child: GestureDetector(
-              onTap: () {
-                setState(() {
-                  _multiSelectionMode = !_multiSelectionMode;
-                });
-                debugPrint('Multi-selection mode: $_multiSelectionMode');
-              },
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: OnisViewerConstants.paddingSmall,
-                  vertical: 4,
-                ),
-                decoration: BoxDecoration(
-                  color: _multiSelectionMode
-                      ? OnisViewerConstants.primaryColor
-                      : OnisViewerConstants.tabButtonColor,
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: Text(
-                  _multiSelectionMode ? 'Multi' : 'Single',
-                  style: TextStyle(
-                    color: _multiSelectionMode
-                        ? Colors.white
-                        : OnisViewerConstants.textColor,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ),
-            ),
-          ),
-
-          // Range selection indicator
-          /*if (widget.isShiftPressed)
-            Container(
-              padding: const EdgeInsets.symmetric(
-                horizontal: OnisViewerConstants.paddingMedium,
-                vertical: OnisViewerConstants.paddingSmall,
-              ),
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: OnisViewerConstants.paddingSmall,
-                  vertical: 4,
-                ),
-                decoration: BoxDecoration(
-                  color: OnisViewerConstants.primaryColor,
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: Text(
-                  'Range',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ),
-            ),*/
         ],
       ),
     );
@@ -523,7 +472,6 @@ class _ResizableDataTableState extends State<ResizableDataTable>
 
     debugPrint('Current selection count: ${currentSelection.length}');
     debugPrint('Is currently selected: $isCurrentlySelected');
-    debugPrint('Multi-selection mode: $_multiSelectionMode');
     debugPrint(
         'Ctrl pressed: $isCtrlOrCmdPressed, Shift pressed: $isShiftPressed');
 
@@ -545,7 +493,7 @@ class _ResizableDataTableState extends State<ResizableDataTable>
         debugPrint(
             'Range selection from index $startIndex to $endIndex (${currentSelection.length} studies)');
       }
-    } else if (_multiSelectionMode || isCtrlOrCmdPressed) {
+    } else if (isCtrlOrCmdPressed) {
       // Multi-selection mode (manual toggle or Ctrl/Cmd + click)
       if (isCurrentlySelected) {
         // Remove from selection

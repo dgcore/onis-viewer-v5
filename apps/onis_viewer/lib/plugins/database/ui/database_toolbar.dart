@@ -9,7 +9,7 @@ class DatabaseToolbar extends StatelessWidget {
   final VoidCallback? onOpen;
   final String? selectedLocation;
   final VoidCallback? onSearch;
-  
+
   final bool canOpen;
   final bool canImport;
   final bool canExport;
@@ -48,19 +48,24 @@ class DatabaseToolbar extends StatelessWidget {
           children: [
             Row(
               children: [
-                _buildButton('Open', Icons.folder_open_outlined, canOpen ? onOpen : null, true),
+                _buildButton('Open', Icons.folder_open_outlined,
+                    canOpen ? onOpen : null, true),
                 const SizedBox(width: 12),
-                _buildButton('Import', Icons.download_outlined, canImport ? onImport : null),
+                _buildButton('Import', Icons.download_outlined,
+                    canImport ? onImport : null),
                 const SizedBox(width: 12),
-                _buildButton('Export', Icons.upload_outlined, canExport ? onExport : null),
+                _buildButton('Export', Icons.upload_outlined,
+                    canExport ? onExport : null),
                 const SizedBox(width: 12),
-                _buildButton('Transfer', Icons.swap_horiz_outlined, canTransfer ? onTransfer : null),
+                _buildButton('Transfer', Icons.swap_horiz_outlined,
+                    canTransfer ? onTransfer : null),
               ],
             ),
             const Spacer(),
             Row(
               children: [
-                _buildIconButton(Icons.search_outlined, canSearch ? onSearch : null),
+                _buildIconButton(
+                    Icons.search_outlined, canSearch ? onSearch : null),
                 const SizedBox(width: 8),
                 _buildIconButton(Icons.settings_outlined, onPreferences),
               ],
@@ -71,7 +76,8 @@ class DatabaseToolbar extends StatelessWidget {
     );
   }
 
-  Widget _buildButton(String label, IconData icon, VoidCallback? onPressed, [bool isPrimary = false]) {
+  Widget _buildButton(String label, IconData icon, VoidCallback? onPressed,
+      [bool isPrimary = false]) {
     final isEnabled = onPressed != null;
     return Material(
       color: Colors.transparent,
@@ -81,16 +87,39 @@ class DatabaseToolbar extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           decoration: BoxDecoration(
-            color: isPrimary && isEnabled ? OnisViewerConstants.primaryColor : Colors.transparent,
+            color: isPrimary && isEnabled
+                ? OnisViewerConstants.primaryColor
+                : Colors.transparent,
             borderRadius: BorderRadius.circular(8),
-            border: isPrimary ? null : Border.all(color: isEnabled ? Colors.grey.shade600 : Colors.grey.shade700),
+            border: isPrimary
+                ? null
+                : Border.all(
+                    color: isEnabled
+                        ? Colors.grey.shade600
+                        : Colors.grey.shade700),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(icon, size: 18, color: isEnabled ? (isPrimary ? Colors.white : OnisViewerConstants.textColor) : OnisViewerConstants.textSecondaryColor.withValues(alpha: 0.5)),
+              Icon(icon,
+                  size: 18,
+                  color: isEnabled
+                      ? (isPrimary
+                          ? Colors.white
+                          : OnisViewerConstants.textColor)
+                      : OnisViewerConstants.textSecondaryColor
+                          .withValues(alpha: 0.5)),
               const SizedBox(width: 8),
-              Text(label, style: TextStyle(color: isEnabled ? (isPrimary ? Colors.white : OnisViewerConstants.textColor) : OnisViewerConstants.textSecondaryColor.withValues(alpha: 0.5), fontSize: 14, fontWeight: FontWeight.w500)),
+              Text(label,
+                  style: TextStyle(
+                      color: isEnabled
+                          ? (isPrimary
+                              ? Colors.white
+                              : OnisViewerConstants.textColor)
+                          : OnisViewerConstants.textSecondaryColor
+                              .withValues(alpha: 0.5),
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500)),
             ],
           ),
         ),
@@ -106,13 +135,19 @@ class DatabaseToolbar extends StatelessWidget {
         onTap: isEnabled ? onPressed : null,
         borderRadius: BorderRadius.circular(8),
         child: Container(
-          width: 40, height: 40,
+          width: 40,
+          height: 40,
           decoration: BoxDecoration(
             color: Colors.grey.shade800,
             borderRadius: BorderRadius.circular(8),
             border: Border.all(color: Colors.grey.shade700),
           ),
-          child: Icon(icon, size: 20, color: isEnabled ? OnisViewerConstants.textSecondaryColor : OnisViewerConstants.textSecondaryColor.withValues(alpha: 0.5)),
+          child: Icon(icon,
+              size: 20,
+              color: isEnabled
+                  ? OnisViewerConstants.textSecondaryColor
+                  : OnisViewerConstants.textSecondaryColor
+                      .withValues(alpha: 0.5)),
         ),
       ),
     );

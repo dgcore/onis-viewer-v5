@@ -68,7 +68,7 @@ class SiteSource extends DatabaseSource {
     }
 
     // Simulate slow server response
-    await Future.delayed(const Duration(seconds: 10));
+    await Future.delayed(const Duration(seconds: 1));
 
     // Mark source as connected
     isActive = true; // Triggers listeners via setter

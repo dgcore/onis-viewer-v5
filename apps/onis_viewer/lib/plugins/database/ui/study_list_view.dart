@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:onis_viewer/plugins/database/ui/resizable_data_table.dart';
 
 import '../../../core/constants.dart';
 import '../../../core/models/study.dart';
-import 'resizable_data_table.dart';
 
 /// Study list view using resizable data table
 class StudyListView extends StatefulWidget {

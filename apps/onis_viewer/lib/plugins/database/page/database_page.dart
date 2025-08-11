@@ -1,19 +1,19 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:onis_viewer/core/models/study.dart';
+import 'package:onis_viewer/plugins/database/ui/study_list_view.dart';
+import 'package:onis_viewer/plugins/sources/site-server/site_source.dart';
 
 import '../../../api/core/ov_api_core.dart';
 import '../../../core/constants.dart';
 import '../../../core/database_source.dart';
-import '../../../core/models/study.dart';
 import '../../../pages/base/base_page.dart';
-import '../../sources/site-server/site_source.dart';
 import '../database_plugin.dart';
 import '../public/database_api.dart';
 import '../ui/database_source_bar.dart';
 import '../ui/database_toolbar.dart';
 import '../ui/resizable_source_bar.dart';
-import '../ui/study_list_view.dart';
 import 'database_controller.dart';
 
 /// Database management page
