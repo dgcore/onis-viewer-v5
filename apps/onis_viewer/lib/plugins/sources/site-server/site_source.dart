@@ -68,7 +68,7 @@ class SiteSource extends DatabaseSource {
     }
 
     // Simulate slow server response
-    await Future.delayed(const Duration(seconds: 10));
+    await Future.delayed(const Duration(seconds: 1));
 
     // Mark source as connected
     isActive = true; // Triggers listeners via setter
@@ -123,5 +123,13 @@ class SiteSource extends DatabaseSource {
       initialInstanceName: instanceName,
       onSave: () {},
     );
+  }
+
+  @override
+  void search() {
+    // Site source specific open/search implementation
+    debugPrint('SiteSource.search() called for source: $name');
+    // TODO: Implement site-specific search functionality
+    // This could open a search dialog, navigate to a search page, etc.
   }
 }

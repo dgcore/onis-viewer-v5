@@ -1,19 +1,19 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import 'package:onis_viewer/core/models/study.dart';
+import 'package:onis_viewer/plugins/database/ui/study_list_view.dart';
+import 'package:onis_viewer/plugins/sources/site-server/site_source.dart';
 
 import '../../../api/core/ov_api_core.dart';
 import '../../../core/constants.dart';
 import '../../../core/database_source.dart';
 import '../../../pages/base/base_page.dart';
-import '../../sources/site-server/site_source.dart';
 import '../database_plugin.dart';
 import '../public/database_api.dart';
 import '../ui/database_source_bar.dart';
 import '../ui/database_toolbar.dart';
 import '../ui/resizable_source_bar.dart';
-import '../ui/study_list_view.dart';
 import 'database_controller.dart';
 
 /// Database management page
@@ -31,10 +31,6 @@ class DatabasePage extends BasePage {
 
 class _DatabasePageState extends BasePageState<DatabasePage> {
   late DatabaseController _controller;
-  final FocusNode _keyboardFocusNode = FocusNode();
-  bool _isCtrlPressed = false;
-  bool _isShiftPressed = false;
-
   DatabaseApi? _dbApi;
   StreamSubscription<DatabaseSource?>? _selectionSub;
   DatabaseSource? _selectedSource;
@@ -73,49 +69,16 @@ class _DatabasePageState extends BasePageState<DatabasePage> {
     return AnimatedBuilder(
       animation: _controller,
       builder: (context, child) {
-        return Focus(
-          focusNode: _keyboardFocusNode,
-          autofocus: true,
-          onKeyEvent: (node, event) {
-            if (event is KeyDownEvent) {
-              if (event.logicalKey == LogicalKeyboardKey.controlLeft ||
-                  event.logicalKey == LogicalKeyboardKey.controlRight ||
-                  event.logicalKey == LogicalKeyboardKey.metaLeft ||
-                  event.logicalKey == LogicalKeyboardKey.metaRight) {
-                setState(() {
-                  _isCtrlPressed = true;
-                });
-              } else if (event.logicalKey == LogicalKeyboardKey.shiftLeft ||
-                  event.logicalKey == LogicalKeyboardKey.shiftRight) {
-                setState(() {
-                  _isShiftPressed = true;
-                });
-              }
-            } else if (event is KeyUpEvent) {
-              if (event.logicalKey == LogicalKeyboardKey.controlLeft ||
-                  event.logicalKey == LogicalKeyboardKey.controlRight ||
-                  event.logicalKey == LogicalKeyboardKey.metaLeft ||
-                  event.logicalKey == LogicalKeyboardKey.metaRight) {
-                setState(() {
-                  _isCtrlPressed = false;
-                });
-              } else if (event.logicalKey == LogicalKeyboardKey.shiftLeft ||
-                  event.logicalKey == LogicalKeyboardKey.shiftRight) {
-                setState(() {
-                  _isShiftPressed = false;
-                });
-              }
-            }
-            return KeyEventResult.ignored;
-          },
-          child: _buildContent(),
-        );
+        return _buildContent();
       },
     );
   }
 
   @override
   Widget? buildPageHeader() {
+    // Get the selected source to determine capabilities
+    final selected = _dbApi?.selectedSource;
+
     // Return the database toolbar as the custom page header
     return DatabaseToolbar(
       onPreferences: () => _controller.openPreferences(),
@@ -124,7 +87,17 @@ class _DatabasePageState extends BasePageState<DatabasePage> {
       onTransfer: () => _controller.transferData(),
       onOpen: () => _controller.openDatabaseFromToolbar(),
       selectedLocation: 'Local computer',
-      onSearch: () => _controller.search(),
+      onSearch: () {
+        final selected = _dbApi?.selectedSource;
+        if (selected != null) {
+          _controller.onSearch(selected.uid);
+        }
+      },
+      canOpen: selected?.canOpen ?? false,
+      canImport: selected?.canImport ?? false,
+      canExport: selected?.canExport ?? false,
+      canTransfer: selected?.canTransfer ?? false,
+      canSearch: selected?.canSearch ?? false,
     );
   }
 
@@ -196,13 +169,27 @@ class _DatabasePageState extends BasePageState<DatabasePage> {
     final isDisconnecting =
         selected is SiteSource ? selected.isDisconnecting : false;
 
+    // Get studies for the current source
+    final studies = selected != null
+        ? _controller.getStudiesForSource(selected.uid)
+        : <Study>[];
+    final selectedStudies = selected != null
+        ? _controller.getSelectedStudiesForSource(selected.uid)
+        : <Study>[];
+
     return StudyListView(
-      studies: _controller.studies,
-      selectedStudies: _controller.selectedStudies,
-      onStudySelected: (study) => _controller.selectStudy(study),
-      onStudiesSelected: (studies) => _controller.selectStudies(studies),
-      isCtrlPressed: _isCtrlPressed,
-      isShiftPressed: _isShiftPressed,
+      studies: studies,
+      selectedStudies: selectedStudies,
+      onStudySelected: (study) {
+        if (selected != null) {
+          _controller.selectStudy(selected.uid, study);
+        }
+      },
+      onStudiesSelected: (studies) {
+        if (selected != null) {
+          _controller.selectStudies(selected.uid, studies);
+        }
+      },
       username: username,
       isDisconnecting: isDisconnecting,
       onDisconnect: () {
@@ -237,7 +224,7 @@ class _DatabasePageState extends BasePageState<DatabasePage> {
     return [
       // Database-specific footer items
       Text(
-        '${_controller.databases.length} databases',
+        '${_controller.totalStudyCount} studies',
         style: const TextStyle(
           fontSize: 12,
           color: OnisViewerConstants.textSecondaryColor,

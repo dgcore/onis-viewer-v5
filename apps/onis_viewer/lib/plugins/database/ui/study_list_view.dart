@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:onis_viewer/plugins/database/ui/resizable_data_table.dart';
 
 import '../../../core/constants.dart';
-import '../models/study.dart';
-import 'resizable_data_table.dart';
+import '../../../core/models/study.dart';
 
 /// Study list view using resizable data table
 class StudyListView extends StatefulWidget {
@@ -11,8 +11,6 @@ class StudyListView extends StatefulWidget {
   final ValueChanged<Study>? onStudySelected;
   final ValueChanged<List<Study>>?
       onStudiesSelected; // New callback for multi-selection
-  final bool isCtrlPressed; // Keyboard modifier state
-  final bool isShiftPressed; // Keyboard modifier state
   final String? username; // Current logged-in username
   final VoidCallback? onDisconnect; // Disconnect callback
   final bool isDisconnecting; // Whether currently disconnecting
@@ -23,8 +21,6 @@ class StudyListView extends StatefulWidget {
     required this.selectedStudies, // Changed from optional to required
     this.onStudySelected,
     this.onStudiesSelected, // New callback
-    this.isCtrlPressed = false,
-    this.isShiftPressed = false,
     this.username,
     this.onDisconnect,
     this.isDisconnecting = false,
@@ -37,6 +33,12 @@ class StudyListView extends StatefulWidget {
 class _StudyListViewState extends State<StudyListView> {
   int? _sortColumnIndex;
   bool _sortAscending = true;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // This logic is no longer needed as scroll position is managed by DatabaseController
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -188,8 +190,8 @@ class _StudyListViewState extends State<StudyListView> {
       sortedStudies.sort((a, b) {
         int comparison = 0;
         switch (_sortColumnIndex) {
-          case 0: // ID
-            comparison = a.id.compareTo(b.id);
+          case 0: // Patient ID
+            comparison = (a.patientId ?? '').compareTo(b.patientId ?? '');
             break;
           case 1: // Name
             comparison = a.name.compareTo(b.name);
@@ -206,13 +208,12 @@ class _StudyListViewState extends State<StudyListView> {
     }
 
     return ResizableDataTable(
+      key: ValueKey('default'), // Use source key to maintain widget identity
       studies: sortedStudies,
       selectedStudies: widget.selectedStudies,
       onStudySelected: widget.isDisconnecting ? null : widget.onStudySelected,
       onStudiesSelected:
           widget.isDisconnecting ? null : widget.onStudiesSelected,
-      isCtrlPressed: widget.isCtrlPressed,
-      isShiftPressed: widget.isShiftPressed,
       sortColumnIndex: _sortColumnIndex,
       sortAscending: _sortAscending,
       onSort: widget.isDisconnecting

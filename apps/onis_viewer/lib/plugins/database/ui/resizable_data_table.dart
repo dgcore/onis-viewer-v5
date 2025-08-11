@@ -1,7 +1,9 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../../core/constants.dart';
-import '../models/study.dart';
+import '../../../core/models/study.dart';
 
 /// A resizable data table that allows column width adjustment
 class ResizableDataTable extends StatefulWidget {
@@ -10,8 +12,6 @@ class ResizableDataTable extends StatefulWidget {
   final ValueChanged<Study>? onStudySelected;
   final ValueChanged<List<Study>>?
       onStudiesSelected; // New callback for multi-selection
-  final bool isCtrlPressed; // Keyboard modifier state
-  final bool isShiftPressed; // Keyboard modifier state
   final int? sortColumnIndex;
   final bool sortAscending;
   final ValueChanged<int?>? onSort;
@@ -22,8 +22,6 @@ class ResizableDataTable extends StatefulWidget {
     required this.selectedStudies, // Changed from optional to required
     this.onStudySelected,
     this.onStudiesSelected, // New callback
-    this.isCtrlPressed = false,
-    this.isShiftPressed = false,
     this.sortColumnIndex,
     this.sortAscending = true,
     this.onSort,
@@ -54,7 +52,6 @@ class _ResizableDataTableState extends State<ResizableDataTable>
   ];
 
   // Selection state
-  bool _multiSelectionMode = false; // Manual toggle for multi-selection
   Study? _lastSelectedStudy; // Track last selected study for range selection
 
   @override
@@ -140,20 +137,20 @@ class _ResizableDataTableState extends State<ResizableDataTable>
 
   @override
   Widget build(BuildContext context) {
-    return Expanded(
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final totalColumnWidth = _columnWidths.reduce((a, b) => a + b);
-          final resizeHandlesWidth = _columnWidths.length *
-              4.0; // 4px per resize handle (reduced from 8px)
-          const toggleButtonWidth = 80.0; // Approximate width of toggle button
-          final totalWidth =
-              totalColumnWidth + resizeHandlesWidth + toggleButtonWidth;
-          final availableWidth = constraints.maxWidth;
-          final needsHorizontalScroll = totalWidth > availableWidth;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final totalColumnWidth = _columnWidths.reduce((a, b) => a + b);
+        final resizeHandlesWidth = _columnWidths.length * 4.0;
+        const toggleButtonWidth = 80.0;
+        final totalWidth =
+            totalColumnWidth + resizeHandlesWidth + toggleButtonWidth;
+        final availableWidth = constraints.maxWidth;
+        final needsHorizontalScroll = totalWidth > availableWidth;
 
-          return SingleChildScrollView(
-            child: SingleChildScrollView(
+        return Column(
+          children: [
+            // Sticky header and filter bar
+            SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               child: SizedBox(
                 width: needsHorizontalScroll ? totalWidth : availableWidth,
@@ -163,15 +160,29 @@ class _ResizableDataTableState extends State<ResizableDataTable>
                     _buildHeaderRow(),
                     // Filter bar
                     _buildFilterBar(),
-                    // Data rows
-                    ..._filteredStudies.map((study) => _buildDataRow(study)),
                   ],
                 ),
               ),
             ),
-          );
-        },
-      ),
+            // Scrollable data rows
+            Expanded(
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: SingleChildScrollView(
+                  child: SizedBox(
+                    width: needsHorizontalScroll ? totalWidth : availableWidth,
+                    child: Column(
+                      children: _filteredStudies
+                          .map((study) => _buildDataRow(study))
+                          .toList(),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -189,8 +200,8 @@ class _ResizableDataTableState extends State<ResizableDataTable>
       ),
       child: Row(
         children: [
-          // ID column header
-          _buildHeaderCell('ID', 0, isNumeric: false),
+          // Patient ID column header
+          _buildHeaderCell('Patient ID', 0, isNumeric: false),
           _buildResizeHandle(0),
 
           // Name column header
@@ -204,71 +215,6 @@ class _ResizableDataTableState extends State<ResizableDataTable>
           // Birth Date column header
           _buildHeaderCell('Birth Date', 3, isNumeric: false),
           _buildResizeHandle(3),
-
-          // Multi-selection toggle button
-          Container(
-            padding: const EdgeInsets.symmetric(
-              horizontal: OnisViewerConstants.paddingMedium,
-              vertical: OnisViewerConstants.paddingSmall,
-            ),
-            child: GestureDetector(
-              onTap: () {
-                setState(() {
-                  _multiSelectionMode = !_multiSelectionMode;
-                });
-                debugPrint('Multi-selection mode: $_multiSelectionMode');
-              },
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: OnisViewerConstants.paddingSmall,
-                  vertical: 4,
-                ),
-                decoration: BoxDecoration(
-                  color: _multiSelectionMode
-                      ? OnisViewerConstants.primaryColor
-                      : OnisViewerConstants.tabButtonColor,
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: Text(
-                  _multiSelectionMode ? 'Multi' : 'Single',
-                  style: TextStyle(
-                    color: _multiSelectionMode
-                        ? Colors.white
-                        : OnisViewerConstants.textColor,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ),
-            ),
-          ),
-
-          // Range selection indicator
-          if (widget.isShiftPressed)
-            Container(
-              padding: const EdgeInsets.symmetric(
-                horizontal: OnisViewerConstants.paddingMedium,
-                vertical: OnisViewerConstants.paddingSmall,
-              ),
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: OnisViewerConstants.paddingSmall,
-                  vertical: 4,
-                ),
-                decoration: BoxDecoration(
-                  color: OnisViewerConstants.primaryColor,
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: Text(
-                  'Range',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ),
-            ),
         ],
       ),
     );
@@ -288,8 +234,8 @@ class _ResizableDataTableState extends State<ResizableDataTable>
       ),
       child: Row(
         children: [
-          // ID filter
-          _buildFilterCell(0, 'Filter ID...'),
+          // Patient ID filter
+          _buildFilterCell(0, 'Filter Patient ID...'),
           _buildResizeHandle(0),
 
           // Name filter
@@ -471,8 +417,8 @@ class _ResizableDataTableState extends State<ResizableDataTable>
         ),
         child: Row(
           children: [
-            // ID cell
-            _buildDataCell(study.id, 0, isSelected, study),
+            // Patient ID cell
+            _buildDataCell(study.patientId ?? 'N/A', 0, isSelected, study),
             _buildResizeHandle(0),
 
             // Name cell
@@ -518,16 +464,18 @@ class _ResizableDataTableState extends State<ResizableDataTable>
   /// Handle row selection with keyboard modifiers
   void _handleRowSelection(Study study) {
     debugPrint('Row selection triggered for study: ${study.name}');
+    print("Shift pressed: $isShiftPressed");
+    print("Ctrl/Cmd pressed: $isCtrlOrCmdPressed");
+
     final currentSelection = List<Study>.from(widget.selectedStudies);
     final isCurrentlySelected = currentSelection.any((s) => s.id == study.id);
 
     debugPrint('Current selection count: ${currentSelection.length}');
     debugPrint('Is currently selected: $isCurrentlySelected');
-    debugPrint('Multi-selection mode: $_multiSelectionMode');
     debugPrint(
-        'Ctrl pressed: ${widget.isCtrlPressed}, Shift pressed: ${widget.isShiftPressed}');
+        'Ctrl pressed: $isCtrlOrCmdPressed, Shift pressed: $isShiftPressed');
 
-    if (widget.isShiftPressed && _lastSelectedStudy != null) {
+    if (isShiftPressed && _lastSelectedStudy != null) {
       // Range selection mode (Shift + click)
       final lastIndex =
           _filteredStudies.indexWhere((s) => s.id == _lastSelectedStudy!.id);
@@ -545,7 +493,7 @@ class _ResizableDataTableState extends State<ResizableDataTable>
         debugPrint(
             'Range selection from index $startIndex to $endIndex (${currentSelection.length} studies)');
       }
-    } else if (_multiSelectionMode || widget.isCtrlPressed) {
+    } else if (isCtrlOrCmdPressed) {
       // Multi-selection mode (manual toggle or Ctrl/Cmd + click)
       if (isCurrentlySelected) {
         // Remove from selection
@@ -588,5 +536,21 @@ class _ResizableDataTableState extends State<ResizableDataTable>
   /// Format date for display
   String _formatDate(DateTime date) {
     return '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}';
+  }
+
+  bool get isShiftPressed =>
+      HardwareKeyboard.instance.logicalKeysPressed
+          .contains(LogicalKeyboardKey.shiftLeft) ||
+      HardwareKeyboard.instance.logicalKeysPressed
+          .contains(LogicalKeyboardKey.shiftRight);
+
+  bool get isCtrlOrCmdPressed {
+    final keys = HardwareKeyboard.instance.logicalKeysPressed;
+    final isMac = defaultTargetPlatform == TargetPlatform.macOS;
+    return isMac
+        ? keys.contains(LogicalKeyboardKey.metaLeft) ||
+            keys.contains(LogicalKeyboardKey.metaRight)
+        : keys.contains(LogicalKeyboardKey.controlLeft) ||
+            keys.contains(LogicalKeyboardKey.controlRight);
   }
 }
