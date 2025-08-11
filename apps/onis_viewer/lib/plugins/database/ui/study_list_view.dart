@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/constants.dart';
-import '../models/study.dart';
+import '../../../core/models/study.dart';
 import 'resizable_data_table.dart';
 
 /// Study list view using resizable data table
@@ -37,6 +37,12 @@ class StudyListView extends StatefulWidget {
 class _StudyListViewState extends State<StudyListView> {
   int? _sortColumnIndex;
   bool _sortAscending = true;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // This logic is no longer needed as scroll position is managed by DatabaseController
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -188,8 +194,8 @@ class _StudyListViewState extends State<StudyListView> {
       sortedStudies.sort((a, b) {
         int comparison = 0;
         switch (_sortColumnIndex) {
-          case 0: // ID
-            comparison = a.id.compareTo(b.id);
+          case 0: // Patient ID
+            comparison = (a.patientId ?? '').compareTo(b.patientId ?? '');
             break;
           case 1: // Name
             comparison = a.name.compareTo(b.name);
@@ -206,6 +212,7 @@ class _StudyListViewState extends State<StudyListView> {
     }
 
     return ResizableDataTable(
+      key: ValueKey('default'), // Use source key to maintain widget identity
       studies: sortedStudies,
       selectedStudies: widget.selectedStudies,
       onStudySelected: widget.isDisconnecting ? null : widget.onStudySelected,

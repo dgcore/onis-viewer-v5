@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/constants.dart';
-import '../models/study.dart';
+import '../../../core/models/study.dart';
 
 /// A resizable data table that allows column width adjustment
 class ResizableDataTable extends StatefulWidget {
@@ -144,9 +144,8 @@ class _ResizableDataTableState extends State<ResizableDataTable>
       child: LayoutBuilder(
         builder: (context, constraints) {
           final totalColumnWidth = _columnWidths.reduce((a, b) => a + b);
-          final resizeHandlesWidth = _columnWidths.length *
-              4.0; // 4px per resize handle (reduced from 8px)
-          const toggleButtonWidth = 80.0; // Approximate width of toggle button
+          final resizeHandlesWidth = _columnWidths.length * 4.0;
+          const toggleButtonWidth = 80.0;
           final totalWidth =
               totalColumnWidth + resizeHandlesWidth + toggleButtonWidth;
           final availableWidth = constraints.maxWidth;
@@ -189,8 +188,8 @@ class _ResizableDataTableState extends State<ResizableDataTable>
       ),
       child: Row(
         children: [
-          // ID column header
-          _buildHeaderCell('ID', 0, isNumeric: false),
+          // Patient ID column header
+          _buildHeaderCell('Patient ID', 0, isNumeric: false),
           _buildResizeHandle(0),
 
           // Name column header
@@ -288,8 +287,8 @@ class _ResizableDataTableState extends State<ResizableDataTable>
       ),
       child: Row(
         children: [
-          // ID filter
-          _buildFilterCell(0, 'Filter ID...'),
+          // Patient ID filter
+          _buildFilterCell(0, 'Filter Patient ID...'),
           _buildResizeHandle(0),
 
           // Name filter
@@ -471,8 +470,8 @@ class _ResizableDataTableState extends State<ResizableDataTable>
         ),
         child: Row(
           children: [
-            // ID cell
-            _buildDataCell(study.id, 0, isSelected, study),
+            // Patient ID cell
+            _buildDataCell(study.patientId ?? 'N/A', 0, isSelected, study),
             _buildResizeHandle(0),
 
             // Name cell

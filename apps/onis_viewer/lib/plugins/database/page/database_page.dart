@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import '../../../api/core/ov_api_core.dart';
 import '../../../core/constants.dart';
 import '../../../core/database_source.dart';
+import '../../../core/models/study.dart';
 import '../../../pages/base/base_page.dart';
 import '../../sources/site-server/site_source.dart';
 import '../database_plugin.dart';
@@ -116,6 +117,9 @@ class _DatabasePageState extends BasePageState<DatabasePage> {
 
   @override
   Widget? buildPageHeader() {
+    // Get the selected source to determine capabilities
+    final selected = _dbApi?.selectedSource;
+
     // Return the database toolbar as the custom page header
     return DatabaseToolbar(
       onPreferences: () => _controller.openPreferences(),
@@ -124,7 +128,17 @@ class _DatabasePageState extends BasePageState<DatabasePage> {
       onTransfer: () => _controller.transferData(),
       onOpen: () => _controller.openDatabaseFromToolbar(),
       selectedLocation: 'Local computer',
-      onSearch: () => _controller.search(),
+      onSearch: () {
+        final selected = _dbApi?.selectedSource;
+        if (selected != null) {
+          _controller.onSearch(selected.uid);
+        }
+      },
+      canOpen: selected?.canOpen ?? false,
+      canImport: selected?.canImport ?? false,
+      canExport: selected?.canExport ?? false,
+      canTransfer: selected?.canTransfer ?? false,
+      canSearch: selected?.canSearch ?? false,
     );
   }
 
@@ -196,11 +210,27 @@ class _DatabasePageState extends BasePageState<DatabasePage> {
     final isDisconnecting =
         selected is SiteSource ? selected.isDisconnecting : false;
 
+    // Get studies for the current source
+    final studies = selected != null
+        ? _controller.getStudiesForSource(selected.uid)
+        : <Study>[];
+    final selectedStudies = selected != null
+        ? _controller.getSelectedStudiesForSource(selected.uid)
+        : <Study>[];
+
     return StudyListView(
-      studies: _controller.studies,
-      selectedStudies: _controller.selectedStudies,
-      onStudySelected: (study) => _controller.selectStudy(study),
-      onStudiesSelected: (studies) => _controller.selectStudies(studies),
+      studies: studies,
+      selectedStudies: selectedStudies,
+      onStudySelected: (study) {
+        if (selected != null) {
+          _controller.selectStudy(selected.uid, study);
+        }
+      },
+      onStudiesSelected: (studies) {
+        if (selected != null) {
+          _controller.selectStudies(selected.uid, studies);
+        }
+      },
       isCtrlPressed: _isCtrlPressed,
       isShiftPressed: _isShiftPressed,
       username: username,
@@ -237,7 +267,7 @@ class _DatabasePageState extends BasePageState<DatabasePage> {
     return [
       // Database-specific footer items
       Text(
-        '${_controller.databases.length} databases',
+        '${_controller.totalStudyCount} studies',
         style: const TextStyle(
           fontSize: 12,
           color: OnisViewerConstants.textSecondaryColor,

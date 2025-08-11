@@ -124,4 +124,12 @@ class SiteSource extends DatabaseSource {
       onSave: () {},
     );
   }
+
+  @override
+  void search() {
+    // Site source specific open/search implementation
+    debugPrint('SiteSource.search() called for source: $name');
+    // TODO: Implement site-specific search functionality
+    // This could open a search dialog, navigate to a search page, etc.
+  }
 }
