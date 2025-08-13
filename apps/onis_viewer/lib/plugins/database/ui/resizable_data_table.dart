@@ -57,6 +57,8 @@ class _ResizableDataTableState extends State<ResizableDataTable>
   int? _draggedColumnIndex;
   int? _dropTargetIndex;
   bool _isDraggingColumn = false;
+  Offset? _dragOffset;
+  final GlobalKey _stackKey = GlobalKey();
 
   // Column definitions
   final List<Map<String, dynamic>> _columnDefinitions = [
@@ -194,40 +196,80 @@ class _ResizableDataTableState extends State<ResizableDataTable>
         final availableWidth = constraints.maxWidth;
         final needsHorizontalScroll = totalWidth > availableWidth;
 
-        return Column(
+        return Stack(
+          key: _stackKey,
           children: [
-            // Sticky header and filter bar
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: SizedBox(
-                width: needsHorizontalScroll ? totalWidth : availableWidth,
-                child: Column(
-                  children: [
-                    // Header row
-                    _buildHeaderRow(),
-                    // Filter bar
-                    _buildFilterBar(),
-                  ],
-                ),
-              ),
-            ),
-            // Scrollable data rows
-            Expanded(
-              child: SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: SingleChildScrollView(
-                  controller: _scrollController,
+            Column(
+              children: [
+                // Sticky header and filter bar
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
                   child: SizedBox(
                     width: needsHorizontalScroll ? totalWidth : availableWidth,
                     child: Column(
-                      children: _filteredStudies
-                          .map((study) => _buildDataRow(study))
-                          .toList(),
+                      children: [
+                        // Header row
+                        _buildHeaderRow(),
+                        // Filter bar
+                        _buildFilterBar(),
+                      ],
+                    ),
+                  ),
+                ),
+                // Scrollable data rows
+                Expanded(
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: SingleChildScrollView(
+                      controller: _scrollController,
+                      child: SizedBox(
+                        width:
+                            needsHorizontalScroll ? totalWidth : availableWidth,
+                        child: Column(
+                          children: _filteredStudies
+                              .map((study) => _buildDataRow(study))
+                              .toList(),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            // Drag image overlay
+            if (_isDraggingColumn &&
+                _draggedColumnIndex != null &&
+                _dragOffset != null)
+              Positioned(
+                left: _dragOffset!.dx -
+                    (_columnWidths[_draggedColumnIndex!] /
+                        2), // Center horizontally
+                top: _dragOffset!.dy - 15, // Small offset above cursor
+                child: Material(
+                  elevation: 8.0,
+                  borderRadius: BorderRadius.circular(4),
+                  child: Container(
+                    width: _columnWidths[_draggedColumnIndex!],
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: OnisViewerConstants.paddingMedium,
+                      vertical: OnisViewerConstants.paddingSmall,
+                    ),
+                    decoration: BoxDecoration(
+                      color: OnisViewerConstants.primaryColor
+                          .withValues(alpha: 0.9),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(
+                      _columnDefinitions[_draggedColumnIndex!]['title'],
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
                 ),
               ),
-            ),
           ],
         );
       },
@@ -257,12 +299,29 @@ class _ResizableDataTableState extends State<ResizableDataTable>
               // Draggable header cell
               GestureDetector(
                 onPanStart: (details) {
-                  setState(() {
-                    _isDraggingColumn = true;
-                    _draggedColumnIndex = columnIndex;
-                  });
+                  final RenderBox? stackBox = _stackKey.currentContext
+                      ?.findRenderObject() as RenderBox?;
+                  if (stackBox != null) {
+                    final localPosition =
+                        stackBox.globalToLocal(details.globalPosition);
+                    setState(() {
+                      _isDraggingColumn = true;
+                      _draggedColumnIndex = columnIndex;
+                      _dragOffset = localPosition;
+                    });
+                  }
                 },
                 onPanUpdate: (details) {
+                  final RenderBox? stackBox = _stackKey.currentContext
+                      ?.findRenderObject() as RenderBox?;
+                  if (stackBox != null) {
+                    final localPosition =
+                        stackBox.globalToLocal(details.globalPosition);
+                    setState(() {
+                      _dragOffset = localPosition;
+                    });
+                  }
+
                   // Calculate which column we're hovering over
                   final RenderBox renderBox =
                       context.findRenderObject() as RenderBox;
@@ -312,6 +371,7 @@ class _ResizableDataTableState extends State<ResizableDataTable>
                     _isDraggingColumn = false;
                     _draggedColumnIndex = null;
                     _dropTargetIndex = null;
+                    _dragOffset = null;
                   });
                 },
                 child: ClipRect(
