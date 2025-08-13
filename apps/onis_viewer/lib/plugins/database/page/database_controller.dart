@@ -1,250 +1,174 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 
-import '../models/study.dart';
+import '../../../core/models/study.dart';
 
-/// Database model
-class Database {
-  final String id;
-  final String name;
-  final String path;
-  final String type;
-  final String status;
-  final String size;
-
-  const Database({
-    required this.id,
-    required this.name,
-    required this.path,
-    required this.type,
-    required this.status,
-    required this.size,
-  });
-}
-
-/// Controller for database operations
 class DatabaseController extends ChangeNotifier {
-  final List<Database> _databases = [];
-  final List<Study> _studies = [];
-  Database? _selectedDatabase;
-  final List<Study> _selectedStudies = []; // Changed from final to mutable
+  // Studies per source: Map<sourceUid, List<Study>>
+  final Map<String, List<Study>> _studiesBySource = {};
+  // Selected studies per source: Map<sourceUid, List<Study>>
+  final Map<String, List<Study>> _selectedStudiesBySource = {};
+  // Scroll positions per source: Map<sourceUid, double>
+  final Map<String, double> _scrollPositionsBySource = {};
   String _searchQuery = '';
 
   // Getters
-  List<Database> get databases => _databases;
-  List<Study> get studies => _studies;
-  Database? get selectedDatabase => _selectedDatabase;
-  List<Study> get selectedStudies =>
-      _selectedStudies; // Changed from Study? to List<Study>
   String get searchQuery => _searchQuery;
 
-  /// Initialize the controller
-  Future<void> initialize() async {
-    // Load sample databases for demonstration
-    _databases.addAll([
-      const Database(
-        id: '1',
-        name: 'Sample Medical Images',
-        path: '/path/to/medical/images',
-        type: 'DICOM',
-        status: 'Connected',
-        size: '2.5 GB',
-      ),
-      const Database(
-        id: '2',
-        name: 'Patient Records',
-        path: '/path/to/patient/records',
-        type: 'SQLite',
-        status: 'Connected',
-        size: '1.8 GB',
-      ),
-      const Database(
-        id: '3',
-        name: 'Research Data',
-        path: '/path/to/research/data',
-        type: 'PostgreSQL',
-        status: 'Disconnected',
-        size: '5.2 GB',
-      ),
-    ]);
-
-    // Auto-select the first database
-    if (_databases.isNotEmpty) {
-      _selectedDatabase = _databases.first;
-      debugPrint('Auto-selected database: ${_selectedDatabase!.name}');
-    }
-
-    // Load sample studies for demonstration
-    _studies.addAll([
-      Study(
-        id: 'ST001',
-        name: 'John Doe',
-        sex: 'M',
-        birthDate: DateTime(1985, 3, 15),
-        patientId: 'P001',
-        studyDate: '2024-01-15',
-        modality: 'CT',
-        status: 'Completed',
-      ),
-      Study(
-        id: 'ST002',
-        name: 'Jane Smith',
-        sex: 'F',
-        birthDate: DateTime(1990, 7, 22),
-        patientId: 'P002',
-        studyDate: '2024-01-16',
-        modality: 'MRI',
-        status: 'In Progress',
-      ),
-      Study(
-        id: 'ST003',
-        name: 'Bob Johnson',
-        sex: 'M',
-        birthDate: DateTime(1978, 11, 8),
-        patientId: 'P003',
-        studyDate: '2024-01-17',
-        modality: 'X-Ray',
-        status: 'Completed',
-      ),
-      Study(
-        id: 'ST004',
-        name: 'Alice Brown',
-        sex: 'F',
-        birthDate: DateTime(1995, 4, 12),
-        patientId: 'P004',
-        studyDate: '2024-01-18',
-        modality: 'Ultrasound',
-        status: 'Scheduled',
-      ),
-      Study(
-        id: 'ST005',
-        name: 'Charlie Wilson',
-        sex: 'M',
-        birthDate: DateTime(1982, 9, 30),
-        patientId: 'P005',
-        studyDate: '2024-01-19',
-        modality: 'CT',
-        status: 'Completed',
-      ),
-    ]);
+  List<Study> getStudiesForSource(String sourceUid) {
+    return _studiesBySource[sourceUid] ?? [];
   }
 
-  /// Dispose the controller
+  List<Study> getSelectedStudiesForSource(String sourceUid) {
+    return _selectedStudiesBySource[sourceUid] ?? [];
+  }
+
+  double getScrollPositionForSource(String sourceUid) {
+    return _scrollPositionsBySource[sourceUid] ?? 0.0;
+  }
+
+  void saveScrollPositionForSource(String sourceUid, double position) {
+    _scrollPositionsBySource[sourceUid] = position;
+    debugPrint('Saved scroll position $position for source $sourceUid');
+  }
+
+  List<Study> get allStudies {
+    return _studiesBySource.values.expand((studies) => studies).toList();
+  }
+
+  int get totalStudyCount {
+    return _studiesBySource.values
+        .fold(0, (sum, studies) => sum + studies.length);
+  }
+
+  Future<void> initialize() async {
+    // No dummy studies - studies will be loaded per source as needed
+    debugPrint('DatabaseController initialized');
+  }
+
   @override
   Future<void> dispose() async {
-    // Clean up resources
     super.dispose();
   }
 
-  /// Add a new database
-  void addDatabase() {
-    debugPrint('Add database action');
-    // In a real implementation, this would show a dialog to add a database
+  Future<void> loadStudiesForSource(String sourceUid) async {
+    debugPrint('Loading studies for source: $sourceUid');
+    _studiesBySource[sourceUid] = [];
+    _selectedStudiesBySource[sourceUid] = [];
+    notifyListeners();
   }
 
-  /// Refresh databases
-  void refreshDatabases() {
-    debugPrint('Refresh databases action');
-    // In a real implementation, this would reload databases from storage
+  void clearStudiesForSource(String sourceUid) {
+    _studiesBySource.remove(sourceUid);
+    _selectedStudiesBySource.remove(sourceUid);
+    notifyListeners();
   }
 
-  /// Search databases
-  void searchDatabases(String query) {
+  void addStudiesToSource(String sourceUid, List<Study> studies) {
+    if (!_studiesBySource.containsKey(sourceUid)) {
+      _studiesBySource[sourceUid] = [];
+    }
+    _studiesBySource[sourceUid]!.addAll(studies);
+    notifyListeners();
+  }
+
+  void searchStudies(String query) {
     _searchQuery = query;
-    debugPrint('Search databases: $query');
-    // In a real implementation, this would filter the database list
+    debugPrint('Search studies: $query');
   }
 
-  /// Select a database
-  void selectDatabase(Database database) {
-    _selectedDatabase = database;
-    debugPrint('Selected database: ${database.name}');
-  }
-
-  /// Select a study
-  void selectStudy(Study study) {
-    _selectedStudies.clear();
-    _selectedStudies.add(study);
-    debugPrint('Selected study: ${study.name}');
+  void selectStudy(String sourceUid, Study study) {
+    if (!_selectedStudiesBySource.containsKey(sourceUid)) {
+      _selectedStudiesBySource[sourceUid] = [];
+    }
+    _selectedStudiesBySource[sourceUid]!.clear();
+    _selectedStudiesBySource[sourceUid]!.add(study);
+    debugPrint('Selected study: ${study.name} for source: $sourceUid');
     notifyListeners();
   }
 
-  /// Select multiple studies
-  void selectStudies(List<Study> studies) {
-    _selectedStudies.clear();
-    _selectedStudies.addAll(studies);
+  void selectStudies(String sourceUid, List<Study> studies) {
+    if (!_selectedStudiesBySource.containsKey(sourceUid)) {
+      _selectedStudiesBySource[sourceUid] = [];
+    }
+    _selectedStudiesBySource[sourceUid]!.clear();
+    _selectedStudiesBySource[sourceUid]!.addAll(studies);
+    debugPrint('Selected ${studies.length} studies for source: $sourceUid');
+    notifyListeners();
+  }
+
+  void clearSelectedStudies(String sourceUid) {
+    _selectedStudiesBySource[sourceUid]?.clear();
+    notifyListeners();
+  }
+
+  Future<void> onSearch(String sourceUid) async {
+    debugPrint('Searching studies for source: $sourceUid');
+    clearStudiesForSource(sourceUid);
+
+    final dummyStudies = <Study>[];
+    final modalities = ['CT', 'MRI', 'X-Ray', 'Ultrasound', 'PET'];
+    final statuses = ['Completed', 'In Progress', 'Scheduled', 'Cancelled'];
+    final sexes = ['M', 'F'];
+    final Random random = Random(DateTime.now().millisecondsSinceEpoch);
+
+    // Generate 500 studies with random patient IDs for realistic testing
+    for (int i = 1; i <= 500; i++) {
+      final modality = modalities[i % modalities.length];
+      final status = statuses[i % statuses.length];
+      final sex = sexes[i % sexes.length];
+      final birthYear = 1950 + (i % 50);
+      final birthMonth = 1 + (i % 12);
+      final birthDay = 1 + (i % 28);
+      final studyYear = 2020 + (i % 5);
+      final studyMonth = 1 + (i % 12);
+      final studyDay = 1 + (i % 28);
+
+      dummyStudies.add(Study(
+        id: 'ST_SEARCH_${i.toString().padLeft(3, '0')}',
+        name: 'Patient ${i.toString().padLeft(3, '0')}',
+        sex: sex,
+        birthDate: DateTime(birthYear, birthMonth, birthDay),
+        patientId: 'P${(100000 + random.nextInt(900000)).toString()}',
+        studyDate:
+            '$studyYear-${studyMonth.toString().padLeft(2, '0')}-${studyDay.toString().padLeft(2, '0')}',
+        modality: modality,
+        status: status,
+      ));
+    }
+
+    addStudiesToSource(sourceUid, dummyStudies);
     debugPrint(
-        'Selected ${studies.length} studies: ${studies.map((s) => s.name).join(', ')}');
-    // Force a rebuild by notifying listeners
-    notifyListeners();
-  }
-
-  /// Open a database
-  void openDatabase(Database database) {
-    debugPrint('Open database: ${database.name}');
-    // In a real implementation, this would open the database
-  }
-
-  /// Export a database
-  void exportDatabase(Database database) {
-    debugPrint('Export database: ${database.name}');
-    // In a real implementation, this would export the database
-  }
-
-  /// Delete a database
-  void deleteDatabase(Database database) {
-    debugPrint('Delete database: ${database.name}');
-    // In a real implementation, this would delete the database
-  }
-
-  /// Show database settings
-  void showSettings() {
-    debugPrint('Show database settings');
-    // In a real implementation, this would show settings dialog
+        'Added ${dummyStudies.length} studies from search for source: $sourceUid');
   }
 
   // Toolbar action methods
-  void quit() {
-    debugPrint('Quit action');
-    // In a real implementation, this would quit the application
-  }
-
   void openPreferences() {
     debugPrint('Open preferences action');
-    // In a real implementation, this would open preferences dialog
   }
 
   void importData() {
     debugPrint('Import data action');
-    // In a real implementation, this would import data
   }
 
   void exportData() {
     debugPrint('Export data action');
-    // In a real implementation, this would export data
   }
 
   void transferData() {
     debugPrint('Transfer data action');
-    // In a real implementation, this would transfer data
-  }
-
-  void createCD() {
-    debugPrint('Create CD action');
-    // In a real implementation, this would create a CD
   }
 
   void openDatabaseFromToolbar() {
     debugPrint('Open database action');
-    // In a real implementation, this would open a database
   }
 
   void search() {
     debugPrint('Search action');
-    // In a real implementation, this would open search dialog
   }
 
-  void stop() {
-    debugPrint('Stop action');
-    // In a real implementation, this would stop current operation
+  void showSettings() {
+    debugPrint('Show database settings');
   }
 }
