@@ -47,6 +47,27 @@ class _ResizableDataTableState extends State<ResizableDataTable>
   final double _minColumnWidth = 80.0;
   final double _maxColumnWidth = 400.0;
 
+  // Column reordering state
+  final List<int> _columnOrder = [
+    0,
+    1,
+    2,
+    3
+  ]; // Default order: Patient ID, Name, Sex, Birth Date
+  int? _draggedColumnIndex;
+  int? _dropTargetIndex;
+  bool _isDraggingColumn = false;
+  Offset? _dragOffset;
+  final GlobalKey _stackKey = GlobalKey();
+
+  // Column definitions
+  final List<Map<String, dynamic>> _columnDefinitions = [
+    {'title': 'Patient ID', 'key': 'patientId', 'isNumeric': false},
+    {'title': 'Name', 'key': 'name', 'isNumeric': false},
+    {'title': 'Sex', 'key': 'sex', 'isNumeric': false},
+    {'title': 'Birth Date', 'key': 'birthDate', 'isNumeric': false},
+  ];
+
   // Filter controllers
   final List<TextEditingController> _filterControllers = [
     TextEditingController(), // ID filter
@@ -175,40 +196,80 @@ class _ResizableDataTableState extends State<ResizableDataTable>
         final availableWidth = constraints.maxWidth;
         final needsHorizontalScroll = totalWidth > availableWidth;
 
-        return Column(
+        return Stack(
+          key: _stackKey,
           children: [
-            // Sticky header and filter bar
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: SizedBox(
-                width: needsHorizontalScroll ? totalWidth : availableWidth,
-                child: Column(
-                  children: [
-                    // Header row
-                    _buildHeaderRow(),
-                    // Filter bar
-                    _buildFilterBar(),
-                  ],
-                ),
-              ),
-            ),
-            // Scrollable data rows
-            Expanded(
-              child: SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: SingleChildScrollView(
-                  controller: _scrollController,
+            Column(
+              children: [
+                // Sticky header and filter bar
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
                   child: SizedBox(
                     width: needsHorizontalScroll ? totalWidth : availableWidth,
                     child: Column(
-                      children: _filteredStudies
-                          .map((study) => _buildDataRow(study))
-                          .toList(),
+                      children: [
+                        // Header row
+                        _buildHeaderRow(),
+                        // Filter bar
+                        _buildFilterBar(),
+                      ],
+                    ),
+                  ),
+                ),
+                // Scrollable data rows
+                Expanded(
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: SingleChildScrollView(
+                      controller: _scrollController,
+                      child: SizedBox(
+                        width:
+                            needsHorizontalScroll ? totalWidth : availableWidth,
+                        child: Column(
+                          children: _filteredStudies
+                              .map((study) => _buildDataRow(study))
+                              .toList(),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            // Drag image overlay
+            if (_isDraggingColumn &&
+                _draggedColumnIndex != null &&
+                _dragOffset != null)
+              Positioned(
+                left: _dragOffset!.dx -
+                    (_columnWidths[_draggedColumnIndex!] /
+                        2), // Center horizontally
+                top: _dragOffset!.dy - 15, // Small offset above cursor
+                child: Material(
+                  elevation: 8.0,
+                  borderRadius: BorderRadius.circular(4),
+                  child: Container(
+                    width: _columnWidths[_draggedColumnIndex!],
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: OnisViewerConstants.paddingMedium,
+                      vertical: OnisViewerConstants.paddingSmall,
+                    ),
+                    decoration: BoxDecoration(
+                      color: OnisViewerConstants.primaryColor
+                          .withValues(alpha: 0.9),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(
+                      _columnDefinitions[_draggedColumnIndex!]['title'],
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
                 ),
               ),
-            ),
           ],
         );
       },
@@ -228,25 +289,157 @@ class _ResizableDataTableState extends State<ResizableDataTable>
         ),
       ),
       child: Row(
-        children: [
-          // Patient ID column header
-          _buildHeaderCell('Patient ID', 0, isNumeric: false),
-          _buildResizeHandle(0),
+        children: _columnOrder.asMap().entries.map((entry) {
+          final displayIndex = entry.key;
+          final columnIndex = entry.value;
+          final columnDef = _columnDefinitions[columnIndex];
 
-          // Name column header
-          _buildHeaderCell('Name', 1, isNumeric: false),
-          _buildResizeHandle(1),
+          return Row(
+            children: [
+              // Draggable header cell
+              GestureDetector(
+                onPanStart: (details) {
+                  final RenderBox? stackBox = _stackKey.currentContext
+                      ?.findRenderObject() as RenderBox?;
+                  if (stackBox != null) {
+                    final localPosition =
+                        stackBox.globalToLocal(details.globalPosition);
+                    setState(() {
+                      _isDraggingColumn = true;
+                      _draggedColumnIndex = columnIndex;
+                      _dragOffset = localPosition;
+                    });
+                  }
+                },
+                onPanUpdate: (details) {
+                  final RenderBox? stackBox = _stackKey.currentContext
+                      ?.findRenderObject() as RenderBox?;
+                  if (stackBox != null) {
+                    final localPosition =
+                        stackBox.globalToLocal(details.globalPosition);
+                    setState(() {
+                      _dragOffset = localPosition;
+                    });
+                  }
 
-          // Sex column header
-          _buildHeaderCell('Sex', 2, isNumeric: false),
-          _buildResizeHandle(2),
+                  // Calculate which column we're hovering over
+                  final RenderBox renderBox =
+                      context.findRenderObject() as RenderBox;
+                  final localPosition =
+                      renderBox.globalToLocal(details.globalPosition);
 
-          // Birth Date column header
-          _buildHeaderCell('Birth Date', 3, isNumeric: false),
-          _buildResizeHandle(3),
-        ],
+                  // Calculate the position of each column to determine drop target
+                  double currentX = 0;
+                  bool foundTarget = false;
+
+                  for (int i = 0; i < _columnOrder.length; i++) {
+                    final colIndex = _columnOrder[i];
+                    final colWidth = _columnWidths[colIndex];
+
+                    // Check if mouse is within this column's bounds
+                    if (localPosition.dx >= currentX &&
+                        localPosition.dx <= currentX + colWidth) {
+                      // If dragging over a different column, set it as drop target
+                      if (colIndex != _draggedColumnIndex) {
+                        setState(() {
+                          _dropTargetIndex = i;
+                        });
+                      } else {
+                        // If dragging over the same column, clear the drop target
+                        setState(() {
+                          _dropTargetIndex = null;
+                        });
+                      }
+                      foundTarget = true;
+                      break;
+                    }
+                    currentX += colWidth;
+                  }
+
+                  // If not found in any column, check if we're at the end
+                  if (!foundTarget && localPosition.dx > currentX) {
+                    setState(() {
+                      _dropTargetIndex = _columnOrder.length; // Drop at the end
+                    });
+                  }
+                },
+                onPanEnd: (details) {
+                  if (_draggedColumnIndex != null && _dropTargetIndex != null) {
+                    _reorderColumn(_draggedColumnIndex!, _dropTargetIndex!);
+                  }
+                  setState(() {
+                    _isDraggingColumn = false;
+                    _draggedColumnIndex = null;
+                    _dropTargetIndex = null;
+                    _dragOffset = null;
+                  });
+                },
+                child: ClipRect(
+                  child: Stack(
+                    children: [
+                      Container(
+                        decoration: BoxDecoration(
+                          color: _draggedColumnIndex == columnIndex
+                              ? OnisViewerConstants.surfaceColor
+                                  .withValues(alpha: 0.5)
+                              : _dropTargetIndex == displayIndex
+                                  ? OnisViewerConstants.primaryColor
+                                      .withValues(alpha: 0.2)
+                                  : null,
+                        ),
+                        child: _buildHeaderCell(columnDef['title'], columnIndex,
+                            isNumeric: columnDef['isNumeric']),
+                      ),
+                      if (_dropTargetIndex == displayIndex)
+                        Positioned.fill(
+                          child: Container(
+                            decoration: BoxDecoration(
+                              border: Border.all(
+                                color: OnisViewerConstants.primaryColor,
+                                width: 2,
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+              // Resize handle
+              _buildResizeHandle(columnIndex),
+            ],
+          );
+        }).toList(),
       ),
     );
+  }
+
+  /// Reorder columns based on drag and drop
+  void _reorderColumn(int draggedColumn, int targetIndex) {
+    final oldIndex = _columnOrder.indexOf(draggedColumn);
+
+    // If dropping on the same column, cancel the operation
+    if (oldIndex == targetIndex) {
+      return;
+    }
+
+    if (oldIndex != -1 &&
+        targetIndex >= 0 &&
+        targetIndex <= _columnOrder.length &&
+        oldIndex != targetIndex) {
+      setState(() {
+        // Remove the dragged column first
+        _columnOrder.removeAt(oldIndex);
+
+        // Insert at the target position
+        // If dropping at the end (after last column), append to the end
+        if (targetIndex >= _columnOrder.length) {
+          _columnOrder.add(draggedColumn);
+        } else {
+          _columnOrder.insert(targetIndex, draggedColumn);
+        }
+      });
+    }
   }
 
   /// Build the filter bar
@@ -262,23 +455,37 @@ class _ResizableDataTableState extends State<ResizableDataTable>
         ),
       ),
       child: Row(
-        children: [
-          // Patient ID filter
-          _buildFilterCell(0, 'Filter Patient ID...'),
-          _buildResizeHandle(0),
+        children: _columnOrder.map((columnIndex) {
+          final columnDef = _columnDefinitions[columnIndex];
+          String hintText;
 
-          // Name filter
-          _buildFilterCell(1, 'Filter Name...'),
-          _buildResizeHandle(1),
+          // Get the correct hint text based on column definition
+          switch (columnDef['key']) {
+            case 'patientId':
+              hintText = 'Filter Patient ID...';
+              break;
+            case 'name':
+              hintText = 'Filter Name...';
+              break;
+            case 'sex':
+              hintText = 'Filter Sex...';
+              break;
+            case 'birthDate':
+              hintText = 'Filter Date...';
+              break;
+            default:
+              hintText = 'Filter...';
+          }
 
-          // Sex filter
-          _buildFilterCell(2, 'Filter Sex...'),
-          _buildResizeHandle(2),
-
-          // Birth Date filter
-          _buildFilterCell(3, 'Filter Date...'),
-          _buildResizeHandle(3),
-        ],
+          return Row(
+            children: [
+              // Filter cell
+              _buildFilterCell(columnIndex, hintText),
+              // Resize handle
+              _buildResizeHandle(columnIndex),
+            ],
+          );
+        }).toList(),
       ),
     );
   }
@@ -445,23 +652,37 @@ class _ResizableDataTableState extends State<ResizableDataTable>
           ),
         ),
         child: Row(
-          children: [
-            // Patient ID cell
-            _buildDataCell(study.patientId ?? 'N/A', 0, isSelected, study),
-            _buildResizeHandle(0),
+          children: _columnOrder.map((columnIndex) {
+            final columnDef = _columnDefinitions[columnIndex];
+            String cellData;
 
-            // Name cell
-            _buildDataCell(study.name, 1, isSelected, study),
-            _buildResizeHandle(1),
+            // Get the correct data based on column definition
+            switch (columnDef['key']) {
+              case 'patientId':
+                cellData = study.patientId ?? 'N/A';
+                break;
+              case 'name':
+                cellData = study.name;
+                break;
+              case 'sex':
+                cellData = study.sex;
+                break;
+              case 'birthDate':
+                cellData = _formatDate(study.birthDate);
+                break;
+              default:
+                cellData = 'N/A';
+            }
 
-            // Sex cell
-            _buildDataCell(study.sex, 2, isSelected, study),
-            _buildResizeHandle(2),
-
-            // Birth Date cell
-            _buildDataCell(_formatDate(study.birthDate), 3, isSelected, study),
-            _buildResizeHandle(3),
-          ],
+            return Row(
+              children: [
+                // Data cell
+                _buildDataCell(cellData, columnIndex, isSelected, study),
+                // Resize handle
+                _buildResizeHandle(columnIndex),
+              ],
+            );
+          }).toList(),
         ),
       ),
     );
