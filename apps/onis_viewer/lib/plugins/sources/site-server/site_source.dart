@@ -1,11 +1,85 @@
 import 'dart:core';
 
 import 'package:flutter/material.dart';
+import 'package:onis_viewer/api/ov_api.dart';
 
 import '../../../core/database_source.dart';
 import 'credentials/credential_store.dart';
 import 'ui/site_server_connection_panel.dart';
 import 'ui/site_server_login_panel.dart';
+
+/// Represents different types of child sources that can be created under a site source
+enum SiteChildSourceType {
+  partition,
+  album,
+  dicomPacs,
+  dicomFolder,
+  partitionFolder
+}
+
+/// A child source under a site source (partition, album, or DICOM PACS)
+class SiteChildSource extends DatabaseSource {
+  final SiteChildSourceType type;
+  final String parentSiteUid;
+
+  SiteChildSource({
+    required super.uid,
+    required super.name,
+    required this.type,
+    required this.parentSiteUid,
+    super.metadata,
+  }) {
+    // Child sources are active by default since they represent available data
+    isActive = true;
+  }
+
+  /// Get the type as a display string
+  String get typeDisplayName {
+    switch (type) {
+      case SiteChildSourceType.partition:
+        return 'Partition';
+      case SiteChildSourceType.album:
+        return 'Album';
+      case SiteChildSourceType.dicomPacs:
+        return 'DICOM PACS';
+      case SiteChildSourceType.dicomFolder:
+        return 'DICOM Folder';
+      case SiteChildSourceType.partitionFolder:
+        return 'Partition Folder';
+    }
+  }
+
+  /// Get an icon for this source type
+  IconData get typeIcon {
+    switch (type) {
+      case SiteChildSourceType.partition:
+        return Icons.folder;
+      case SiteChildSourceType.album:
+        return Icons.photo_library;
+      case SiteChildSourceType.dicomPacs:
+        return Icons.medical_services;
+      case SiteChildSourceType.dicomFolder:
+        return Icons.folder_open;
+      case SiteChildSourceType.partitionFolder:
+        return Icons.folder_special;
+    }
+  }
+
+  @override
+  bool get canSearch => isActive;
+
+  @override
+  void search() {
+    debugPrint('SiteChildSource.search() called for $typeDisplayName: $name');
+    // Trigger search in the database controller
+    final api = OVApi();
+    final dbApi = api.plugins.getPublicApi('onis_database_plugin');
+    if (dbApi != null) {
+      // This will trigger the search functionality in the database page
+      debugPrint('Triggering search for child source: $name');
+    }
+  }
+}
 
 class SiteSource extends DatabaseSource {
   /// Public constructor for a site source (without parent)
@@ -21,12 +95,38 @@ class SiteSource extends DatabaseSource {
   bool _isDisconnecting = false;
 
   /// Get the current logged-in username (if any)
+  @override
   String? get currentUsername => _lastUsername;
 
   /// Get whether the source is currently disconnecting
+  @override
   bool get isDisconnecting => _isDisconnecting;
 
+  /// Get whether this source is a root site source (always true for SiteSource)
+  bool get isRootSite => true;
+
+  /// Get child sources of a specific type
+  List<SiteChildSource> getChildSourcesByType(SiteChildSourceType type) {
+    return subSources
+        .whereType<SiteChildSource>()
+        .where((source) => source.type == type)
+        .toList();
+  }
+
+  /// Get all partitions
+  List<SiteChildSource> get partitions =>
+      getChildSourcesByType(SiteChildSourceType.partition);
+
+  /// Get all albums
+  List<SiteChildSource> get albums =>
+      getChildSourcesByType(SiteChildSourceType.album);
+
+  /// Get all DICOM PACS sources
+  List<SiteChildSource> get dicomPacsSources =>
+      getChildSourcesByType(SiteChildSourceType.dicomPacs);
+
   /// Disconnect from the source
+  @override
   Future<void> disconnect() async {
     _isDisconnecting = true;
     notifyListeners();
@@ -41,6 +141,10 @@ class SiteSource extends DatabaseSource {
     _lastRemember = false;
     _isLoggingIn = false;
     _isDisconnecting = false;
+
+    // Note: Child sources should be removed by DatabaseSourceManager
+    debugPrint('Disconnected from site: $name');
+
     notifyListeners();
   }
 
@@ -73,6 +177,9 @@ class SiteSource extends DatabaseSource {
     // Mark source as connected
     isActive = true; // Triggers listeners via setter
 
+    // Create child sources after successful authentication
+    _createChildSources();
+
     // Reset logging-in flag
     _isLoggingIn = false;
     notifyListeners();
@@ -80,6 +187,11 @@ class SiteSource extends DatabaseSource {
 
   @override
   Widget? buildLoginPanel(BuildContext context) {
+    // Only show login panel if not authenticated and no child sources exist
+    if (isActive || subSources.isNotEmpty) {
+      return null;
+    }
+
     return KeyedSubtree(
       key: ValueKey<String>('login-$uid'),
       child: FutureBuilder<SiteServerCredentials?>(
@@ -126,10 +238,62 @@ class SiteSource extends DatabaseSource {
   }
 
   @override
+  bool get canSearch => isActive;
+
+  @override
   void search() {
     // Site source specific open/search implementation
     debugPrint('SiteSource.search() called for source: $name');
     // TODO: Implement site-specific search functionality
     // This could open a search dialog, navigate to a search page, etc.
+  }
+
+  void _createChildSources() {
+    // Create partition source as a child of this site source
+
+    final partitionsFolder = SiteChildSource(
+      uid: '${uid}_partitions',
+      name: 'Partitions',
+      type: SiteChildSourceType.partitionFolder,
+      parentSiteUid: uid,
+      metadata: {
+        'type': 'partition_list',
+        'parent_site': uid,
+      },
+    );
+
+    OVApi().sources.registerSource(partitionsFolder, parentUid: uid);
+
+    final partition1 = SiteChildSource(
+      uid: '${uid}_partition1',
+      name: 'Partition 1',
+      type: SiteChildSourceType.partition,
+      parentSiteUid: uid,
+      metadata: {
+        'type': 'partition',
+        'parent_site': uid,
+        'description': 'Main clinical data partition',
+        'size': '2.5 TB',
+      },
+    );
+    OVApi().sources.registerSource(partition1, parentUid: partitionsFolder.uid);
+
+    final partition2 = SiteChildSource(
+      uid: '${uid}_partition2',
+      name: 'Partition 2',
+      type: SiteChildSourceType.partition,
+      parentSiteUid: uid,
+      metadata: {
+        'type': 'partition',
+        'parent_site': uid,
+        'description': 'Research and development data',
+        'size': '1.8 TB',
+      },
+    );
+    OVApi().sources.registerSource(partition2, parentUid: partitionsFolder.uid);
+
+    debugPrint('Created child sources for site: $name');
+    debugPrint('- Partitions folder: ${partitionsFolder.name}');
+    debugPrint('- Partitions: ${partition1.name}, ${partition2.name}');
   }
 }
