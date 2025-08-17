@@ -12,4 +12,9 @@ abstract class DatabaseApi {
 
   /// Stream emitting selection changes
   Stream<DatabaseSource?> get onSelectionChanged;
+
+  /// Expand or collapse a source node in the source tree
+  /// [uid] - The UID of the source to expand/collapse
+  /// [expand] - true to expand, false to collapse
+  void expandSourceNode(String uid, {bool expand = true});
 }
