@@ -160,6 +160,10 @@ class SiteSource extends DatabaseSource {
     _isLoggingIn = true;
     notifyListeners();
 
+    // Simulate slow server response for login
+    await Future.delayed(const Duration(seconds: 1));
+
+    // Store or clear credentials based on remember flag
     if (remember) {
       await SiteServerCredentialStore.save(
         uid,
@@ -171,14 +175,18 @@ class SiteSource extends DatabaseSource {
       await SiteServerCredentialStore.clear(uid);
     }
 
-    // Simulate slow server response
-    await Future.delayed(const Duration(seconds: 1));
-
-    // Mark source as connected
-    isActive = true; // Triggers listeners via setter
+    // Mark source as active
+    isActive = true;
 
     // Create child sources after successful authentication
     _createChildSources();
+
+    // Auto-expand the site source node in the source tree
+    final api = OVApi();
+    final dbApi = api.plugins.getPublicApi('onis_database_plugin');
+    if (dbApi != null) {
+      dbApi.expandSourceNode(uid, expand: true, expandChildren: true);
+    }
 
     // Reset logging-in flag
     _isLoggingIn = false;

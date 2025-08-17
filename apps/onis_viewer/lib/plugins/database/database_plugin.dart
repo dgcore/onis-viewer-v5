@@ -8,6 +8,7 @@ import '../../core/page_type.dart';
 import '../../core/plugin_interface.dart';
 import 'page/database_page.dart';
 import 'public/database_api.dart';
+import 'ui/database_source_bar.dart';
 
 class _DatabaseApiImpl implements DatabaseApi {
   final _selectionController = StreamController<DatabaseSource?>.broadcast();
@@ -32,6 +33,16 @@ class _DatabaseApiImpl implements DatabaseApi {
 
   @override
   Stream<DatabaseSource?> get onSelectionChanged => _selectionController.stream;
+
+  @override
+  void expandSourceNode(String uid, {bool expand = true, bool expandChildren = false}) {
+    // Direct call to static methods in DatabaseSourceBar
+    if (expand) {
+      DatabaseSourceBar.expandNode(uid, expandChildren: expandChildren);
+    } else {
+      DatabaseSourceBar.collapseNode(uid);
+    }
+  }
 }
 
 /// Database page type constant
