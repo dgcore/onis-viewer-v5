@@ -35,7 +35,8 @@ class _DatabaseApiImpl implements DatabaseApi {
   Stream<DatabaseSource?> get onSelectionChanged => _selectionController.stream;
 
   @override
-  void expandSourceNode(String uid, {bool expand = true, bool expandChildren = false}) {
+  void expandSourceNode(String uid,
+      {bool expand = true, bool expandChildren = false}) {
     // Direct call to static methods in DatabaseSourceBar
     if (expand) {
       DatabaseSourceBar.expandNode(uid, expandChildren: expandChildren);
