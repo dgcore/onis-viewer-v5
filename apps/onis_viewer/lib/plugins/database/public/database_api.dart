@@ -16,5 +16,5 @@ abstract class DatabaseApi {
   /// Expand or collapse a source node in the source tree
   /// [uid] - The UID of the source to expand/collapse
   /// [expand] - true to expand, false to collapse
-  void expandSourceNode(String uid, {bool expand = true});
+  void expandSourceNode(String uid, {bool expand = true, bool expandChildren = false});
 }

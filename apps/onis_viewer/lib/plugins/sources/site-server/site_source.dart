@@ -161,7 +161,7 @@ class SiteSource extends DatabaseSource {
     notifyListeners();
 
     // Simulate slow server response for login
-    await Future.delayed(const Duration(seconds: 10));
+    await Future.delayed(const Duration(seconds: 1));
 
     // Store or clear credentials based on remember flag
     if (remember) {
@@ -185,7 +185,7 @@ class SiteSource extends DatabaseSource {
     final api = OVApi();
     final dbApi = api.plugins.getPublicApi('onis_database_plugin');
     if (dbApi != null) {
-      dbApi.expandSourceNode(uid, expand: true);
+      dbApi.expandSourceNode(uid, expand: true, expandChildren: true);
     }
 
     // Reset logging-in flag

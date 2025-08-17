@@ -22,8 +22,8 @@ class DatabaseSourceBar extends StatefulWidget {
   State<DatabaseSourceBar> createState() => _DatabaseSourceBarState();
 
   /// Static method to expand a node by UID
-  static void expandNode(String uid) {
-    _DatabaseSourceBarState.expandNode(uid);
+  static void expandNode(String uid, {bool expandChildren = false}) {
+    _DatabaseSourceBarState.expandNode(uid, expandChildren: expandChildren);
   }
 
   /// Static method to collapse a node by UID
@@ -76,9 +76,21 @@ class _DatabaseSourceBarState extends State<DatabaseSourceBar> {
   }
 
   /// Static method to expand a node by UID
-  static void expandNode(String uid) {
+  static void expandNode(String uid, {bool expandChildren = false}) {
     _currentInstance?.setState(() {
       _currentInstance!._expanded.add(uid);
+
+      if (expandChildren) {
+        // Expand immediate children
+        final source = _currentInstance!._manager.allSources
+            .where((s) => s.uid == uid)
+            .firstOrNull;
+        if (source != null) {
+          for (final child in source.subSources) {
+            _currentInstance!._expanded.add(child.uid);
+          }
+        }
+      }
     });
   }
 
