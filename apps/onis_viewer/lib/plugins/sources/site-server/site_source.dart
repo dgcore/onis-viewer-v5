@@ -79,11 +79,8 @@ class SiteChildSource extends DatabaseSource {
         .firstOrNull;
 
     if (parentSite != null) {
-      // Use dynamic casting to access the currentUsername property
-      final dynamic dynamicParent = parentSite;
-      return dynamicParent.currentUsername;
+      return parentSite.currentUsername;
     }
-
     return null;
   }
 
@@ -96,6 +93,27 @@ class SiteChildSource extends DatabaseSource {
     if (dbApi != null) {
       // This will trigger the search functionality in the database page
       debugPrint('Triggering search for child source: $name');
+    }
+  }
+
+  @override
+  Future<void> disconnect() async {
+    debugPrint(
+        'SiteChildSource.disconnect() called for $typeDisplayName: $name');
+
+    // Find the parent site source and call its disconnect method
+    final api = OVApi();
+    final manager = api.sources;
+    final parentSite = manager.allSources
+        .where((source) => source.uid == parentSiteUid)
+        .firstOrNull;
+
+    if (parentSite != null) {
+      debugPrint(
+          'Calling disconnect on parent site source: ${parentSite.name}');
+      await parentSite.disconnect();
+    } else {
+      debugPrint('Parent site source not found for child source: $name');
     }
   }
 }
