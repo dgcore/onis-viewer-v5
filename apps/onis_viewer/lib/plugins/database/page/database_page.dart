@@ -118,7 +118,7 @@ class _DatabasePageState extends BasePageState<DatabasePage> {
           minWidth: 250,
           maxWidth: 500,
           child: DatabaseSourceBar(
-            selectedSource: null,
+            selectedSource: selected,
             onSourceSelected: (source) {
               _dbApi?.selectSourceByUid(source.uid);
             },

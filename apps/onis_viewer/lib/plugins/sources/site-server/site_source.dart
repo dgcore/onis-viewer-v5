@@ -21,6 +21,7 @@ enum SiteChildSourceType {
 class SiteChildSource extends DatabaseSource {
   final SiteChildSourceType type;
   final String parentSiteUid;
+  bool _isDisconnecting = false;
 
   SiteChildSource({
     required super.uid,
@@ -84,6 +85,28 @@ class SiteChildSource extends DatabaseSource {
     return null;
   }
 
+  /// Get whether the parent site source is currently disconnecting
+  @override
+  bool get isDisconnecting {
+    // Return local disconnecting state first, then check parent
+    if (_isDisconnecting) {
+      return true;
+    }
+
+    // Find the parent site source and get its disconnecting state
+    final api = OVApi();
+    final manager = api.sources;
+    final parentSite = manager.allSources
+        .where((source) => source.uid == parentSiteUid)
+        .firstOrNull;
+
+    if (parentSite != null) {
+      return parentSite.isDisconnecting;
+    }
+
+    return false;
+  }
+
   @override
   void search() {
     debugPrint('SiteChildSource.search() called for $typeDisplayName: $name');
@@ -101,6 +124,10 @@ class SiteChildSource extends DatabaseSource {
     debugPrint(
         'SiteChildSource.disconnect() called for $typeDisplayName: $name');
 
+    // Set local disconnecting state immediately
+    _isDisconnecting = true;
+    notifyListeners();
+
     // Find the parent site source and call its disconnect method
     final api = OVApi();
     final manager = api.sources;
@@ -114,6 +141,16 @@ class SiteChildSource extends DatabaseSource {
       await parentSite.disconnect();
     } else {
       debugPrint('Parent site source not found for child source: $name');
+    }
+
+    // Reset local disconnecting state
+    _isDisconnecting = false;
+    notifyListeners();
+
+    // Check and fix selection after disconnect completes
+    final dbApi = api.plugins.getPublicApi('onis_database_plugin');
+    if (dbApi != null) {
+      dbApi.checkAndFixSelection(uid);
     }
   }
 }
