@@ -68,6 +68,25 @@ class SiteChildSource extends DatabaseSource {
   @override
   bool get canSearch => isActive;
 
+  /// Get the current username from the parent site source
+  @override
+  String? get currentUsername {
+    // Find the parent site source and get its username
+    final api = OVApi();
+    final manager = api.sources;
+    final parentSite = manager.allSources
+        .where((source) => source.uid == parentSiteUid)
+        .firstOrNull;
+
+    if (parentSite != null) {
+      // Use dynamic casting to access the currentUsername property
+      final dynamic dynamicParent = parentSite;
+      return dynamicParent.currentUsername;
+    }
+
+    return null;
+  }
+
   @override
   void search() {
     debugPrint('SiteChildSource.search() called for $typeDisplayName: $name');
