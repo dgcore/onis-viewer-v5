@@ -134,6 +134,21 @@ class SiteSource extends DatabaseSource {
     // Simulate slow server response for disconnect
     await Future.delayed(const Duration(seconds: 10));
 
+    // Remove all child sources that were created during login
+    final api = OVApi();
+    final manager = api.sources;
+
+    // Get all child sources of this site source
+    final childSources = manager.allSources
+        .where((source) =>
+            source is SiteChildSource && (source).parentSiteUid == uid)
+        .toList();
+
+    // Remove each child source
+    for (final childSource in childSources) {
+      manager.removeSource(childSource);
+    }
+
     // Mark source as disconnected
     isActive = false;
     _lastUsername = null;
@@ -142,8 +157,8 @@ class SiteSource extends DatabaseSource {
     _isLoggingIn = false;
     _isDisconnecting = false;
 
-    // Note: Child sources should be removed by DatabaseSourceManager
-    debugPrint('Disconnected from site: $name');
+    debugPrint(
+        'Disconnected from site: $name (removed ${childSources.length} child sources)');
 
     notifyListeners();
   }
