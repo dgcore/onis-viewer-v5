@@ -44,17 +44,6 @@ class _DatabaseApiImpl implements DatabaseApi {
       DatabaseSourceBar.collapseNode(uid);
     }
   }
-
-  @override
-  void expandSourceNode(String uid,
-      {bool expand = true, bool expandChildren = false}) {
-    // Direct call to static methods in DatabaseSourceBar
-    if (expand) {
-      DatabaseSourceBar.expandNode(uid, expandChildren: expandChildren);
-    } else {
-      DatabaseSourceBar.collapseNode(uid);
-    }
-  }
 }
 
 /// Database page type constant
