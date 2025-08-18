@@ -2,6 +2,8 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 
+import '../../../api/core/ov_api_core.dart';
+import '../../../core/database_source.dart';
 import '../../../core/models/study.dart';
 
 class DatabaseController extends ChangeNotifier {
@@ -43,8 +45,30 @@ class DatabaseController extends ChangeNotifier {
   }
 
   Future<void> initialize() async {
+    // Listen to source removal events to clear cache
+    final api = OVApi();
+    api.sources.onSourceUnregistered.listen(_onSourceRemoved);
+
+    // Listen to source registration events to clear cache for new sources
+    api.sources.onSourceRegistered.listen(_onSourceRegistered);
+
     // No dummy studies - studies will be loaded per source as needed
     debugPrint('DatabaseController initialized');
+  }
+
+  /// Handle source removal by clearing its cached data
+  void _onSourceRemoved(DatabaseSource source) {
+    debugPrint('Source removed, clearing cache for: ${source.uid}');
+    clearStudiesForSource(source.uid);
+    _scrollPositionsBySource.remove(source.uid);
+  }
+
+  /// Handle source registration by clearing any existing cache for the new source
+  void _onSourceRegistered(DatabaseSource source) {
+    debugPrint(
+        'Source registered, clearing any existing cache for: ${source.uid}');
+    clearStudiesForSource(source.uid);
+    _scrollPositionsBySource.remove(source.uid);
   }
 
   @override
