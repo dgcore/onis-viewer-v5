@@ -24,8 +24,77 @@ class _DatabaseApiImpl implements DatabaseApi {
           (s) => s != null,
           orElse: () => null,
         );
-    _selected = match;
+
+    if (match != null) {
+      _selected = match;
+    } else {
+      // Source not found, try to select an alternative
+      debugPrint('Source with UID $uid not found, selecting alternative');
+      _selectAlternativeSource();
+    }
+
     _selectionController.add(_selected);
+  }
+
+  /// Select an alternative source when the current selection is no longer available
+  void _selectAlternativeSource([String? destroyedSourceUid]) {
+    final manager = OVApi().sources;
+    final allSources = manager.allSources;
+
+    if (allSources.isEmpty) {
+      _selected = null;
+      return;
+    }
+
+    // If we know which source was destroyed, try to find its parent first
+    if (destroyedSourceUid != null) {
+      // Look for a source that has the destroyed source as a child
+      final parentSource = allSources.where((source) {
+        return source.subSources
+            .any((child) => child.uid == destroyedSourceUid);
+      }).firstOrNull;
+
+      if (parentSource != null) {
+        _selected = parentSource;
+        debugPrint('Selected parent of destroyed source: ${parentSource.name}');
+        return;
+      }
+    }
+
+    // Try to find an active source first
+    final activeSource = allSources.where((s) => s.isActive).firstOrNull;
+    if (activeSource != null) {
+      _selected = activeSource;
+      debugPrint('Selected alternative active source: ${activeSource.name}');
+      return;
+    }
+
+    // If no active sources, select the first available source
+    _selected = allSources.first;
+    debugPrint('Selected alternative source: ${_selected!.name}');
+  }
+
+  /// Check if the currently selected source still exists and select alternative if needed
+  @override
+  void checkAndFixSelection([String? destroyedSourceUid]) {
+    if (_selected == null) {
+      _selectAlternativeSource(destroyedSourceUid);
+      if (_selected != null) {
+        _selectionController.add(_selected);
+      }
+      return;
+    }
+
+    final manager = OVApi().sources;
+    final sourceStillExists =
+        manager.allSources.any((s) => s.uid == _selected!.uid);
+
+    if (!sourceStillExists) {
+      debugPrint(
+          'Currently selected source no longer exists, selecting alternative');
+      _selectAlternativeSource(destroyedSourceUid);
+      _selectionController.add(_selected);
+    }
   }
 
   @override
