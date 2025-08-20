@@ -3,8 +3,10 @@ import 'dart:core';
 import 'package:flutter/material.dart';
 import 'package:onis_viewer/api/ov_api.dart';
 
+import '../../../api/request/async_request.dart';
 import '../../../core/database_source.dart';
 import 'credentials/credential_store.dart';
+import 'request/site_async_request.dart';
 import 'ui/site_server_connection_panel.dart';
 import 'ui/site_server_login_panel.dart';
 
@@ -161,6 +163,10 @@ class SiteSource extends DatabaseSource {
   bool _lastRemember = false;
   bool _isLoggingIn = false;
   bool _isDisconnecting = false;
+
+  /// Map to store SiteAsyncRequest instances
+  /// First key: source UID, Second key: RequestType
+  final Map<String, Map<RequestType, List<SiteAsyncRequest>>> _requests = {};
 
   /// Get the current logged-in username (if any)
   @override

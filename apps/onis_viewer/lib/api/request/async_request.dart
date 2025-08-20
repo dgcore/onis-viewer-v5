@@ -60,12 +60,16 @@ abstract class AsyncResponse {
 
 /// Interface for asynchronous requests that can be sent and cancelled
 abstract class AsyncRequest {
-  /// Send the request with the provided JSON data
+  /// The type of request
+  RequestType get requestType;
+
+  /// The JSON data for the request
+  Map<String, dynamic>? get data;
+
+  /// Send the request
   ///
-  /// [type] - The type of request to send
-  /// [data] - The JSON structure containing the request data
   /// Returns a Future that completes with the response when the request is finished
-  Future<AsyncResponse> send(RequestType type, [Map<String, dynamic>? data]);
+  Future<AsyncResponse> send();
 
   /// Cancel the current request if it's in progress
   ///
