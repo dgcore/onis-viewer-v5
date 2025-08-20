@@ -48,7 +48,18 @@ class _DatabaseApiImpl implements DatabaseApi {
 
     // If we know which source was destroyed, try to find its parent first
     if (destroyedSourceUid != null) {
-      // Look for a source that has the destroyed source as a child
+      // First, try to find a source with this exact UID (in case it's a parent site UID)
+      final exactMatch = allSources
+          .where((source) => source.uid == destroyedSourceUid)
+          .firstOrNull;
+      if (exactMatch != null) {
+        _selected = exactMatch;
+        debugPrint(
+            'Selected exact match for destroyed source: ${exactMatch.name}');
+        return;
+      }
+
+      // If no exact match, look for a source that has the destroyed source as a child
       final parentSource = allSources.where((source) {
         return source.subSources
             .any((child) => child.uid == destroyedSourceUid);

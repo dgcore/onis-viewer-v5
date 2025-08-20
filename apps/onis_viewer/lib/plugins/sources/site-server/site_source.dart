@@ -146,12 +146,6 @@ class SiteChildSource extends DatabaseSource {
     // Reset local disconnecting state
     _isDisconnecting = false;
     notifyListeners();
-
-    // Check and fix selection after disconnect completes
-    final dbApi = api.plugins.getPublicApi('onis_database_plugin');
-    if (dbApi != null) {
-      dbApi.checkAndFixSelection(uid);
-    }
   }
 }
 
@@ -235,6 +229,13 @@ class SiteSource extends DatabaseSource {
         'Disconnected from site: $name (removed ${childSources.length} child sources)');
 
     notifyListeners();
+
+    // Check and fix selection after disconnect completes
+    // Use the current site UID for selection logic
+    final dbApi = api.plugins.getPublicApi('onis_database_plugin');
+    if (dbApi != null) {
+      dbApi.checkAndFixSelection(uid);
+    }
   }
 
   /// Mock login: optionally store credentials, wait 10 seconds, then mark active
