@@ -43,6 +43,9 @@ dependencies:
   flutter_advanced_table: ^1.1.5
   flutter_secure_storage: ^9.2.2
 
+  # HTTP client for making network requests
+  http: ^1.2.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
