@@ -3,6 +3,8 @@ import 'dart:core';
 
 import 'package:flutter/widgets.dart';
 
+import '../api/request/async_request.dart';
+
 // Note: SiteSource import removed to avoid circular dependency
 // We'll use runtime type checking instead
 
@@ -138,6 +140,15 @@ class DatabaseSource extends ChangeNotifier {
   /// Default implementation does nothing
   void search() {
     // Default implementation - subclasses should override
+  }
+
+  /// Create an AsyncRequest for the specified request type
+  /// Should be overridden by subclasses to provide specific request implementations
+  /// Default implementation returns null
+  AsyncRequest? createRequest(RequestType requestType,
+      [Map<String, dynamic>? data]) {
+    // Default implementation - subclasses should override
+    return null;
   }
 
   /// Get the current username for this source (if applicable)

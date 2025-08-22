@@ -179,6 +179,22 @@ class SiteSource extends DatabaseSource {
   /// Get whether this source is a root site source (always true for SiteSource)
   bool get isRootSite => true;
 
+  /// Create an AsyncRequest for the specified request type
+  /// Overrides the base class method to create SiteAsyncRequest instances
+  @override
+  AsyncRequest? createRequest(RequestType requestType,
+      [Map<String, dynamic>? data]) {
+    // For now, we'll create a basic SiteAsyncRequest
+    // In a real implementation, you would need to get the base URL from metadata or configuration
+    final baseUrl = metadata['baseUrl'] as String? ?? 'https://api.example.com';
+
+    return SiteAsyncRequest(
+      baseUrl: baseUrl,
+      requestType: requestType,
+      data: data,
+    );
+  }
+
   /// Get child sources of a specific type
   List<SiteChildSource> getChildSourcesByType(SiteChildSourceType type) {
     return subSources
@@ -350,6 +366,30 @@ class SiteSource extends DatabaseSource {
     debugPrint('SiteSource.search() called for source: $name');
     // TODO: Implement site-specific search functionality
     // This could open a search dialog, navigate to a search page, etc.
+
+    // Generate 500 studies with random patient IDs for realistic testing
+    /*for (int i = 1; i <= 500; i++) {
+      final modality = modalities[i % modalities.length];
+      final status = statuses[i % statuses.length];
+      final sex = sexes[i % sexes.length];
+      final birthYear = 1950 + (i % 50);
+      final birthMonth = 1 + (i % 12);
+      final birthDay = 1 + (i % 28);
+      final studyYear = 2020 + (i % 5);
+      final studyMonth = 1 + (i % 12);
+      final studyDay = 1 + (i % 28);
+
+      dummyStudies.add(Study(
+        id: 'ST_SEARCH_${i.toString().padLeft(3, '0')}',
+        name: 'Patient ${i.toString().padLeft(3, '0')}',
+        sex: sex,
+        birthDate: DateTime(birthYear, birthMonth, birthDay),
+        patientId: 'P${(100000 + random.nextInt(900000)).toString()}',
+        studyDate:
+            '$studyYear-${studyMonth.toString().padLeft(2, '0')}-${studyDay.toString().padLeft(2, '0')}',
+        modality: modality,
+        status: status,
+      ));*/
   }
 
   void _createChildSources() {
