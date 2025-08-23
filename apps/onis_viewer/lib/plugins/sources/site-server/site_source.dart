@@ -130,6 +130,9 @@ class SiteChildSource extends DatabaseSource {
     _isDisconnecting = true;
     notifyListeners();
 
+    // Emit disconnection event and wait for subscribers to complete
+    await emitDisconnecting();
+
     // Find the parent site source and call its disconnect method
     final api = OVApi();
     final manager = api.sources;
@@ -221,8 +224,11 @@ class SiteSource extends DatabaseSource {
     _isDisconnecting = true;
     notifyListeners();
 
+    // Emit disconnection event and wait for subscribers to complete
+    await emitDisconnecting();
+
     // Simulate slow server response for disconnect
-    await Future.delayed(const Duration(seconds: 10));
+    //await Future.delayed(const Duration(seconds: 10));
 
     // Remove all child sources that were created during login
     final api = OVApi();

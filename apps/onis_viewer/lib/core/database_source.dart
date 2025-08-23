@@ -8,6 +8,14 @@ import '../api/request/async_request.dart';
 // Note: SiteSource import removed to avoid circular dependency
 // We'll use runtime type checking instead
 
+/// Represents a pending disconnection operation
+class PendingDisconnection {
+  final Completer<void> completer;
+  int remainingSubscribers;
+
+  PendingDisconnection(this.completer, this.remainingSubscribers);
+}
+
 /// Represents a database source with hierarchical structure
 /// Each source can have sub-sources and maintains a weak reference to its parent
 class DatabaseSource extends ChangeNotifier {
@@ -28,6 +36,89 @@ class DatabaseSource extends ChangeNotifier {
 
   /// Additional metadata for this source
   final Map<String, dynamic> _metadata = {};
+
+  /// Stream controller for disconnection events
+  static final StreamController<String> _disconnectionController =
+      StreamController<String>.broadcast();
+
+  /// Stream for disconnection events (source UID)
+  static Stream<String> get onDisconnecting {
+    _subscriberCount++;
+    debugPrint('New subscriber added. Total subscribers: $_subscriberCount');
+    return _disconnectionController.stream;
+  }
+
+  /// Track the number of active subscribers
+  static int _subscriberCount = 0;
+
+  /// Map to track pending disconnections by source UID
+  static final Map<String, PendingDisconnection> _pendingDisconnections = {};
+
+  /// Subscribe to disconnection events and return the subscription
+  static StreamSubscription<String> subscribeToDisconnection(
+      Function(String) onDisconnecting) {
+    _subscriberCount++;
+    debugPrint(
+        'Subscribed to disconnection events. Total subscribers: $_subscriberCount');
+    return _disconnectionController.stream.listen(onDisconnecting);
+  }
+
+  /// Unsubscribe from disconnection events
+  static Future<void> unsubscribeToDisconnection(
+      StreamSubscription<String>? subscription) async {
+    if (subscription != null) {
+      await subscription.cancel();
+      _subscriberCount = (_subscriberCount - 1).clamp(0, _subscriberCount);
+      debugPrint(
+          'Unsubscribed from disconnection events. Total subscribers: $_subscriberCount');
+    }
+  }
+
+  /// Emit a disconnection event for this source and return a completer
+  Future<void> emitDisconnecting() async {
+    debugPrint('Emitting disconnection event for source: $uid');
+
+    // Create a pending disconnection
+    final completer = Completer<void>();
+    final pendingDisconnection =
+        PendingDisconnection(completer, _subscriberCount);
+
+    // Store the pending disconnection for this source
+    _pendingDisconnections[uid] = pendingDisconnection;
+
+    debugPrint(
+        'Waiting for $_subscriberCount subscribers to complete disconnection for source: $uid');
+
+    // Emit the event
+    _disconnectionController.add(uid);
+
+    // Wait for this specific disconnection to complete
+    await completer.future;
+  }
+
+  /// Signal that a disconnection subscriber has completed its tasks
+  static void signalDisconnectionComplete(String sourceUid) {
+    debugPrint('Disconnection subscriber completed for source: $sourceUid');
+
+    final pendingDisconnection = _pendingDisconnections[sourceUid];
+    if (pendingDisconnection != null &&
+        pendingDisconnection.remainingSubscribers > 0) {
+      pendingDisconnection.remainingSubscribers--;
+      debugPrint(
+          'Remaining subscribers for source $sourceUid: ${pendingDisconnection.remainingSubscribers}');
+
+      // If all subscribers have completed, complete the disconnection
+      if (pendingDisconnection.remainingSubscribers == 0) {
+        if (!pendingDisconnection.completer.isCompleted) {
+          pendingDisconnection.completer.complete();
+          debugPrint('All subscribers completed for source: $sourceUid');
+        }
+
+        // Clean up
+        _pendingDisconnections.remove(sourceUid);
+      }
+    }
+  }
 
   /// Public constructor for a database source (without parent)
   /// Parent relationships should be managed by DatabaseSourceManager

@@ -1,5 +1,7 @@
+import 'dart:async';
 import 'dart:math';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../../../api/core/ov_api_core.dart';
@@ -8,6 +10,9 @@ import '../../../core/database_source.dart';
 import '../../../core/models/study.dart';
 
 class DatabaseController extends ChangeNotifier {
+  /// Static list to track all DatabaseController instances
+  static final List<DatabaseController> _instances = [];
+
   // Studies per source: Map<sourceUid, List<Study>>
   final Map<String, List<Study>> _studiesBySource = {};
   // Selected studies per source: Map<sourceUid, List<Study>>
@@ -22,9 +27,43 @@ class DatabaseController extends ChangeNotifier {
   // Callback for showing error messages
   final Function(String message)? _showError;
 
-  // Constructor with optional error callback
+  /// Stream subscription for disconnection events
+  StreamSubscription<String>? _disconnectionSubscription;
+
+  /// Constructor
   DatabaseController({Function(String message)? showError})
-      : _showError = showError;
+      : _showError = showError {
+    _instances.add(this);
+
+    // Subscribe to disconnection events and store the subscription
+    _disconnectionSubscription =
+        DatabaseSource.subscribeToDisconnection(_onSourceDisconnecting);
+  }
+
+  /// Handle source disconnection events
+  void _onSourceDisconnecting(String sourceUid) async {
+    debugPrint(
+        'Source disconnecting: $sourceUid - cancelling pending requests');
+
+    try {
+      // Cancel all pending requests for this source
+      await _cancelAllRequestsForSource(sourceUid);
+
+      // Clear cached data for this source
+      clearStudiesForSource(sourceUid);
+      clearSelectedStudies(sourceUid);
+
+      debugPrint('Cleanup completed for disconnecting source: $sourceUid');
+
+      // Signal that we've completed our cleanup
+      DatabaseSource.signalDisconnectionComplete(sourceUid);
+    } catch (e) {
+      debugPrint(
+          'Error during disconnection cleanup for source $sourceUid: $e');
+      // Still signal completion even if there was an error
+      DatabaseSource.signalDisconnectionComplete(sourceUid);
+    }
+  }
 
   // Getters
   String get searchQuery => _searchQuery;
@@ -84,6 +123,13 @@ class DatabaseController extends ChangeNotifier {
 
   @override
   Future<void> dispose() async {
+    // Unsubscribe from disconnection events
+    await DatabaseSource.unsubscribeToDisconnection(_disconnectionSubscription);
+    _disconnectionSubscription = null;
+
+    // Remove from instances list
+    _instances.remove(this);
+
     // Cancel all pending requests
     for (final sourceUid in _pendingRequests.keys.toList()) {
       await _cancelAllRequestsForSource(sourceUid);
@@ -241,6 +287,9 @@ class DatabaseController extends ChangeNotifier {
     _pendingRequests[sourceUid]![RequestType.findStudies] = request;
 
     try {
+      debugPrint('Delaying for 10 seconds');
+      await Future.delayed(const Duration(seconds: 10));
+      debugPrint('Delayed for 10 seconds');
       //final response = await request.send();
 
       // 6. Handle the response
