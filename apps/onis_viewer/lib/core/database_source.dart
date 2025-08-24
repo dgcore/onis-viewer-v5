@@ -229,9 +229,9 @@ class DatabaseSource extends ChangeNotifier {
 
   /// Search method - should be overridden by subclasses
   /// Default implementation does nothing
-  void search() {
-    // Default implementation - subclasses should override
-  }
+  //void search() {
+  // Default implementation - subclasses should override
+  //}
 
   /// Create an AsyncRequest for the specified request type
   /// Should be overridden by subclasses to provide specific request implementations

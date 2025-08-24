@@ -23,7 +23,7 @@ enum SiteChildSourceType {
 class SiteChildSource extends DatabaseSource {
   final SiteChildSourceType type;
   final String parentSiteUid;
-  bool _isDisconnecting = false;
+  final bool _isDisconnecting = false;
 
   SiteChildSource({
     required super.uid,
@@ -109,31 +109,37 @@ class SiteChildSource extends DatabaseSource {
     return false;
   }
 
+  /// Create an AsyncRequest for the specified request type
+  /// Overrides the base class method to create SiteAsyncRequest instances
   @override
-  void search() {
-    debugPrint('SiteChildSource.search() called for $typeDisplayName: $name');
-    // Trigger search in the database controller
-    final api = OVApi();
-    final dbApi = api.plugins.getPublicApi('onis_database_plugin');
-    if (dbApi != null) {
-      // This will trigger the search functionality in the database page
-      debugPrint('Triggering search for child source: $name');
-    }
+  AsyncRequest? createRequest(RequestType requestType,
+      [Map<String, dynamic>? data]) {
+    // For now, we'll create a basic SiteAsyncRequest
+    // In a real implementation, you would need to get the base URL from metadata or configuration
+    final baseUrl = metadata['baseUrl'] as String? ?? 'https://api.example.com';
+
+    return SiteAsyncRequest(
+      baseUrl: baseUrl,
+      requestType: requestType,
+      data: data,
+    );
   }
+
+  //@override
+  //void search() {
+  //debugPrint('SiteChildSource.search() called for $typeDisplayName: $name');
+  // Trigger search in the database controller
+  //final api = OVApi();
+  //final dbApi = api.plugins.getPublicApi('onis_database_plugin');
+  //if (dbApi != null) {
+  // This will trigger the search functionality in the database page
+  //debugPrint('Triggering search for child source: $name');
+  //}
+  //}
 
   @override
   Future<void> disconnect() async {
-    debugPrint(
-        'SiteChildSource.disconnect() called for $typeDisplayName: $name');
-
-    // Set local disconnecting state immediately
-    _isDisconnecting = true;
-    notifyListeners();
-
-    // Emit disconnection event and wait for subscribers to complete
-    await emitDisconnecting();
-
-    // Find the parent site source and call its disconnect method
+    // Find the parent site source and get its disconnecting state
     final api = OVApi();
     final manager = api.sources;
     final parentSite = manager.allSources
@@ -141,16 +147,8 @@ class SiteChildSource extends DatabaseSource {
         .firstOrNull;
 
     if (parentSite != null) {
-      debugPrint(
-          'Calling disconnect on parent site source: ${parentSite.name}');
-      await parentSite.disconnect();
-    } else {
-      debugPrint('Parent site source not found for child source: $name');
+      return parentSite.disconnect();
     }
-
-    // Reset local disconnecting state
-    _isDisconnecting = false;
-    notifyListeners();
   }
 }
 
@@ -161,19 +159,19 @@ class SiteSource extends DatabaseSource {
       : super();
 
   // Track last used credentials and pending login per source
-  String? _lastUsername;
-  String? _lastPassword;
-  bool _lastRemember = false;
-  bool _isLoggingIn = false;
+  String? lastUsername;
+  String? lastPassword;
+  bool lastRemember = false;
+  bool isLoggingIn = false;
   bool _isDisconnecting = false;
 
   /// Map to store SiteAsyncRequest instances
   /// First key: source UID, Second key: RequestType
-  final Map<String, Map<RequestType, List<SiteAsyncRequest>>> _requests = {};
+  final Map<String, Map<RequestType, List<SiteAsyncRequest>>> requests = {};
 
   /// Get the current logged-in username (if any)
   @override
-  String? get currentUsername => _lastUsername;
+  String? get currentUsername => lastUsername;
 
   /// Get whether the source is currently disconnecting
   @override
@@ -221,6 +219,7 @@ class SiteSource extends DatabaseSource {
   /// Disconnect from the source
   @override
   Future<void> disconnect() async {
+    if (_isDisconnecting) return;
     _isDisconnecting = true;
     notifyListeners();
 
@@ -247,10 +246,10 @@ class SiteSource extends DatabaseSource {
 
     // Mark source as disconnected
     isActive = false;
-    _lastUsername = null;
-    _lastPassword = null;
-    _lastRemember = false;
-    _isLoggingIn = false;
+    lastUsername = null;
+    lastPassword = null;
+    lastRemember = false;
+    isLoggingIn = false;
     _isDisconnecting = false;
 
     debugPrint(
@@ -272,10 +271,10 @@ class SiteSource extends DatabaseSource {
     required String password,
     required bool remember,
   }) async {
-    _lastUsername = username;
-    _lastPassword = password;
-    _lastRemember = remember;
-    _isLoggingIn = true;
+    lastUsername = username;
+    lastPassword = password;
+    lastRemember = remember;
+    isLoggingIn = true;
     notifyListeners();
 
     // Simulate slow server response for login
@@ -297,7 +296,7 @@ class SiteSource extends DatabaseSource {
     isActive = true;
 
     // Create child sources after successful authentication
-    _createChildSources();
+    createChildSources();
 
     // Auto-expand the site source node in the source tree
     final api = OVApi();
@@ -307,7 +306,7 @@ class SiteSource extends DatabaseSource {
     }
 
     // Reset logging-in flag
-    _isLoggingIn = false;
+    isLoggingIn = false;
     notifyListeners();
   }
 
@@ -324,19 +323,19 @@ class SiteSource extends DatabaseSource {
         future: SiteServerCredentialStore.load(uid),
         builder: (context, snapshot) {
           final saved = snapshot.data;
-          final initialUsername = _isLoggingIn
-              ? (_lastUsername ?? saved?.username)
+          final initialUsername = isLoggingIn
+              ? (lastUsername ?? saved?.username)
               : (saved?.username);
-          final initialPassword = _isLoggingIn
-              ? (_lastPassword ?? saved?.password)
+          final initialPassword = isLoggingIn
+              ? (lastPassword ?? saved?.password)
               : (saved?.password);
           final initialRemember =
-              _isLoggingIn ? _lastRemember : (saved?.remember ?? false);
+              isLoggingIn ? lastRemember : (saved?.remember ?? false);
           return SiteServerLoginPanel(
             initialUsername: initialUsername,
             initialPassword: initialPassword,
             initialRemember: initialRemember,
-            initialSubmitting: _isLoggingIn,
+            initialSubmitting: isLoggingIn,
             instanceName: name,
             onSubmitAsync: (username, password, remember) async {
               await login(
@@ -366,15 +365,15 @@ class SiteSource extends DatabaseSource {
   @override
   bool get canSearch => isActive;
 
-  @override
-  void search() {
-    // Site source specific open/search implementation
-    debugPrint('SiteSource.search() called for source: $name');
-    // TODO: Implement site-specific search functionality
-    // This could open a search dialog, navigate to a search page, etc.
+  //@override
+  //void search() {
+  // Site source specific open/search implementation
+  //debugPrint('SiteSource.search() called for source: $name');
+  // TODO: Implement site-specific search functionality
+  // This could open a search dialog, navigate to a search page, etc.
 
-    // Generate 500 studies with random patient IDs for realistic testing
-    /*for (int i = 1; i <= 500; i++) {
+  // Generate 500 studies with random patient IDs for realistic testing
+  /*for (int i = 1; i <= 500; i++) {
       final modality = modalities[i % modalities.length];
       final status = statuses[i % statuses.length];
       final sex = sexes[i % sexes.length];
@@ -396,9 +395,9 @@ class SiteSource extends DatabaseSource {
         modality: modality,
         status: status,
       ));*/
-  }
+  //}
 
-  void _createChildSources() {
+  void createChildSources() {
     // Create partition source as a child of this site source
 
     final partitionsFolder = SiteChildSource(
