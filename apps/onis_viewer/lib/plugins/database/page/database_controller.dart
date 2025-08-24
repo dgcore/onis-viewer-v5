@@ -41,10 +41,21 @@ class DatabaseController extends ChangeNotifier {
   }
 
   /// Handle source disconnection events
-  void _onSourceDisconnecting(String sourceUid) async {
+  void _onSourceDisconnecting(String sourceUid) {
     debugPrint(
         'Source disconnecting: $sourceUid - cancelling pending requests');
 
+    // Handle the async operations without making this method async
+    _handleDisconnectionCleanup(sourceUid).catchError((error) {
+      debugPrint(
+          'Error during disconnection cleanup for source $sourceUid: $error');
+      // Still signal completion even if there was an error
+      DatabaseSource.signalDisconnectionComplete(sourceUid);
+    });
+  }
+
+  /// Handle the async cleanup operations for disconnection
+  Future<void> _handleDisconnectionCleanup(String sourceUid) async {
     try {
       // Cancel all pending requests for this source
       await _cancelAllRequestsForSource(sourceUid);
@@ -60,8 +71,8 @@ class DatabaseController extends ChangeNotifier {
     } catch (e) {
       debugPrint(
           'Error during disconnection cleanup for source $sourceUid: $e');
-      // Still signal completion even if there was an error
-      DatabaseSource.signalDisconnectionComplete(sourceUid);
+      // Re-throw to be caught by the catchError in _onSourceDisconnecting
+      rethrow;
     }
   }
 
@@ -287,10 +298,10 @@ class DatabaseController extends ChangeNotifier {
     _pendingRequests[sourceUid]![RequestType.findStudies] = request;
 
     try {
-      debugPrint('Delaying for 10 seconds');
-      await Future.delayed(const Duration(seconds: 10));
-      debugPrint('Delayed for 10 seconds');
-      //final response = await request.send();
+      //debugPrint('Delaying for 10 seconds');
+      //await Future.delayed(const Duration(seconds: 10));
+      //debugPrint('Delayed for 10 seconds');
+      final response = await request.send();
 
       // 6. Handle the response
       /*if (response.isSuccess) {
