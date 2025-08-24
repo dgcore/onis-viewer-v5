@@ -20,7 +20,7 @@ class SiteAsyncRequest implements AsyncRequest {
   final Map<String, dynamic>? data;
 
   /// Stream controller for request cancellation
-  StreamController<bool>? _cancellationController;
+  //StreamController<bool>? _cancellationController;
 
   /// Flag to track if cancellation was requested
   bool _isCancelled = false;
@@ -60,7 +60,7 @@ class SiteAsyncRequest implements AsyncRequest {
     await cancel();
 
     // Create cancellation controller for this request
-    _cancellationController = StreamController<bool>();
+    /*_cancellationController = StreamController<bool>();
 
     // Listen to cancellation events
     StreamSubscription<bool>? cancellationSubscription;
@@ -70,7 +70,7 @@ class SiteAsyncRequest implements AsyncRequest {
         debugPrint('SiteAsyncRequest.send() - cancellation signal received');
         _isCancelled = true;
       }
-    });
+    });*/
 
     try {
       debugPrint('SiteAsyncRequest.send() - building URL');
@@ -133,16 +133,16 @@ class SiteAsyncRequest implements AsyncRequest {
       debugPrint('SiteAsyncRequest.send() - finally block executing');
 
       // Cancel the cancellation subscription
-      await cancellationSubscription.cancel();
+      //await cancellationSubscription.cancel();
 
       _currentRequest = null;
 
       // Close the cancellation controller
-      if (_cancellationController != null &&
+      /*if (_cancellationController != null &&
           !_cancellationController!.isClosed) {
         _cancellationController!.close();
       }
-      _cancellationController = null;
+      _cancellationController = null;*/
 
       // Complete the send operation
       if (_sendCompleter != null && !_sendCompleter!.isCompleted) {
@@ -164,13 +164,13 @@ class SiteAsyncRequest implements AsyncRequest {
       _currentRequest = null;
 
       // Add cancellation signal and close
-      if (_cancellationController != null &&
+      /*if (_cancellationController != null &&
           !_cancellationController!.isClosed) {
         _cancellationController!.add(true);
         await _cancellationController!.close();
         debugPrint('SiteAsyncRequest.cancel() - cancellation signal sent');
       }
-      _cancellationController = null;
+      _cancellationController = null;*/
 
       // Wait for the send operation to complete
       if (_sendCompleter != null && !_sendCompleter!.isCompleted) {
