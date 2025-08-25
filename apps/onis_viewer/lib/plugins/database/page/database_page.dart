@@ -75,28 +75,38 @@ class _DatabasePageState extends BasePageState<DatabasePage> {
 
   @override
   Widget? buildPageHeader() {
-    // Get the selected source to determine capabilities
-    final selected = _dbApi?.selectedSource;
-
     // Return the database toolbar as the custom page header
-    return DatabaseToolbar(
-      onPreferences: () => _controller.openPreferences(),
-      onImport: () => _controller.importData(),
-      onExport: () => _controller.exportData(),
-      onTransfer: () => _controller.transferData(),
-      onOpen: () => _controller.openDatabaseFromToolbar(),
-      selectedLocation: 'Local computer',
-      onSearch: () {
+    // Use AnimatedBuilder to rebuild when controller changes
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, child) {
+        // Get the selected source to determine capabilities
         final selected = _dbApi?.selectedSource;
-        if (selected != null) {
-          _controller.onSearch(selected.uid);
-        }
+
+        return DatabaseToolbar(
+          onPreferences: () => _controller.openPreferences(),
+          onImport: () => _controller.importData(),
+          onExport: () => _controller.exportData(),
+          onTransfer: () => _controller.transferData(),
+          onOpen: () => _controller.openDatabaseFromToolbar(),
+          selectedLocation: 'Local computer',
+          onSearch: () {
+            final selected = _dbApi?.selectedSource;
+            if (selected != null) {
+              _controller.onSearch(selected.uid);
+            }
+          },
+          canOpen: selected != null ? _controller.canOpen(selected.uid) : false,
+          canImport:
+              selected != null ? _controller.canImport(selected.uid) : false,
+          canExport:
+              selected != null ? _controller.canExport(selected.uid) : false,
+          canTransfer:
+              selected != null ? _controller.canTransfer(selected.uid) : false,
+          canSearch:
+              selected != null ? _controller.canSearch(selected.uid) : false,
+        );
       },
-      canOpen: selected?.canOpen ?? false,
-      canImport: selected?.canImport ?? false,
-      canExport: selected?.canExport ?? false,
-      canTransfer: selected?.canTransfer ?? false,
-      canSearch: selected?.canSearch ?? false,
     );
   }
 

@@ -89,6 +89,13 @@ class DatabaseController extends ChangeNotifier {
     return _studiesBySource[sourceUid] ?? [];
   }
 
+  /// Check if there are any studies selected for the given source
+  /// Returns true if at least one study is selected, false otherwise
+  bool hasSelectedStudies(String sourceUid) {
+    final selectedStudies = _selectedStudiesBySource[sourceUid];
+    return selectedStudies != null && selectedStudies.isNotEmpty;
+  }
+
   List<Study> getSelectedStudiesForSource(String sourceUid) {
     return _selectedStudiesBySource[sourceUid] ?? [];
   }
@@ -401,5 +408,40 @@ class DatabaseController extends ChangeNotifier {
 
   void showSettings() {
     debugPrint('Show database settings');
+  }
+
+  /// Check if search is available for the given source
+  /// Returns true if the source is connected
+  bool canSearch(String sourceUid) {
+    final api = OVApi();
+    final source = api.sources.findSourceByUid(sourceUid);
+    return source?.isActive ?? false;
+  }
+
+  /// Check if import is available for the given source
+  /// Returns true if the source is connected
+  bool canImport(String sourceUid) {
+    return canSearch(sourceUid);
+  }
+
+  /// Check if export is available for the given source
+  /// Returns true if the source is connected and at least one study is selected
+  bool canExport(String sourceUid) {
+    final api = OVApi();
+    final source = api.sources.findSourceByUid(sourceUid);
+    if (source == null) return false;
+    return source.isActive && hasSelectedStudies(sourceUid);
+  }
+
+  /// Check if open is available for the given source
+  /// Returns true if the source is connected and at least one study is selected
+  bool canOpen(String sourceUid) {
+    return canExport(sourceUid);
+  }
+
+  /// Check if transfer is available for the given source
+  /// Returns true if the source is connected and at least one study is selected
+  bool canTransfer(String sourceUid) {
+    return canExport(sourceUid);
   }
 }

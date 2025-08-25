@@ -205,27 +205,7 @@ class DatabaseSource extends ChangeNotifier {
   Widget? buildConnectionPanel(BuildContext context) => null;
 
   // Capability methods for toolbar actions
-  // These methods should be overridden by subclasses to provide specific capabilities
-
-  /// Check if the source supports opening databases
-  /// Default implementation returns false
-  bool get canOpen => false;
-
-  /// Check if the source supports importing data
-  /// Default implementation returns false
-  bool get canImport => false;
-
-  /// Check if the source supports exporting data
-  /// Default implementation returns false
-  bool get canExport => false;
-
-  /// Check if the source supports transferring data
-  /// Default implementation returns false
-  bool get canTransfer => false;
-
-  /// Check if the source supports searching
-  /// Default implementation returns true when the source is active/connected
-  bool get canSearch => isActive;
+  // These methods have been moved to DatabaseController for centralized state management
 
   /// Search method - should be overridden by subclasses
   /// Default implementation does nothing
