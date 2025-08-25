@@ -110,18 +110,6 @@ class SiteChildSource extends DatabaseSource {
     );
   }
 
-  //@override
-  //void search() {
-  //debugPrint('SiteChildSource.search() called for $typeDisplayName: $name');
-  // Trigger search in the database controller
-  //final api = OVApi();
-  //final dbApi = api.plugins.getPublicApi('onis_database_plugin');
-  //if (dbApi != null) {
-  // This will trigger the search functionality in the database page
-  //debugPrint('Triggering search for child source: $name');
-  //}
-  //}
-
   @override
   Future<void> disconnect() async {
     final parentSite = this.parentSite;

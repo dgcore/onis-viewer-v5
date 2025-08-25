@@ -506,12 +506,12 @@ class DatabaseSourceManager extends ChangeNotifier {
   }*/
 
   /// Find a source by UID
-  /*DatabaseSource? findSourceByUid(String uid) {
+  DatabaseSource? findSourceByUid(String uid) {
     return _sourcesByUid[uid];
   }
 
   /// Get all active sources
-  List<DatabaseSource> get activeSources {
+  /*List<DatabaseSource> get activeSources {
     return _sourcesByUid.values.where((source) => source.isActive).toList();
   }
 

@@ -57,12 +57,18 @@ class DatabaseController extends ChangeNotifier {
   /// Handle the async cleanup operations for disconnection
   Future<void> _handleDisconnectionCleanup(String sourceUid) async {
     try {
-      // Cancel all pending requests for this source
-      await _cancelAllRequestsForSource(sourceUid);
+      // Get all child sources of the disconnecting source
+      final api = OVApi();
+      final source = api.sources.findSourceByUid(sourceUid);
+      final childSources =
+          source != null ? [source, ...source.allDescendants] : [];
 
-      // Clear cached data for this source
-      clearStudiesForSource(sourceUid);
-      clearSelectedStudies(sourceUid);
+      // Cancel requests and clear data for each child source
+      for (final childSource in childSources) {
+        await _cancelAllRequestsForSource(childSource.uid);
+        clearStudiesForSource(childSource.uid);
+        clearSelectedStudies(childSource.uid);
+      }
 
       debugPrint('Cleanup completed for disconnecting source: $sourceUid');
 
