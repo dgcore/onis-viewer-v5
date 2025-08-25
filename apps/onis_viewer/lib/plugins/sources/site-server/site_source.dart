@@ -22,15 +22,12 @@ enum SiteChildSourceType {
 /// A child source under a site source (partition, album, or DICOM PACS)
 class SiteChildSource extends DatabaseSource {
   final SiteChildSourceType type;
-  final String parentSiteUid;
-  final bool _isDisconnecting = false;
   WeakReference<SiteSource>? _parentSiteRef;
 
   SiteChildSource({
     required super.uid,
     required super.name,
     required this.type,
-    required this.parentSiteUid,
     super.metadata,
   }) {
     // Child sources are active by default since they represent available data
@@ -93,17 +90,8 @@ class SiteChildSource extends DatabaseSource {
   /// Get whether the parent site source is currently disconnecting
   @override
   bool get isDisconnecting {
-    // Return local disconnecting state first, then check parent
-    if (_isDisconnecting) {
-      return true;
-    }
-
     final parentSite = this.parentSite;
-    if (parentSite != null) {
-      return parentSite.isDisconnecting;
-    }
-
-    return false;
+    return parentSite?.isDisconnecting ?? false;
   }
 
   /// Create an AsyncRequest for the specified request type
@@ -224,10 +212,10 @@ class SiteSource extends DatabaseSource {
     final api = OVApi();
     final manager = api.sources;
 
-    // Get all child sources of this site source
+    // Get all child sources of this site source using weak references
     final childSources = manager.allSources
         .where((source) =>
-            source is SiteChildSource && (source).parentSiteUid == uid)
+            source is SiteChildSource && (source).parentSite == this)
         .toList();
 
     // Remove each child source
@@ -395,7 +383,6 @@ class SiteSource extends DatabaseSource {
       uid: '${uid}_partitions',
       name: 'Partitions',
       type: SiteChildSourceType.partitionFolder,
-      parentSiteUid: uid,
       metadata: {
         'type': 'partition_list',
         'parent_site': uid,
@@ -408,7 +395,6 @@ class SiteSource extends DatabaseSource {
       uid: '${uid}_partition1',
       name: 'Partition 1',
       type: SiteChildSourceType.partition,
-      parentSiteUid: uid,
       metadata: {
         'type': 'partition',
         'parent_site': uid,
@@ -423,7 +409,6 @@ class SiteSource extends DatabaseSource {
       uid: '${uid}_partition2',
       name: 'Partition 2',
       type: SiteChildSourceType.partition,
-      parentSiteUid: uid,
       metadata: {
         'type': 'partition',
         'parent_site': uid,
