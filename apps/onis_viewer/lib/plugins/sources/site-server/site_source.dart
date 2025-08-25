@@ -24,6 +24,7 @@ class SiteChildSource extends DatabaseSource {
   final SiteChildSourceType type;
   final String parentSiteUid;
   final bool _isDisconnecting = false;
+  WeakReference<SiteSource>? _parentSiteRef;
 
   SiteChildSource({
     required super.uid,
@@ -35,6 +36,14 @@ class SiteChildSource extends DatabaseSource {
     // Child sources are active by default since they represent available data
     isActive = true;
   }
+
+  /// Set the parent site source reference
+  void setParentSite(SiteSource parentSite) {
+    _parentSiteRef = WeakReference(parentSite);
+  }
+
+  /// Get the parent site source (if available)
+  SiteSource? get parentSite => _parentSiteRef?.target;
 
   /// Get the type as a display string
   String get typeDisplayName {
@@ -74,13 +83,7 @@ class SiteChildSource extends DatabaseSource {
   /// Get the current username from the parent site source
   @override
   String? get currentUsername {
-    // Find the parent site source and get its username
-    final api = OVApi();
-    final manager = api.sources;
-    final parentSite = manager.allSources
-        .where((source) => source.uid == parentSiteUid)
-        .firstOrNull;
-
+    final parentSite = this.parentSite;
     if (parentSite != null) {
       return parentSite.currentUsername;
     }
@@ -95,13 +98,7 @@ class SiteChildSource extends DatabaseSource {
       return true;
     }
 
-    // Find the parent site source and get its disconnecting state
-    final api = OVApi();
-    final manager = api.sources;
-    final parentSite = manager.allSources
-        .where((source) => source.uid == parentSiteUid)
-        .firstOrNull;
-
+    final parentSite = this.parentSite;
     if (parentSite != null) {
       return parentSite.isDisconnecting;
     }
@@ -139,13 +136,7 @@ class SiteChildSource extends DatabaseSource {
 
   @override
   Future<void> disconnect() async {
-    // Find the parent site source and get its disconnecting state
-    final api = OVApi();
-    final manager = api.sources;
-    final parentSite = manager.allSources
-        .where((source) => source.uid == parentSiteUid)
-        .firstOrNull;
-
+    final parentSite = this.parentSite;
     if (parentSite != null) {
       return parentSite.disconnect();
     }
@@ -410,7 +401,7 @@ class SiteSource extends DatabaseSource {
         'parent_site': uid,
       },
     );
-
+    partitionsFolder.setParentSite(this);
     OVApi().sources.registerSource(partitionsFolder, parentUid: uid);
 
     final partition1 = SiteChildSource(
@@ -425,6 +416,7 @@ class SiteSource extends DatabaseSource {
         'size': '2.5 TB',
       },
     );
+    partition1.setParentSite(this);
     OVApi().sources.registerSource(partition1, parentUid: partitionsFolder.uid);
 
     final partition2 = SiteChildSource(
@@ -439,6 +431,7 @@ class SiteSource extends DatabaseSource {
         'size': '1.8 TB',
       },
     );
+    partition2.setParentSite(this);
     OVApi().sources.registerSource(partition2, parentUid: partitionsFolder.uid);
 
     debugPrint('Created child sources for site: $name');
