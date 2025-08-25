@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 import '../../../../api/request/async_request.dart';
@@ -18,14 +19,20 @@ class SiteAsyncRequest implements AsyncRequest {
   @override
   final Map<String, dynamic>? data;
 
+  /// Stream controller for request cancellation
+  //StreamController<bool>? _cancellationController;
+
+  /// Flag to track if cancellation was requested
+  bool _isCancelled = false;
+
+  /// Completer to track when the send operation completes
+  Completer<void>? _sendCompleter;
+
   /// HTTP client for making requests
   final http.Client _client;
 
-  /// Current request in progress (if any)
+  /// Current HTTP request being processed
   http.Request? _currentRequest;
-
-  /// Stream controller for request cancellation
-  StreamController<bool>? _cancellationController;
 
   /// Constructor
   ///
@@ -40,16 +47,37 @@ class SiteAsyncRequest implements AsyncRequest {
 
   @override
   Future<AsyncResponse> send() async {
+    debugPrint(
+        'SiteAsyncRequest.send() started for request type: $requestType');
+
+    // Create completer to track completion
+    _sendCompleter = Completer<void>();
+
+    // Reset cancellation flag
+    _isCancelled = false;
+
     // Cancel any existing request
     await cancel();
 
     // Create cancellation controller for this request
-    _cancellationController = StreamController<bool>();
+    /*_cancellationController = StreamController<bool>();
+
+    // Listen to cancellation events
+    StreamSubscription<bool>? cancellationSubscription;
+    cancellationSubscription =
+        _cancellationController!.stream.listen((cancelled) {
+      if (cancelled) {
+        debugPrint('SiteAsyncRequest.send() - cancellation signal received');
+        _isCancelled = true;
+      }
+    });*/
 
     try {
+      debugPrint('SiteAsyncRequest.send() - building URL');
       // Build the request URL based on the request type
       final url = _buildUrl(requestType);
 
+      debugPrint('SiteAsyncRequest.send() - creating HTTP request');
       // Create the HTTP request
       _currentRequest = http.Request('POST', Uri.parse(url));
       _currentRequest!.headers['Content-Type'] = 'application/json';
@@ -59,11 +87,25 @@ class SiteAsyncRequest implements AsyncRequest {
         _currentRequest!.body = jsonEncode(data);
       }
 
+      debugPrint('SiteAsyncRequest.send() - starting 10 second delay');
+      await Future.delayed(const Duration(seconds: 10));
+      debugPrint('SiteAsyncRequest.send() - 10 second delay completed');
+
+      // Check if cancelled during the delay
+      if (_isCancelled) {
+        debugPrint(
+            'SiteAsyncRequest.send() - request was cancelled during delay');
+        return _createCancelledResponse();
+      }
+
+      debugPrint('SiteAsyncRequest.send() - sending HTTP request');
       // Send the request
       final response = await _client.send(_currentRequest!);
 
       // Check if request was cancelled
-      if (_cancellationController!.isClosed) {
+      if (_isCancelled) {
+        debugPrint(
+            'SiteAsyncRequest.send() - request was cancelled after HTTP send');
         return _createCancelledResponse();
       }
 
@@ -73,31 +115,70 @@ class SiteAsyncRequest implements AsyncRequest {
         final responseBody = await response.stream.bytesToString();
         final responseData = jsonDecode(responseBody) as Map<String, dynamic>?;
 
+        debugPrint('SiteAsyncRequest.send() - returning success response');
         return _createSuccessResponse(response.statusCode, responseData);
       } else {
         // Error
         final responseBody = await response.stream.bytesToString();
+        debugPrint('SiteAsyncRequest.send() - returning error response');
         return _createErrorResponse(response.statusCode, responseBody);
       }
     } catch (e) {
+      debugPrint('SiteAsyncRequest.send() - caught exception: $e');
       if (e is HttpRequestException) {
         return _createErrorResponse(e.statusCode, e.message);
       }
       return _createErrorResponse(0, 'HTTP request failed: $e');
     } finally {
+      debugPrint('SiteAsyncRequest.send() - finally block executing');
+
+      // Cancel the cancellation subscription
+      //await cancellationSubscription.cancel();
+
       _currentRequest = null;
-      await _cancellationController?.close();
-      _cancellationController = null;
+
+      // Close the cancellation controller
+      /*if (_cancellationController != null &&
+          !_cancellationController!.isClosed) {
+        _cancellationController!.close();
+      }
+      _cancellationController = null;*/
+
+      // Complete the send operation
+      if (_sendCompleter != null && !_sendCompleter!.isCompleted) {
+        _sendCompleter!.complete();
+      }
+
+      debugPrint('SiteAsyncRequest.send() - finally block completed');
     }
   }
 
   @override
   Future<void> cancel() async {
+    debugPrint('SiteAsyncRequest.cancel() called');
+
+    // Set cancellation flag
+    _isCancelled = true;
+
     if (_currentRequest != null) {
       _currentRequest = null;
-      _cancellationController?.add(true);
-      await _cancellationController?.close();
-      _cancellationController = null;
+
+      // Add cancellation signal and close
+      /*if (_cancellationController != null &&
+          !_cancellationController!.isClosed) {
+        _cancellationController!.add(true);
+        await _cancellationController!.close();
+        debugPrint('SiteAsyncRequest.cancel() - cancellation signal sent');
+      }
+      _cancellationController = null;*/
+
+      // Wait for the send operation to complete
+      if (_sendCompleter != null && !_sendCompleter!.isCompleted) {
+        debugPrint(
+            'SiteAsyncRequest.cancel() - waiting for send operation to complete');
+        await _sendCompleter!.future;
+        debugPrint('SiteAsyncRequest.cancel() - send operation completed');
+      }
     }
   }
 
