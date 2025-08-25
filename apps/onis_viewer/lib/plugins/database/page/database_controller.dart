@@ -402,4 +402,59 @@ class DatabaseController extends ChangeNotifier {
   void showSettings() {
     debugPrint('Show database settings');
   }
+
+  /// Check if search is available for the given source
+  /// Returns true if the source is connected
+  bool canSearch(String sourceUid) {
+    final api = OVApi();
+    final source = api.sources.findSourceByUid(sourceUid);
+    return source?.isActive ?? false;
+  }
+
+  /// Check if import is available for the given source
+  /// Returns true if the source is connected
+  bool canImport(String sourceUid) {
+    final api = OVApi();
+    final source = api.sources.findSourceByUid(sourceUid);
+    return source?.isActive ?? false;
+  }
+
+  /// Check if export is available for the given source
+  /// Returns true if the source is connected and at least one study is selected
+  bool canExport(String sourceUid) {
+    final api = OVApi();
+    final source = api.sources.findSourceByUid(sourceUid);
+    if (source?.isActive != true) {
+      return false;
+    }
+
+    final selectedStudies = getSelectedStudiesForSource(sourceUid);
+    return selectedStudies.isNotEmpty;
+  }
+
+  /// Check if open is available for the given source
+  /// Returns true if the source is connected and at least one study is selected
+  bool canOpen(String sourceUid) {
+    final api = OVApi();
+    final source = api.sources.findSourceByUid(sourceUid);
+    if (source?.isActive != true) {
+      return false;
+    }
+
+    final selectedStudies = getSelectedStudiesForSource(sourceUid);
+    return selectedStudies.isNotEmpty;
+  }
+
+  /// Check if transfer is available for the given source
+  /// Returns true if the source is connected and at least one study is selected
+  bool canTransfer(String sourceUid) {
+    final api = OVApi();
+    final source = api.sources.findSourceByUid(sourceUid);
+    if (source?.isActive != true) {
+      return false;
+    }
+
+    final selectedStudies = getSelectedStudiesForSource(sourceUid);
+    return selectedStudies.isNotEmpty;
+  }
 }

@@ -213,7 +213,7 @@ class DatabaseSource extends ChangeNotifier {
 
   /// Check if the source supports importing data
   /// Default implementation returns false
-  bool get canImport => false;
+  bool get canImport => isActive;
 
   /// Check if the source supports exporting data
   /// Default implementation returns false
