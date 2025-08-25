@@ -92,11 +92,12 @@ class _DatabasePageState extends BasePageState<DatabasePage> {
           _controller.onSearch(selected.uid);
         }
       },
-      canOpen: selected?.canOpen ?? false,
-      canImport: selected?.canImport ?? false,
-      canExport: selected?.canExport ?? false,
-      canTransfer: selected?.canTransfer ?? false,
-      canSearch: selected?.canSearch ?? false,
+      canOpen: selected != null ? _controller.canOpen(selected.uid) : false,
+      canImport: selected != null ? _controller.canImport(selected.uid) : false,
+      canExport: selected != null ? _controller.canExport(selected.uid) : false,
+      canTransfer:
+          selected != null ? _controller.canTransfer(selected.uid) : false,
+      canSearch: selected != null ? _controller.canSearch(selected.uid) : false,
     );
   }
 

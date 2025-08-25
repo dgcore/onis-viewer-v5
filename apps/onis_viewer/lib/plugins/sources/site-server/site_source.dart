@@ -74,7 +74,6 @@ class SiteChildSource extends DatabaseSource {
     }
   }
 
-  @override
   bool get canSearch => isActive;
 
   /// Get the current username from the parent site source
@@ -329,7 +328,6 @@ class SiteSource extends DatabaseSource {
     );
   }
 
-  @override
   bool get canSearch => isActive;
 
   //@override
