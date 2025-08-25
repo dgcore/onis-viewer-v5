@@ -74,8 +74,6 @@ class SiteChildSource extends DatabaseSource {
     }
   }
 
-  bool get canSearch => isActive;
-
   /// Get the current username from the parent site source
   @override
   String? get currentUsername {
@@ -327,8 +325,6 @@ class SiteSource extends DatabaseSource {
       onSave: () {},
     );
   }
-
-  bool get canSearch => isActive;
 
   //@override
   //void search() {
