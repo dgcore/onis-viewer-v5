@@ -79,6 +79,7 @@ class _ResizableDataTableState extends State<ResizableDataTable>
   // Selection state
   Study? _lastSelectedStudy; // Track last selected study for range selection
   late ScrollController _scrollController;
+  late ScrollController _verticalScrollController;
 
   @override
   void initState() {
@@ -86,6 +87,7 @@ class _ResizableDataTableState extends State<ResizableDataTable>
     _scrollController =
         ScrollController(initialScrollOffset: widget.initialScrollPosition);
     _scrollController.addListener(_onScrollChanged);
+    _verticalScrollController = ScrollController();
 
     // Add listeners to filter controllers
     for (final controller in _filterControllers) {
@@ -100,6 +102,7 @@ class _ResizableDataTableState extends State<ResizableDataTable>
     // Dispose filter controllers
     _scrollController.removeListener(_onScrollChanged);
     _scrollController.dispose();
+    _verticalScrollController.dispose();
     for (final controller in _filterControllers) {
       controller.dispose();
     }
@@ -199,32 +202,24 @@ class _ResizableDataTableState extends State<ResizableDataTable>
         return Stack(
           key: _stackKey,
           children: [
-            Column(
-              children: [
-                // Sticky header and filter bar
-                SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: SizedBox(
-                    width: needsHorizontalScroll ? totalWidth : availableWidth,
-                    child: Column(
-                      children: [
-                        // Header row
-                        _buildHeaderRow(),
-                        // Filter bar
-                        _buildFilterBar(),
-                      ],
-                    ),
-                  ),
-                ),
-                // Scrollable data rows
-                Expanded(
-                  child: SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: SingleChildScrollView(
-                      controller: _scrollController,
-                      child: SizedBox(
-                        width:
-                            needsHorizontalScroll ? totalWidth : availableWidth,
+            // Horizontal scroll view containing the entire table
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              controller: _scrollController,
+              child: SizedBox(
+                width: needsHorizontalScroll ? totalWidth : availableWidth,
+                child: Column(
+                  children: [
+                    // Header row
+                    _buildHeaderRow(),
+                    // Filter bar
+                    _buildFilterBar(),
+                    // Data rows with vertical scrolling
+                    SizedBox(
+                      height: constraints.maxHeight -
+                          120, // Reserve space for header and filter
+                      child: SingleChildScrollView(
+                        controller: _verticalScrollController,
                         child: Column(
                           children: _filteredStudies
                               .map((study) => _buildDataRow(study))
@@ -232,9 +227,9 @@ class _ResizableDataTableState extends State<ResizableDataTable>
                         ),
                       ),
                     ),
-                  ),
+                  ],
                 ),
-              ],
+              ),
             ),
             // Drag image overlay
             if (_isDraggingColumn &&
