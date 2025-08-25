@@ -89,6 +89,13 @@ class DatabaseController extends ChangeNotifier {
     return _studiesBySource[sourceUid] ?? [];
   }
 
+  /// Check if there are any studies selected for the given source
+  /// Returns true if at least one study is selected, false otherwise
+  bool hasSelectedStudies(String sourceUid) {
+    final selectedStudies = _selectedStudiesBySource[sourceUid];
+    return selectedStudies != null && selectedStudies.isNotEmpty;
+  }
+
   List<Study> getSelectedStudiesForSource(String sourceUid) {
     return _selectedStudiesBySource[sourceUid] ?? [];
   }
@@ -414,9 +421,7 @@ class DatabaseController extends ChangeNotifier {
   /// Check if import is available for the given source
   /// Returns true if the source is connected
   bool canImport(String sourceUid) {
-    final api = OVApi();
-    final source = api.sources.findSourceByUid(sourceUid);
-    return source?.isActive ?? false;
+    return canSearch(sourceUid);
   }
 
   /// Check if export is available for the given source
@@ -424,37 +429,19 @@ class DatabaseController extends ChangeNotifier {
   bool canExport(String sourceUid) {
     final api = OVApi();
     final source = api.sources.findSourceByUid(sourceUid);
-    if (source?.isActive != true) {
-      return false;
-    }
-
-    final selectedStudies = getSelectedStudiesForSource(sourceUid);
-    return selectedStudies.isNotEmpty;
+    if (source == null) return false;
+    return source.isActive && hasSelectedStudies(sourceUid);
   }
 
   /// Check if open is available for the given source
   /// Returns true if the source is connected and at least one study is selected
   bool canOpen(String sourceUid) {
-    final api = OVApi();
-    final source = api.sources.findSourceByUid(sourceUid);
-    if (source?.isActive != true) {
-      return false;
-    }
-
-    final selectedStudies = getSelectedStudiesForSource(sourceUid);
-    return selectedStudies.isNotEmpty;
+    return canExport(sourceUid);
   }
 
   /// Check if transfer is available for the given source
   /// Returns true if the source is connected and at least one study is selected
   bool canTransfer(String sourceUid) {
-    final api = OVApi();
-    final source = api.sources.findSourceByUid(sourceUid);
-    if (source?.isActive != true) {
-      return false;
-    }
-
-    final selectedStudies = getSelectedStudiesForSource(sourceUid);
-    return selectedStudies.isNotEmpty;
+    return canExport(sourceUid);
   }
 }
