@@ -22,6 +22,7 @@ add_subdirectory(${CMAKE_SOURCE_DIR}/../../libs/onis_kit ${CMAKE_BINARY_DIR}/oni
 # Source files
 set(SERVER_SOURCES
     src/main.cpp
+    src/include_test.cpp
 )
 
 set(SERVER_HEADERS
@@ -37,6 +38,7 @@ add_executable(onis_site_server
 target_include_directories(onis_site_server PRIVATE
     ${CMAKE_SOURCE_DIR}/shared/cpp
     ${CMAKE_SOURCE_DIR}/libs/onis_kit/public
+    ${CMAKE_SOURCE_DIR}/libs
 )
 
 # Link libraries
