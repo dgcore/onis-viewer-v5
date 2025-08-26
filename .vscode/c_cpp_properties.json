@@ -5,7 +5,12 @@
       "includePath": [
         "${workspaceFolder}/**",
         "${workspaceFolder}/shared/cpp/**",
-        "${workspaceFolder}/apps/onis_site_server/include/**"
+        "${workspaceFolder}/apps/onis_site_server/include/**",
+        "${workspaceFolder}/libs/**",
+        "${workspaceFolder}/libs/onis_kit/include/**",
+        "${workspaceFolder}/libs/onis_kit/public/**",
+        "/opt/homebrew/opt/drogon/include/**",
+        "/opt/homebrew/opt/jsoncpp/include/**"
       ],
       "defines": [],
       "macFrameworkPath": [

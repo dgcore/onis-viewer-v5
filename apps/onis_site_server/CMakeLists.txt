@@ -13,16 +13,22 @@ if(CMAKE_BUILD_TYPE STREQUAL "Debug")
     message(STATUS "Building in Debug mode with symbols")
 endif()
 
-# Add the shared C++ library first
-add_subdirectory(${CMAKE_SOURCE_DIR}/../../shared/cpp/onis_core ${CMAKE_BINARY_DIR}/onis_core)
+# Libraries are already added in the root CMakeLists.txt
 
-# Add the onis_kit library
-add_subdirectory(${CMAKE_SOURCE_DIR}/../../libs/onis_kit ${CMAKE_BINARY_DIR}/onis_kit)
+# Find Drogon and dependencies (installed via Homebrew)
+set(DROGON_ROOT "/opt/homebrew/opt/drogon")
+set(DROGON_INCLUDE_DIRS "${DROGON_ROOT}/include")
+set(DROGON_LIBRARIES "${DROGON_ROOT}/lib/libdrogon.dylib" "${DROGON_ROOT}/lib/libtrantor.dylib")
+
+set(JSONCPP_ROOT "/opt/homebrew/opt/jsoncpp")
+set(JSONCPP_INCLUDE_DIRS "${JSONCPP_ROOT}/include")
+set(JSONCPP_LIBRARIES "${JSONCPP_ROOT}/lib/libjsoncpp.dylib")
 
 # Source files
 set(SERVER_SOURCES
     src/main.cpp
-    src/include_test.cpp
+    src/network/drogon/drogon_http_server.cpp
+    src/network/drogon/drogon_http_controller.cpp
 )
 
 set(SERVER_HEADERS
@@ -39,12 +45,16 @@ target_include_directories(onis_site_server PRIVATE
     ${CMAKE_SOURCE_DIR}/shared/cpp
     ${CMAKE_SOURCE_DIR}/libs/onis_kit/public
     ${CMAKE_SOURCE_DIR}/libs
+    ${DROGON_INCLUDE_DIRS}
+    ${JSONCPP_INCLUDE_DIRS}
 )
 
 # Link libraries
 target_link_libraries(onis_site_server PRIVATE
     onis_core
     onis_kit
+    ${DROGON_LIBRARIES}
+    ${JSONCPP_LIBRARIES}
     # Add other libraries as needed:
     # ${DCMTK_LIBRARIES}
     # ${BOOST_LIBRARIES}

@@ -1,6 +1,7 @@
 #include <iostream>
 #include <string>
-#include "core/result.hpp"
+#include "onis_kit/include/core/result.hpp"
+#include "onis_kit/include/core/thread.hpp"
 
 int main(int argc, char* argv[]) {
   std::cout << "ONIS Site Server v1.0.0" << std::endl;
