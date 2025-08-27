@@ -88,7 +88,7 @@ class SiteAsyncRequest implements AsyncRequest {
       }
 
       debugPrint('SiteAsyncRequest.send() - starting 10 second delay');
-      await Future.delayed(const Duration(seconds: 10));
+      //await Future.delayed(const Duration(seconds: 10));
       debugPrint('SiteAsyncRequest.send() - 10 second delay completed');
 
       // Check if cancelled during the delay

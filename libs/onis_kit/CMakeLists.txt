@@ -14,6 +14,8 @@ endif()
 # Source files
 set(ONIS_KIT_SOURCES
     src/core/result.cpp
+    src/core/thread.cpp
+    src/core/event.cpp
 )
 
 # Header files
@@ -21,6 +23,8 @@ set(ONIS_KIT_HEADERS
     public/core/result.hpp
     public/core/object.hpp
     public/core/types.hpp
+    public/core/thread.hpp
+    public/core/event.hpp
 )
 
 # Create shared library

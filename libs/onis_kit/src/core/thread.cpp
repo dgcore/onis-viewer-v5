@@ -1,5 +1,5 @@
 #include "../../public/core/thread.hpp"
-
+#include <iostream>
 namespace dgc {
 
 //----------------------------------------------------------------------------
@@ -37,8 +37,8 @@ void thread::stop() {
       throw std::logic_error(
           "Thread::stop() called more than once or concurrently.");
     }
-    will_quit_ = true;
     post_message_tothread_(DGMSG_QUIT, 0, 0);
+    will_quit_ = true;
   }
   thread_->join();
   {
@@ -149,7 +149,6 @@ bool thread::post_message_tothread_(u32 id, u64 wParam, u64 lParam) {
   std::lock_guard<std::recursive_mutex> lock(_message_mutex);
   if (thread_ == nullptr || will_quit_)
     return false;
-
   if (id == DGMSG_TIMER) {
     auto it = timers_.find(wParam);
     if (it != timers_.end()) {
