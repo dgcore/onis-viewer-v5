@@ -29,6 +29,7 @@ set(SERVER_SOURCES
     src/main.cpp
     src/network/drogon/drogon_http_server.cpp
     src/network/drogon/drogon_http_controller.cpp
+    src/services/requests/request_service.cpp
 )
 
 set(SERVER_HEADERS
@@ -74,4 +75,10 @@ install(TARGETS onis_site_server
 install(DIRECTORY config/
     DESTINATION etc/onis_site_server
     FILES_MATCHING PATTERN "*.conf" PATTERN "*.json"
+)
+
+# Copy certificates
+install(DIRECTORY certificates/
+    DESTINATION etc/onis_site_server/certificates
+    FILES_MATCHING PATTERN "*.crt" PATTERN "*.key"
 ) 

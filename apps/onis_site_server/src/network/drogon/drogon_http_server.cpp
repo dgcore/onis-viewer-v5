@@ -10,8 +10,9 @@
 // static constructor
 //------------------------------------------------------------------------------
 
-drogon_http_server_ptr drogon_http_server::create() {
-  drogon_http_server_ptr ret = std::make_shared<drogon_http_server>();
+drogon_http_server_ptr drogon_http_server::create(
+    const request_service_ptr& srv) {
+  drogon_http_server_ptr ret = std::make_shared<drogon_http_server>(srv);
   ret->run();
   return ret;
 }
@@ -20,7 +21,10 @@ drogon_http_server_ptr drogon_http_server::create() {
 // constructor
 //------------------------------------------------------------------------------
 
-drogon_http_server::drogon_http_server() : dgc::thread() {}
+drogon_http_server::drogon_http_server(const request_service_ptr& srv)
+    : dgc::thread() {
+  this->rqsrv_ = srv;
+}
 
 //------------------------------------------------------------------------------
 // destructor
@@ -39,9 +43,30 @@ void drogon_http_server::init_instance() {
 }
 
 void drogon_http_server::exit_instance() {
+  std::cout << "Stopping drogon server..." << std::endl;
   drogon::app().quit();
+
+  // Give the server a moment to stop gracefully
+  std::this_thread::sleep_for(std::chrono::milliseconds(500));
+
   if (this->th_.joinable()) {
-    this->th_.join();
+    std::cout << "Joining worker thread..." << std::endl;
+
+    // Try to join with a timeout
+    auto start = std::chrono::steady_clock::now();
+    while (this->th_.joinable()) {
+      auto now = std::chrono::steady_clock::now();
+      auto elapsed =
+          std::chrono::duration_cast<std::chrono::milliseconds>(now - start);
+      if (elapsed.count() > 2000) {  // 2 second timeout
+        std::cout << "Timeout waiting for worker thread, detaching..."
+                  << std::endl;
+        this->th_.detach();
+        break;
+      }
+      std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
+    std::cout << "Worker thread handled" << std::endl;
   }
   dgc::thread::exit_instance();
 }
@@ -52,11 +77,14 @@ void drogon_http_server::worker_thread(drogon_http_server* server,
     drogon::app()
         .addListener("0.0.0.0", 5555, true)
         .setThreadNum(10)
-        .setSSLFiles(
-            "/home/hibino/Documents/HCR-X1/certificate/certificate.crt",
-            "/home/hibino/Documents/HCR-X1/certificate/private.key");
+        .setSSLFiles("/Users/cedric/Documents/certificate.crt",
+                     "/Users/cedric/Documents/private.key");
     drogon::app().registerController(controller);
-    std::thread([]() { drogon::app().run(); }).detach();
+
+    // Run Drogon directly in this thread (not detached)
+    std::cout << "Starting drogon server" << std::endl;
+    drogon::app().run();
+    std::cout << "Drogon server stopped" << std::endl;
   } catch (const std::exception& ex) {
   }
 }
