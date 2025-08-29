@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
@@ -45,12 +44,7 @@ class SiteAsyncRequest implements AsyncRequest {
     required this.requestType,
     this.data,
   }) : _client = http.Client() {
-    // Set up SSL certificate validation override for desktop platforms
-    if (Platform.isWindows || Platform.isMacOS || Platform.isLinux) {
-      if (HttpOverrides.current == null) {
-        HttpOverrides.global = _MyHttpOverrides();
-      }
-    }
+    debugPrint('SiteAsyncRequest created with baseUrl: $baseUrl');
   }
 
   @override
@@ -106,7 +100,12 @@ class SiteAsyncRequest implements AsyncRequest {
         return _createCancelledResponse();
       }*/
 
-      debugPrint('SiteAsyncRequest.send() - sending HTTP request');
+      debugPrint(
+          'SiteAsyncRequest.send() - sending HTTP request to: ${_currentRequest!.url}');
+      debugPrint(
+          'SiteAsyncRequest.send() - request headers: ${_currentRequest!.headers}');
+      debugPrint(
+          'SiteAsyncRequest.send() - request body: ${_currentRequest!.body}');
       // Send the request
       final response = await _client.send(_currentRequest!);
 
@@ -298,14 +297,4 @@ class HttpRequestException implements Exception {
 
   @override
   String toString() => 'HttpRequestException: $message (Status: $statusCode)';
-}
-
-/// HTTP overrides to ignore SSL certificate validation
-class _MyHttpOverrides extends HttpOverrides {
-  @override
-  HttpClient createHttpClient(SecurityContext? context) {
-    return super.createHttpClient(context)
-      ..badCertificateCallback =
-          (X509Certificate cert, String host, int port) => true;
-  }
 }

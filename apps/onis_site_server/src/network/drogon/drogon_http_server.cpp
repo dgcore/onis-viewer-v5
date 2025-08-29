@@ -76,6 +76,7 @@ void drogon_http_server::worker_thread(drogon_http_server* server,
   try {
     drogon::app()
         .addListener("0.0.0.0", 5555, true)
+        .addListener("0.0.0.0", 5556, false)  // HTTP listener on port 5556
         .setThreadNum(10)
         .setSSLFiles("/Users/cedric/Documents/certificate.crt",
                      "/Users/cedric/Documents/private.key");

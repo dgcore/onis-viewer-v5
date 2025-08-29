@@ -150,7 +150,7 @@ class SiteSource extends DatabaseSource {
   AsyncRequest? createRequest(RequestType requestType,
       [Map<String, dynamic>? data]) {
     // Get the base URL from metadata or use default localhost server
-    final baseUrl = metadata['baseUrl'] as String? ?? 'http://localhost:5555';
+    final baseUrl = metadata['baseUrl'] as String? ?? 'https://127.0.0.1:5555';
 
     return SiteAsyncRequest(
       baseUrl: baseUrl,
