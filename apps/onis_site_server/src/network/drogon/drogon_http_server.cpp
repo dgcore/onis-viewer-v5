@@ -38,7 +38,7 @@ drogon_http_server::~drogon_http_server() {}
 
 void drogon_http_server::init_instance() {
   dgc::thread::init_instance();
-  this->controller_ = http_drogon_controller::create(/*this->rqsrv_*/);
+  this->controller_ = http_drogon_controller::create(this->rqsrv_);
   this->th_ = std::thread(this->worker_thread, this, this->controller_);
 }
 
