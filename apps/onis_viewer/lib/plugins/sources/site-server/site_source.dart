@@ -149,9 +149,8 @@ class SiteSource extends DatabaseSource {
   @override
   AsyncRequest? createRequest(RequestType requestType,
       [Map<String, dynamic>? data]) {
-    // For now, we'll create a basic SiteAsyncRequest
-    // In a real implementation, you would need to get the base URL from metadata or configuration
-    final baseUrl = metadata['baseUrl'] as String? ?? 'https://api.example.com';
+    // Get the base URL from metadata or use default localhost server
+    final baseUrl = metadata['baseUrl'] as String? ?? 'http://localhost:5555';
 
     return SiteAsyncRequest(
       baseUrl: baseUrl,
@@ -229,7 +228,7 @@ class SiteSource extends DatabaseSource {
     }
   }
 
-  /// Mock login: optionally store credentials, wait 10 seconds, then mark active
+  /// Authenticate with the site server
   Future<void> login({
     required String username,
     required String password,
@@ -241,37 +240,66 @@ class SiteSource extends DatabaseSource {
     isLoggingIn = true;
     notifyListeners();
 
-    // Simulate slow server response for login
-    await Future.delayed(const Duration(seconds: 1));
+    try {
+      // Create authentication request
+      final request = createRequest(RequestType.login, {
+        'username': username,
+        'password': password,
+      });
 
-    // Store or clear credentials based on remember flag
-    if (remember) {
-      await SiteServerCredentialStore.save(
-        uid,
-        username: username,
-        password: password,
-        remember: true,
-      );
-    } else {
-      await SiteServerCredentialStore.clear(uid);
+      if (request == null) {
+        throw Exception('Failed to create authentication request');
+      }
+
+      // Send the authentication request and wait for response
+      final response = await request.send();
+
+      if (!response.isSuccess) {
+        throw Exception('Authentication failed: ${response.errorMessage}');
+      }
+
+      // Check if authentication was successful
+      final data = response.data;
+      if (data == null || data['success'] != true) {
+        throw Exception('Authentication failed: Invalid response from server');
+      }
+
+      // Store or clear credentials based on remember flag
+      if (remember) {
+        await SiteServerCredentialStore.save(
+          uid,
+          username: username,
+          password: password,
+          remember: true,
+        );
+      } else {
+        await SiteServerCredentialStore.clear(uid);
+      }
+
+      // Mark source as active
+      isActive = true;
+
+      // Create child sources after successful authentication
+      createChildSources();
+
+      // Auto-expand the site source node in the source tree
+      final api = OVApi();
+      final dbApi = api.plugins.getPublicApi('onis_database_plugin');
+      if (dbApi != null) {
+        dbApi.expandSourceNode(uid, expand: true, expandChildren: true);
+      }
+    } catch (e) {
+      // Authentication failed
+      isActive = false;
+      lastUsername = null;
+      lastPassword = null;
+      lastRemember = false;
+      rethrow; // Re-throw the exception so the UI can handle it
+    } finally {
+      // Reset logging-in flag
+      isLoggingIn = false;
+      notifyListeners();
     }
-
-    // Mark source as active
-    isActive = true;
-
-    // Create child sources after successful authentication
-    createChildSources();
-
-    // Auto-expand the site source node in the source tree
-    final api = OVApi();
-    final dbApi = api.plugins.getPublicApi('onis_database_plugin');
-    if (dbApi != null) {
-      dbApi.expandSourceNode(uid, expand: true, expandChildren: true);
-    }
-
-    // Reset logging-in flag
-    isLoggingIn = false;
-    notifyListeners();
   }
 
   @override

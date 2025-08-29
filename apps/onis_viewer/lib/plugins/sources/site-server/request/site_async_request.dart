@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
@@ -43,7 +44,14 @@ class SiteAsyncRequest implements AsyncRequest {
     required this.baseUrl,
     required this.requestType,
     this.data,
-  }) : _client = http.Client();
+  }) : _client = http.Client() {
+    // Set up SSL certificate validation override for desktop platforms
+    if (Platform.isWindows || Platform.isMacOS || Platform.isLinux) {
+      if (HttpOverrides.current == null) {
+        HttpOverrides.global = _MyHttpOverrides();
+      }
+    }
+  }
 
   @override
   Future<AsyncResponse> send() async {
@@ -92,11 +100,11 @@ class SiteAsyncRequest implements AsyncRequest {
       debugPrint('SiteAsyncRequest.send() - 10 second delay completed');
 
       // Check if cancelled during the delay
-      if (_isCancelled) {
+      /*if (_isCancelled) {
         debugPrint(
             'SiteAsyncRequest.send() - request was cancelled during delay');
         return _createCancelledResponse();
-      }
+      }*/
 
       debugPrint('SiteAsyncRequest.send() - sending HTTP request');
       // Send the request
@@ -192,7 +200,7 @@ class SiteAsyncRequest implements AsyncRequest {
       case RequestType.export:
         return '$baseUrl/api/export';
       case RequestType.login:
-        return '$baseUrl/api/auth/login';
+        return '$baseUrl/accounts/authenticate';
       case RequestType.logout:
         return '$baseUrl/api/auth/logout';
       case RequestType.getStudy:
@@ -290,4 +298,14 @@ class HttpRequestException implements Exception {
 
   @override
   String toString() => 'HttpRequestException: $message (Status: $statusCode)';
+}
+
+/// HTTP overrides to ignore SSL certificate validation
+class _MyHttpOverrides extends HttpOverrides {
+  @override
+  HttpClient createHttpClient(SecurityContext? context) {
+    return super.createHttpClient(context)
+      ..badCertificateCallback =
+          (X509Certificate cert, String host, int port) => true;
+  }
 }
