@@ -8,11 +8,10 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # Find required packages
 find_package(PkgConfig REQUIRED)
 
-# Set pkg-config path for PostgreSQL
-set(ENV{PKG_CONFIG_PATH} "/opt/homebrew/lib/postgresql@14/pkgconfig:$ENV{PKG_CONFIG_PATH}")
-
-# Find PostgreSQL
-pkg_check_modules(POSTGRESQL REQUIRED libpq)
+# PostgreSQL paths for Postgres.app installation
+set(POSTGRESQL_INCLUDE_DIRS "/Applications/Postgres.app/Contents/Versions/15/include")
+set(POSTGRESQL_LIBRARY_DIRS "/Applications/Postgres.app/Contents/Versions/15/lib")
+set(POSTGRESQL_LIBRARIES "pq")
 
 # Find SQLite3
 pkg_check_modules(SQLITE3 REQUIRED sqlite3)
