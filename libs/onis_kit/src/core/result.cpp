@@ -1,4 +1,4 @@
-#include "../../public/core/result.hpp"
+#include "../../include/core/result.hpp"
 
 namespace dgc {
 
