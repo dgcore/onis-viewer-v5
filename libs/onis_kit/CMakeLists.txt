@@ -5,6 +5,18 @@ project(onis_kit VERSION 1.0.0 LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# Find required packages
+find_package(PkgConfig REQUIRED)
+
+# Set pkg-config path for PostgreSQL
+set(ENV{PKG_CONFIG_PATH} "/opt/homebrew/lib/postgresql@14/pkgconfig:$ENV{PKG_CONFIG_PATH}")
+
+# Find PostgreSQL
+pkg_check_modules(POSTGRESQL REQUIRED libpq)
+
+# Find SQLite3
+pkg_check_modules(SQLITE3 REQUIRED sqlite3)
+
 # Debug configuration
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
     set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -g -O0")
@@ -16,15 +28,30 @@ set(ONIS_KIT_SOURCES
     src/core/result.cpp
     src/core/thread.cpp
     src/core/event.cpp
+    src/database/postgresql/postgresql_connection.cpp
+    src/database/postgresql/postgresql_query.cpp
+    src/database/postgresql/postgresql_result.cpp
+    src/database/sqlite/sqlite_connection.cpp
+    src/database/sqlite/sqlite_query.cpp
+    src/database/sqlite/sqlite_result.cpp
 )
 
 # Header files
 set(ONIS_KIT_HEADERS
-    public/core/result.hpp
-    public/core/object.hpp
-    public/core/types.hpp
-    public/core/thread.hpp
-    public/core/event.hpp
+    include/core/result.hpp
+    include/core/object.hpp
+    include/core/types.hpp
+    include/core/thread.hpp
+    include/core/event.hpp
+    include/database/database_interface.hpp
+    include/database/postgresql/postgresql.hpp
+    include/database/postgresql/postgresql_connection.hpp
+    include/database/postgresql/postgresql_query.hpp
+    include/database/postgresql/postgresql_result.hpp
+    include/database/sqlite/sqlite.hpp
+    include/database/sqlite/sqlite_connection.hpp
+    include/database/sqlite/sqlite_query.hpp
+    include/database/sqlite/sqlite_result.hpp
 )
 
 # Create shared library
@@ -42,13 +69,27 @@ set_target_properties(onis_kit PROPERTIES
 
 # Include directories
 target_include_directories(onis_kit PUBLIC
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/public>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     $<INSTALL_INTERFACE:include/onis_kit>
+    ${POSTGRESQL_INCLUDE_DIRS}
+    ${SQLITE3_INCLUDE_DIRS}
 )
 
 # Compiler definitions
 target_compile_definitions(onis_kit PRIVATE
     ONIS_KIT_LIBRARY
+)
+
+# Link libraries
+target_link_libraries(onis_kit PRIVATE
+    ${POSTGRESQL_LIBRARIES}
+    ${SQLITE3_LIBRARIES}
+)
+
+# Add library directories
+target_link_directories(onis_kit PRIVATE
+    ${POSTGRESQL_LIBRARY_DIRS}
+    ${SQLITE3_LIBRARY_DIRS}
 )
 
 # Installation

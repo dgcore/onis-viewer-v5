@@ -1,4 +1,4 @@
-#include "../../public/core/event.hpp"
+#include "../../include/core/event.hpp"
 
 namespace dgc {
 

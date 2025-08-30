@@ -1,4 +1,4 @@
-#include "../../public/core/thread.hpp"
+#include "../../include/core/thread.hpp"
 #include <iostream>
 namespace dgc {
 
