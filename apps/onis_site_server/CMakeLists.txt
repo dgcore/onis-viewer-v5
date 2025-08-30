@@ -30,6 +30,8 @@ set(SERVER_SOURCES
     src/network/drogon/drogon_http_server.cpp
     src/network/drogon/drogon_http_controller.cpp
     src/services/requests/request_service.cpp
+    src/database/site_database.cpp
+    src/database/site_database_pool.cpp
 )
 
 set(SERVER_HEADERS
@@ -44,8 +46,10 @@ add_executable(onis_site_server
 # Include directories
 target_include_directories(onis_site_server PRIVATE
     ${CMAKE_SOURCE_DIR}/shared/cpp
-    ${CMAKE_SOURCE_DIR}/libs/onis_kit/public
-    ${CMAKE_SOURCE_DIR}/libs
+    ${CMAKE_SOURCE_DIR}/../../libs/onis_kit/include
+    ${CMAKE_SOURCE_DIR}/../../libs
+    ${CMAKE_SOURCE_DIR}/include
+    "/Applications/Postgres.app/Contents/Versions/15/include"
     ${DROGON_INCLUDE_DIRS}
     ${JSONCPP_INCLUDE_DIRS}
 )
@@ -54,11 +58,19 @@ target_include_directories(onis_site_server PRIVATE
 target_link_libraries(onis_site_server PRIVATE
     onis_core
     onis_kit
+    pq
     ${DROGON_LIBRARIES}
     ${JSONCPP_LIBRARIES}
     # Add other libraries as needed:
     # ${DCMTK_LIBRARIES}
     # ${BOOST_LIBRARIES}
+)
+
+# Add library search directories
+target_link_directories(onis_site_server PRIVATE
+    ${CMAKE_SOURCE_DIR}/../../build/lib
+    ${CMAKE_SOURCE_DIR}/../../libs/onis_kit/build
+    "/Applications/Postgres.app/Contents/Versions/15/lib"
 )
 
 # Compiler definitions
