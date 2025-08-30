@@ -1,7 +1,7 @@
 #pragma once
 
 #include <memory>
-#include "database/site_database_pool.hpp"
+#include "../../database/site_database_pool.hpp"
 
 ////////////////////////////////////////////////////////////////////////////////
 // request_service class

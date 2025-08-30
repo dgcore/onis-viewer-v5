@@ -2,7 +2,7 @@
 
 #include <memory>
 #include <string>
-#include "database/database_interface.hpp"
+#include "onis_kit/include/database/database_interface.hpp"
 
 class site_database {
 public:

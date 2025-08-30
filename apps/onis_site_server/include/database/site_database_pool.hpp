@@ -3,7 +3,7 @@
 #include <functional>
 #include <memory>
 #include <queue>
-#include "database/site_database.hpp"
+#include "site_database.hpp"
 
 class site_database_pool {
 public:
