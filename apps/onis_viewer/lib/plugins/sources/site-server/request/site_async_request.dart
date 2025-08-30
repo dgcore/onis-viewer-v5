@@ -43,7 +43,9 @@ class SiteAsyncRequest implements AsyncRequest {
     required this.baseUrl,
     required this.requestType,
     this.data,
-  }) : _client = http.Client();
+  }) : _client = http.Client() {
+    debugPrint('SiteAsyncRequest created with baseUrl: $baseUrl');
+  }
 
   @override
   Future<AsyncResponse> send() async {
@@ -92,13 +94,18 @@ class SiteAsyncRequest implements AsyncRequest {
       debugPrint('SiteAsyncRequest.send() - 10 second delay completed');
 
       // Check if cancelled during the delay
-      if (_isCancelled) {
+      /*if (_isCancelled) {
         debugPrint(
             'SiteAsyncRequest.send() - request was cancelled during delay');
         return _createCancelledResponse();
-      }
+      }*/
 
-      debugPrint('SiteAsyncRequest.send() - sending HTTP request');
+      debugPrint(
+          'SiteAsyncRequest.send() - sending HTTP request to: ${_currentRequest!.url}');
+      debugPrint(
+          'SiteAsyncRequest.send() - request headers: ${_currentRequest!.headers}');
+      debugPrint(
+          'SiteAsyncRequest.send() - request body: ${_currentRequest!.body}');
       // Send the request
       final response = await _client.send(_currentRequest!);
 
@@ -192,7 +199,7 @@ class SiteAsyncRequest implements AsyncRequest {
       case RequestType.export:
         return '$baseUrl/api/export';
       case RequestType.login:
-        return '$baseUrl/api/auth/login';
+        return '$baseUrl/accounts/authenticate';
       case RequestType.logout:
         return '$baseUrl/api/auth/logout';
       case RequestType.getStudy:

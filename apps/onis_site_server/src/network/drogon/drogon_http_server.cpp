@@ -38,7 +38,7 @@ drogon_http_server::~drogon_http_server() {}
 
 void drogon_http_server::init_instance() {
   dgc::thread::init_instance();
-  this->controller_ = http_drogon_controller::create(/*this->rqsrv_*/);
+  this->controller_ = http_drogon_controller::create(this->rqsrv_);
   this->th_ = std::thread(this->worker_thread, this, this->controller_);
 }
 
@@ -76,6 +76,7 @@ void drogon_http_server::worker_thread(drogon_http_server* server,
   try {
     drogon::app()
         .addListener("0.0.0.0", 5555, true)
+        .addListener("0.0.0.0", 5556, false)  // HTTP listener on port 5556
         .setThreadNum(10)
         .setSSLFiles("/Users/cedric/Documents/certificate.crt",
                      "/Users/cedric/Documents/private.key");
