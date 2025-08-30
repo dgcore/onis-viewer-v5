@@ -1,0 +1,19 @@
+{
+  "database": {
+    "type": "postgresql",
+    "host": "localhost",
+    "port": 5432,
+    "user": "postgres",
+    "password": "your_password_here",
+    "database_name": "onis_site_db"
+  },
+  "http": {
+    "http_port": 5556,
+    "https_port": 5555,
+    "ssl": {
+      "enabled": true,
+      "certificate_file": "certificates/certificate.crt",
+      "private_key_file": "certificates/private.key"
+    }
+  }
+} 
