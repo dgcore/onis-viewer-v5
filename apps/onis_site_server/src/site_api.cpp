@@ -89,7 +89,8 @@ bool site_api::initialize(const std::string& config_file_path) {
     }
 
     // Initialize HTTP server
-    http_server_ = drogon_http_server::create(request_service_);
+    http_server_ =
+        drogon_http_server::create(request_service_, config_service_);
     if (!http_server_) {
       std::cerr << "site_api: Failed to create HTTP server" << std::endl;
       return false;
