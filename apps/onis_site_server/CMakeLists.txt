@@ -27,9 +27,11 @@ set(JSONCPP_LIBRARIES "${JSONCPP_ROOT}/lib/libjsoncpp.dylib")
 # Source files
 set(SERVER_SOURCES
     src/main.cpp
+    src/site_api.cpp
     src/network/drogon/drogon_http_server.cpp
     src/network/drogon/drogon_http_controller.cpp
     src/services/requests/request_service.cpp
+    src/services/config/config_service.cpp
     src/database/site_database.cpp
     src/database/site_database_pool.cpp
 )

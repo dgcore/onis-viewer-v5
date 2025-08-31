@@ -1,7 +1,7 @@
+#include <filesystem>
 #include <iostream>
 #include <string>
-#include "../include/network/drogon/drogon_http_server.hpp"
-#include "../include/services/requests/request_service.hpp"
+#include "../include/site_api.hpp"
 #include "onis_kit/include/core/result.hpp"
 #include "onis_kit/include/core/thread.hpp"
 
@@ -19,28 +19,42 @@ public:
 
   void init_instance() {
     dgc::thread::init_instance();
-    rqsrv_ = request_service::create();
-    drogon_http_server_ = drogon_http_server::create(rqsrv_);
-    drogon_http_server_->run();
-    // drogon server will exit the application if it encounters a problem
-    // to avoid crash, we pause the application here:
-    std::this_thread::sleep_for(std::chrono::milliseconds(3));
+
+    // Initialize the site API with config file
+    std::string config_file_path =
+        "~/Documents/ONIS5/site_server/config/config.json";
+
+    // Expand the tilde to home directory
+    if (config_file_path[0] == '~') {
+      const char* home_dir = getenv("HOME");
+      if (home_dir) {
+        config_file_path = std::string(home_dir) + config_file_path.substr(1);
+      }
+    }
+
+    std::cout << "Initializing site API with config: " << config_file_path
+              << std::endl;
+
+    if (!api().initialize(config_file_path)) {
+      std::cerr << "Failed to initialize site API" << std::endl;
+      return;
+    }
+
+    std::cout << "Site API initialized successfully" << std::endl;
   }
 
   void exit_instance() {
-    if (drogon_http_server_ != nullptr) {
-      drogon_http_server_->stop();
-    }
+    // Shutdown the site API
+    api().shutdown();
     dgc::thread::exit_instance();
   }
 
 private:
-  drogon_http_server_ptr drogon_http_server_;
-  request_service_ptr rqsrv_;
+  // No longer need individual service pointers as they're managed by site_api
 };
 
 int main() {
-  std::cout << "Starting process..." << std::endl;
+  std::cout << "Starting ONIS Site Server..." << std::endl;
   std::cout << "Initialize app..." << std::endl;
   main_thread th;
   th.run();
