@@ -31,6 +31,7 @@ set(SERVER_SOURCES
     src/network/drogon/drogon_http_server.cpp
     src/network/drogon/drogon_http_controller.cpp
     src/services/requests/request_service.cpp
+    src/services/config/config_service.cpp
     src/database/site_database.cpp
     src/database/site_database_pool.cpp
 )

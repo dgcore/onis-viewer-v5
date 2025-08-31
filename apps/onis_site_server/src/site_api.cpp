@@ -1,4 +1,4 @@
-#include "site_api.hpp"
+#include "../include/site_api.hpp"
 #include <iostream>
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -17,14 +17,14 @@ site_api_ptr site_api::instance_ = nullptr;
 
 site_api_ptr site_api::get_instance() {
   if (!instance_) {
-    instance_ = std::shared_ptr<site_api>(new site_api());
+    instance_ = std::make_shared<site_api>();
   }
   return instance_;
 }
 
 site_api& site_api::instance() {
   if (!instance_) {
-    instance_ = std::shared_ptr<site_api>(new site_api());
+    instance_ = std::make_shared<site_api>();
   }
   return *instance_;
 }
@@ -33,7 +33,11 @@ site_api& site_api::instance() {
 // Constructor and destructor
 //------------------------------------------------------------------------------
 
-site_api::site_api() : initialized_(false), config_file_path_("") {
+site_api::site_api()
+    : initialized_(false),
+      request_service_(nullptr),
+      config_service_(nullptr),
+      http_server_(nullptr) {
   std::cout << "site_api: Singleton instance created" << std::endl;
 }
 
@@ -48,19 +52,61 @@ site_api::~site_api() {
 // API lifecycle
 //------------------------------------------------------------------------------
 
-bool site_api::initialize() {
+bool site_api::initialize(const std::string& config_file_path) {
   if (initialized_) {
     std::cerr << "site_api: API already initialized" << std::endl;
     return false;
   }
 
   try {
-    // TODO: Initialize configuration service
-    // TODO: Initialize database pool
-    // TODO: Initialize HTTP server components
+    // Initialize config service
+    config_service_ = config_service::create();
+    if (!config_service_) {
+      std::cerr << "site_api: Failed to create config service" << std::endl;
+      return false;
+    }
+
+    // Load configuration from file
+    if (!config_service_->load_config(config_file_path)) {
+      std::cerr << "site_api: Failed to load configuration from: "
+                << config_file_path << std::endl;
+      std::cerr << "site_api: Config error: "
+                << config_service_->get_last_error() << std::endl;
+      return false;
+    }
+
+    // Validate configuration
+    if (!config_service_->is_valid()) {
+      std::cerr << "site_api: Configuration is not valid" << std::endl;
+      return false;
+    }
+
+    // Initialize request service
+    request_service_ = request_service::create();
+    if (!request_service_) {
+      std::cerr << "site_api: Failed to create request service" << std::endl;
+      return false;
+    }
+
+    // Initialize HTTP server
+    http_server_ = drogon_http_server::create(request_service_);
+    if (!http_server_) {
+      std::cerr << "site_api: Failed to create HTTP server" << std::endl;
+      return false;
+    } else {
+      std::cout << "site_api: HTTP server created successfully" << std::endl;
+      http_server_->run();
+      // drogon server will exit the application if it encounters a problem
+      // to avoid crash, we pause the application here:
+      std::this_thread::sleep_for(std::chrono::milliseconds(3));
+    }
+
+    // TODO: Initialize database pool with config values
+    // TODO: Configure HTTP server with config values
 
     initialized_ = true;
-    std::cout << "site_api: Initialized successfully" << std::endl;
+    std::cout << "site_api: Initialized successfully with config: "
+              << config_file_path << std::endl;
     return true;
   } catch (const std::exception& e) {
     std::cerr << "site_api: Initialization failed: " << e.what() << std::endl;
@@ -74,9 +120,23 @@ void site_api::shutdown() {
   }
 
   try {
-    // TODO: Shutdown HTTP server components
+    // Shutdown HTTP server
+    if (http_server_) {
+      http_server_->stop();
+      http_server_.reset();
+    }
+
+    // Shutdown request service
+    if (request_service_) {
+      request_service_.reset();
+    }
+
+    // Shutdown config service
+    if (config_service_) {
+      config_service_.reset();
+    }
+
     // TODO: Shutdown database pool
-    // TODO: Shutdown configuration service
 
     initialized_ = false;
     std::cout << "site_api: Shutdown completed" << std::endl;
@@ -90,15 +150,25 @@ bool site_api::is_initialized() const {
 }
 
 //------------------------------------------------------------------------------
-// Configuration
+// Request service access
 //------------------------------------------------------------------------------
 
-void site_api::set_config_file(const std::string& config_file_path) {
-  config_file_path_ = config_file_path;
-  std::cout << "site_api: Config file set to: " << config_file_path_
-            << std::endl;
+request_service_ptr site_api::get_request_service() const {
+  return request_service_;
 }
 
-std::string site_api::get_config_file() const {
-  return config_file_path_;
+//------------------------------------------------------------------------------
+// Config service access
+//------------------------------------------------------------------------------
+
+config_service_ptr site_api::get_config_service() const {
+  return config_service_;
+}
+
+//------------------------------------------------------------------------------
+// HTTP server access
+//------------------------------------------------------------------------------
+
+drogon_http_server_ptr site_api::get_http_server() const {
+  return http_server_;
 }
