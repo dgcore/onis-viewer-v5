@@ -11,26 +11,27 @@
 //------------------------------------------------------------------------------
 
 drogon_http_server_ptr drogon_http_server::create(
-    const request_service_ptr& srv) {
-  drogon_http_server_ptr ret = std::make_shared<drogon_http_server>(srv);
-  ret->run();
-  return ret;
+    const request_service_ptr& srv, const config_service_ptr& config) {
+  return std::make_shared<drogon_http_server>(srv, config);
 }
 
 //------------------------------------------------------------------------------
 // constructor
 //------------------------------------------------------------------------------
 
-drogon_http_server::drogon_http_server(const request_service_ptr& srv)
-    : dgc::thread() {
-  this->rqsrv_ = srv;
+drogon_http_server::drogon_http_server(const request_service_ptr& srv,
+                                       const config_service_ptr& config)
+    : rqsrv_(srv), config_service_(config) {
+  std::cout << "drogon_http_server: Constructor" << std::endl;
 }
 
 //------------------------------------------------------------------------------
 // destructor
 //------------------------------------------------------------------------------
 
-drogon_http_server::~drogon_http_server() {}
+drogon_http_server::~drogon_http_server() {
+  std::cout << "drogon_http_server: Destructor" << std::endl;
+}
 
 //------------------------------------------------------------------------------
 // init / exit
@@ -38,54 +39,81 @@ drogon_http_server::~drogon_http_server() {}
 
 void drogon_http_server::init_instance() {
   dgc::thread::init_instance();
-  this->controller_ = http_drogon_controller::create(this->rqsrv_);
-  this->th_ = std::thread(this->worker_thread, this, this->controller_);
+  std::cout << "drogon_http_server: init_instance" << std::endl;
+
+  controller_ = http_drogon_controller::create(rqsrv_);
+  th_ = std::thread(worker_thread, this, controller_);
 }
 
 void drogon_http_server::exit_instance() {
-  std::cout << "Stopping drogon server..." << std::endl;
+  std::cout << "drogon_http_server: exit_instance" << std::endl;
   drogon::app().quit();
-
-  // Give the server a moment to stop gracefully
-  std::this_thread::sleep_for(std::chrono::milliseconds(500));
-
-  if (this->th_.joinable()) {
-    std::cout << "Joining worker thread..." << std::endl;
-
-    // Try to join with a timeout
-    auto start = std::chrono::steady_clock::now();
-    while (this->th_.joinable()) {
-      auto now = std::chrono::steady_clock::now();
-      auto elapsed =
-          std::chrono::duration_cast<std::chrono::milliseconds>(now - start);
-      if (elapsed.count() > 2000) {  // 2 second timeout
-        std::cout << "Timeout waiting for worker thread, detaching..."
-                  << std::endl;
-        this->th_.detach();
-        break;
-      }
-      std::this_thread::sleep_for(std::chrono::milliseconds(10));
-    }
-    std::cout << "Worker thread handled" << std::endl;
+  if (th_.joinable()) {
+    th_.join();
   }
   dgc::thread::exit_instance();
 }
 
+//------------------------------------------------------------------------------
+// properties
+//------------------------------------------------------------------------------
+
+request_service_ptr drogon_http_server::get_request_service() const {
+  return rqsrv_;
+}
+
+config_service_ptr drogon_http_server::get_config_service() const {
+  return config_service_;
+}
+
+//------------------------------------------------------------------------------
+// worker thread
+//------------------------------------------------------------------------------
+
 void drogon_http_server::worker_thread(drogon_http_server* server,
                                        http_drogon_controller_ptr controller) {
   try {
+    // Get configuration values
+    auto config = server->get_config_service();
+    if (!config) {
+      std::cerr << "drogon_http_server: No config service available"
+                << std::endl;
+      return;
+    }
+
+    int http_port = config->get_http_port();
+    int https_port = config->get_https_port();
+    bool ssl_enabled = config->is_ssl_enabled();
+    std::string cert_file = config->get_ssl_certificate_file();
+    std::string key_file = config->get_ssl_private_key_file();
+
+    std::cout << "drogon_http_server: Configuring server with:" << std::endl;
+    std::cout << "  HTTP port: " << http_port << std::endl;
+    std::cout << "  HTTPS port: " << https_port << std::endl;
+    std::cout << "  SSL enabled: " << (ssl_enabled ? "yes" : "no") << std::endl;
+    if (ssl_enabled) {
+      std::cout << "  Certificate file: " << cert_file << std::endl;
+      std::cout << "  Private key file: " << key_file << std::endl;
+    }
+
+    // Configure Drogon with config values
     drogon::app()
-        .addListener("0.0.0.0", 5555, true)
-        .addListener("0.0.0.0", 5556, false)  // HTTP listener on port 5556
-        .setThreadNum(10)
-        .setSSLFiles("/Users/cedric/Documents/certificate.crt",
-                     "/Users/cedric/Documents/private.key");
-    drogon::app().registerController(controller);
+        .addListener("0.0.0.0", https_port, true)   // HTTPS listener
+        .addListener("0.0.0.0", http_port, false);  // HTTP listener
+
+    // Set SSL files only if SSL is enabled
+    if (ssl_enabled) {
+      drogon::app().setSSLFiles(cert_file, key_file);
+    }
+
+    drogon::app().setThreadNum(10).registerController(controller);
 
     // Run Drogon directly in this thread (not detached)
-    std::cout << "Starting drogon server" << std::endl;
+    std::cout << "drogon_http_server: Starting drogon server" << std::endl;
     drogon::app().run();
-    std::cout << "Drogon server stopped" << std::endl;
+    std::cout << "drogon_http_server: Drogon server stopped" << std::endl;
   } catch (const std::exception& ex) {
+    std::cerr << "drogon_http_server: Exception in worker thread: " << ex.what()
+              << std::endl;
   }
 }

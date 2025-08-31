@@ -75,11 +75,23 @@ bool config_service::load_config(const std::string& config_file_path) {
       auto& http = j["http"];
       http_config_.http_port = http.value("http_port", 5556);
       http_config_.https_port = http.value("https_port", 5555);
-      http_config_.ssl_enabled = http.value("ssl_enabled", true);
-      http_config_.ssl_certificate_file =
-          http.value("ssl_certificate_file", "certificates/certificate.crt");
-      http_config_.ssl_private_key_file =
-          http.value("ssl_private_key_file", "certificates/private.key");
+
+      // Parse nested SSL configuration
+      if (http.contains("ssl")) {
+        auto& ssl = http["ssl"];
+        http_config_.ssl_enabled = ssl.value("enabled", true);
+        http_config_.ssl_certificate_file =
+            ssl.value("certificate_file", "certificates/certificate.crt");
+        http_config_.ssl_private_key_file =
+            ssl.value("private_key_file", "certificates/private.key");
+      } else {
+        // Fallback to top-level SSL settings if nested structure not found
+        http_config_.ssl_enabled = http.value("ssl_enabled", true);
+        http_config_.ssl_certificate_file =
+            http.value("certificate_file", "certificates/certificate.crt");
+        http_config_.ssl_private_key_file =
+            http.value("private_key_file", "certificates/private.key");
+      }
     }
 
     is_valid_ = true;
@@ -110,9 +122,9 @@ bool config_service::save_config(const std::string& config_file_path) {
     // HTTP configuration
     j["http"]["http_port"] = http_config_.http_port;
     j["http"]["https_port"] = http_config_.https_port;
-    j["http"]["ssl_enabled"] = http_config_.ssl_enabled;
-    j["http"]["ssl_certificate_file"] = http_config_.ssl_certificate_file;
-    j["http"]["ssl_private_key_file"] = http_config_.ssl_private_key_file;
+    j["http"]["ssl"]["enabled"] = http_config_.ssl_enabled;
+    j["http"]["ssl"]["certificate_file"] = http_config_.ssl_certificate_file;
+    j["http"]["ssl"]["private_key_file"] = http_config_.ssl_private_key_file;
 
     std::ofstream file(config_file_path);
     if (!file.is_open()) {

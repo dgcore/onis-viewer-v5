@@ -2,6 +2,7 @@
 
 #include <drogon/drogon.h>
 #include <memory>
+#include "../../../include/services/config/config_service.hpp"
 #include "../../../include/services/requests/request_service.hpp"
 #include "./drogon_http_controller.hpp"
 #include "onis_kit/include/core/thread.hpp"
@@ -18,9 +19,11 @@ typedef std::weak_ptr<drogon_http_server> drogon_http_server_wptr;
 
 class drogon_http_server : public dgc::thread {
 public:
-  static drogon_http_server_ptr create(const request_service_ptr& srv);
+  static drogon_http_server_ptr create(const request_service_ptr& srv,
+                                       const config_service_ptr& config);
 
-  drogon_http_server(const request_service_ptr& srv);
+  drogon_http_server(const request_service_ptr& srv,
+                     const config_service_ptr& config);
   ~drogon_http_server();
 
   // init / exit:
@@ -29,6 +32,7 @@ public:
 
   // properties:
   request_service_ptr get_request_service() const;
+  config_service_ptr get_config_service() const;
 
 protected:
   static void worker_thread(drogon_http_server* server,
@@ -36,5 +40,6 @@ protected:
 
   std::thread th_;
   request_service_ptr rqsrv_;
+  config_service_ptr config_service_;
   http_drogon_controller_ptr controller_;
 };
