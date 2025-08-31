@@ -1,7 +1,10 @@
 #include "../../../include/services/config/config_service.hpp"
 #include <fstream>
 #include <iostream>
+#include <nlohmann/json.hpp>
 #include <sstream>
+
+using json = nlohmann::json;
 
 ////////////////////////////////////////////////////////////////////////////////
 // config_service class
@@ -53,23 +56,81 @@ bool config_service::load_config(const std::string& config_file_path) {
     return false;
   }
 
-  std::stringstream buffer;
-  buffer << file.rdbuf();
-  std::string content = buffer.str();
-  file.close();
+  try {
+    json j = json::parse(file);
 
-  // TODO: Implement JSON parsing
-  // For now, just mark as valid if file exists
-  is_valid_ = true;
-  last_error_ = "";
+    // Parse database configuration
+    if (j.contains("database")) {
+      auto& db = j["database"];
+      db_config_.host = db.value("host", "localhost");
+      db_config_.port = db.value("port", 5432);
+      db_config_.database_name = db.value("database_name", "onis_site_db");
+      db_config_.user = db.value("user", "postgres");
+      db_config_.password = db.value("password", "");
+      db_config_.type = db.value("type", "postgresql");
+    }
 
-  return true;
+    // Parse HTTP configuration
+    if (j.contains("http")) {
+      auto& http = j["http"];
+      http_config_.http_port = http.value("http_port", 5556);
+      http_config_.https_port = http.value("https_port", 5555);
+      http_config_.ssl_enabled = http.value("ssl_enabled", true);
+      http_config_.ssl_certificate_file =
+          http.value("ssl_certificate_file", "certificates/certificate.crt");
+      http_config_.ssl_private_key_file =
+          http.value("ssl_private_key_file", "certificates/private.key");
+    }
+
+    is_valid_ = true;
+    last_error_ = "";
+    return true;
+
+  } catch (const json::exception& e) {
+    last_error_ = "JSON parsing error: " + std::string(e.what());
+    return false;
+  } catch (const std::exception& e) {
+    last_error_ = "File reading error: " + std::string(e.what());
+    return false;
+  }
 }
 
 bool config_service::save_config(const std::string& config_file_path) {
-  // TODO: Implement JSON generation and file writing
-  last_error_ = "Save config not implemented yet";
-  return false;
+  try {
+    json j;
+
+    // Database configuration
+    j["database"]["host"] = db_config_.host;
+    j["database"]["port"] = db_config_.port;
+    j["database"]["database_name"] = db_config_.database_name;
+    j["database"]["user"] = db_config_.user;
+    j["database"]["password"] = db_config_.password;
+    j["database"]["type"] = db_config_.type;
+
+    // HTTP configuration
+    j["http"]["http_port"] = http_config_.http_port;
+    j["http"]["https_port"] = http_config_.https_port;
+    j["http"]["ssl_enabled"] = http_config_.ssl_enabled;
+    j["http"]["ssl_certificate_file"] = http_config_.ssl_certificate_file;
+    j["http"]["ssl_private_key_file"] = http_config_.ssl_private_key_file;
+
+    std::ofstream file(config_file_path);
+    if (!file.is_open()) {
+      last_error_ =
+          "Could not open config file for writing: " + config_file_path;
+      return false;
+    }
+
+    file << j.dump(2);  // Pretty print with 2 spaces indentation
+    file.close();
+
+    last_error_ = "";
+    return true;
+
+  } catch (const std::exception& e) {
+    last_error_ = "Save config error: " + std::string(e.what());
+    return false;
+  }
 }
 
 //------------------------------------------------------------------------------
