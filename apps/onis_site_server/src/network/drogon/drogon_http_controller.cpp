@@ -30,11 +30,11 @@ http_drogon_controller::~http_drogon_controller() {}
 void http_drogon_controller::authenticate(
     const drogon::HttpRequestPtr& req,
     std::function<void(const drogon::HttpResponsePtr&)>&& callback) const {
-  Json::Value responseData;
+  json responseData;
   responseData["success"] = true;
   responseData["message"] = "Authentication successful";
   responseData["user"]["username"] = "test";
-  auto resp = drogon::HttpResponse::newHttpJsonResponse(responseData);
+  auto resp = drogon::HttpResponse::newHttpJsonResponse(responseData.dump());
   resp->setStatusCode(drogon::HttpStatusCode::k200OK);
   return callback(resp);
 }
@@ -42,11 +42,11 @@ void http_drogon_controller::authenticate(
 void http_drogon_controller::logout(
     const drogon::HttpRequestPtr& req,
     std::function<void(const drogon::HttpResponsePtr&)>&& callback) const {
-  Json::Value responseData;
+  json responseData;
   responseData["success"] = true;
-  responseData["message"] = "Authentication successful";
+  responseData["message"] = "Logout successful";
   responseData["user"]["username"] = "test";
-  auto resp = drogon::HttpResponse::newHttpJsonResponse(responseData);
+  auto resp = drogon::HttpResponse::newHttpJsonResponse(responseData.dump());
   resp->setStatusCode(drogon::HttpStatusCode::k200OK);
   return callback(resp);
 }

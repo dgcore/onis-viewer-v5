@@ -20,9 +20,13 @@ set(DROGON_ROOT "/opt/homebrew/opt/drogon")
 set(DROGON_INCLUDE_DIRS "${DROGON_ROOT}/include")
 set(DROGON_LIBRARIES "${DROGON_ROOT}/lib/libdrogon.dylib" "${DROGON_ROOT}/lib/libtrantor.dylib")
 
+# Find JsonCPP (required by Drogon)
 set(JSONCPP_ROOT "/opt/homebrew/opt/jsoncpp")
 set(JSONCPP_INCLUDE_DIRS "${JSONCPP_ROOT}/include")
 set(JSONCPP_LIBRARIES "${JSONCPP_ROOT}/lib/libjsoncpp.dylib")
+
+# Find nlohmann/json (installed via Homebrew)
+find_package(nlohmann_json REQUIRED)
 
 # Source files
 set(SERVER_SOURCES
@@ -63,6 +67,7 @@ target_link_libraries(onis_site_server PRIVATE
     pq
     ${DROGON_LIBRARIES}
     ${JSONCPP_LIBRARIES}
+    nlohmann_json::nlohmann_json
     # Add other libraries as needed:
     # ${DCMTK_LIBRARIES}
     # ${BOOST_LIBRARIES}

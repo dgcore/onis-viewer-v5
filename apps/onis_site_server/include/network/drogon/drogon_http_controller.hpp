@@ -1,7 +1,10 @@
 #pragma once
 
 #include <drogon/HttpController.h>
+#include <nlohmann/json.hpp>
 #include "../../../include/services/requests/request_service.hpp"
+
+using json = nlohmann::json;
 
 ////////////////////////////////////////////////////////////////////////////////
 // drogon_http_controller
