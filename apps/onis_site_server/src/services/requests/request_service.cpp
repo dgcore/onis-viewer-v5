@@ -1,5 +1,39 @@
 #include "../../../include/services/requests/request_service.hpp"
+#include "../../../include/exceptions/site_server_exceptions.hpp"
 #include "onis_kit/include/database/postgresql/postgresql_connection.hpp"
+
+////////////////////////////////////////////////////////////////////////////////
+// request_database class
+////////////////////////////////////////////////////////////////////////////////
+
+//------------------------------------------------------------------------------
+// constructor
+//------------------------------------------------------------------------------
+
+request_database::request_database(request_service* service) {
+  service_ = service;
+  db_ = service->get_database_connection();
+}
+
+//------------------------------------------------------------------------------
+// destructor
+//------------------------------------------------------------------------------
+
+request_database::~request_database() {
+  service_->return_database_connection(db_);
+}
+
+//------------------------------------------------------------------------------
+// operators
+//------------------------------------------------------------------------------
+
+std::shared_ptr<site_database> request_database::operator->() {
+  return db_;
+}
+
+const std::shared_ptr<site_database> request_database::operator->() const {
+  return db_;
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 // request_service class
@@ -18,7 +52,7 @@ request_service_ptr request_service::create() {
 // constructor
 //------------------------------------------------------------------------------
 
-request_service::request_service() {
+request_service::request_service() : session_timeout_(std::chrono::hours(1)) {
   // Initialize database pool with default max size of 10
   database_pool_ = std::make_unique<site_database_pool>(10);
 
@@ -60,4 +94,101 @@ std::shared_ptr<site_database> request_service::get_database_connection() {
 void request_service::return_database_connection(
     std::shared_ptr<site_database> connection) {
   database_pool_->return_connection(connection);
+}
+
+//------------------------------------------------------------------------------
+// sessions
+//------------------------------------------------------------------------------
+
+void request_service::register_session(const request_session_ptr& session) {
+  std::lock_guard<std::mutex> lock(sessions_mutex_);
+
+  // Check if the session already exists:
+  if (sessions_.find(session->session_id) != sessions_.end()) {
+    throw std::runtime_error("Session already exists");
+  }
+
+  // Register the session:
+  sessions_[session->session_id] = session;
+  session->first_access = std::chrono::system_clock::now();
+  session->last_access = std::chrono::system_clock::now();
+}
+
+void request_service::unregister_session(const std::string& session_id) {
+  std::lock_guard<std::mutex> lock(sessions_mutex_);
+  if (sessions_.find(session_id) != sessions_.end()) {
+    sessions_.erase(session_id);
+  }
+}
+
+request_session_ptr request_service::find_session(
+    const std::string& session_id) const {
+  std::lock_guard<std::mutex> lock(sessions_mutex_);
+  auto it = sessions_.find(session_id);
+  if (it != sessions_.end()) {
+    return it->second;
+  }
+  throw std::runtime_error("Session not found");
+}
+
+void request_service::cleanup_sessions() {
+  std::lock_guard<std::mutex> lock(sessions_mutex_);
+  auto it = sessions_.begin();
+  while (it != sessions_.end()) {
+    if (is_session_expired(it->second, false)) {
+      it = sessions_.erase(it);
+    } else {
+      ++it;
+    }
+  }
+}
+
+bool request_service::is_session_expired(const request_session_ptr& session,
+                                         bool update_last_access) {
+  if (!session) {
+    return true;  // Null session is considered expired
+  }
+
+  auto now = std::chrono::system_clock::now();
+  auto time_since_last_access =
+      std::chrono::duration_cast<std::chrono::seconds>(now -
+                                                       session->last_access);
+
+  // Check if session has expired (timeout exceeded or negative time difference)
+  bool expired = (time_since_last_access < std::chrono::seconds::zero() ||
+                  time_since_last_access > session_timeout_);
+
+  // Update last_access if requested and session is not expired
+  if (update_last_access && !expired) {
+    session->last_access = now;
+  }
+  return expired;
+}
+
+//------------------------------------------------------------------------------
+// process request
+//------------------------------------------------------------------------------
+
+void request_service::process_request(const request_data_ptr& req) {
+  try {
+    switch (req->get_type()) {
+      case request_type::kAuthenticate:
+        process_authenticate_request(req);
+        break;
+      default:
+        break;
+    }
+  } catch (const site_server_exception& e) {
+    req->write_output([&](json& output) {
+      output.clear();
+      output["status"] = e.get_code();
+      output["message"] = e.what();
+    });
+  } catch (const std::exception& e) {
+    req->write_output([&](json& output) {
+      output.clear();
+      output["status"] = 9999;
+      output["message"] = e.what();
+    });
+  }
 }

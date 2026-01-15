@@ -28,15 +28,35 @@ set(JSONCPP_LIBRARIES "${JSONCPP_ROOT}/lib/libjsoncpp.dylib")
 # Find nlohmann/json (installed via Homebrew)
 find_package(nlohmann_json REQUIRED)
 
+# Find jwt-cpp
+include(FetchContent)
+FetchContent_Declare(
+  jwt-cpp
+  GIT_REPOSITORY https://github.com/Thalhammer/jwt-cpp.git
+  GIT_TAG v0.7.0
+)
+FetchContent_MakeAvailable(jwt-cpp)
+
 # Source files
 set(SERVER_SOURCES
     src/main.cpp
     src/site_api.cpp
     src/network/drogon/drogon_http_server.cpp
     src/network/drogon/drogon_http_controller.cpp
+    src/services/requests/request_data.cpp
     src/services/requests/request_service.cpp
+    src/services/requests/request_service_authenticate.cpp
+    src/services/requests/sessions/request_session.cpp
     src/services/config/config_service.cpp
     src/database/site_database.cpp
+    src/database/site_database_organization.cpp
+    src/database/site_database_permission.cpp
+    src/database/site_database_site.cpp
+    src/database/site_database_volume.cpp
+    src/database/site_database_role.cpp
+    src/database/site_database_group.cpp
+    src/database/site_database_user.cpp
+    src/database/sql_builder.cpp
     src/database/site_database_pool.cpp
 )
 
@@ -58,6 +78,7 @@ target_include_directories(onis_site_server PRIVATE
     "/Applications/Postgres.app/Contents/Versions/15/include"
     ${DROGON_INCLUDE_DIRS}
     ${JSONCPP_INCLUDE_DIRS}
+    ${jwt-cpp_SOURCE_DIR}/include
 )
 
 # Link libraries
@@ -68,6 +89,7 @@ target_link_libraries(onis_site_server PRIVATE
     ${DROGON_LIBRARIES}
     ${JSONCPP_LIBRARIES}
     nlohmann_json::nlohmann_json
+    jwt-cpp::jwt-cpp
     # Add other libraries as needed:
     # ${DCMTK_LIBRARIES}
     # ${BOOST_LIBRARIES}

@@ -1,6 +1,7 @@
 #include "database/sqlite/sqlite_result.hpp"
 #include <sqlite3.h>
 #include <iostream>
+#include "utilities/uuid.hpp"
 
 namespace onis_kit {
 namespace database {
@@ -12,73 +13,117 @@ sqlite_row::sqlite_row(sqlite3_stmt* stmt) : stmt_(stmt) {
 
 sqlite_row::~sqlite_row() {}
 
-std::string sqlite_row::get_string(int column_index) const {
-  if (column_index < 0 || column_index >= get_column_count()) {
-    return "";
+std::string sqlite_row::get_uuid(int& column_index, bool allow_null,
+                                 bool allow_empty) const {
+  std::string value = get_string(column_index, allow_null, allow_empty);
+  if (!value.empty() && !dgc::util::uuid::is_valid(value)) {
+    throw std::invalid_argument("Invalid UUID format");
   }
-
-  if (sqlite3_column_type(stmt_, column_index) == SQLITE_NULL) {
-    return "";
-  }
-
-  const unsigned char* value = sqlite3_column_text(stmt_, column_index);
-  return value ? reinterpret_cast<const char*>(value) : "";
+  return value;
 }
 
-int sqlite_row::get_int(int column_index) const {
+std::string sqlite_row::get_string(int& column_index, bool allow_null,
+                                   bool allow_empty) const {
   if (column_index < 0 || column_index >= get_column_count()) {
-    return 0;
+    throw std::out_of_range("Column index out of range");
   }
 
   if (sqlite3_column_type(stmt_, column_index) == SQLITE_NULL) {
-    return 0;
+    if (!allow_null) {
+      throw std::invalid_argument("Null value not allowed");
+    }
+    if (!allow_empty) {
+      throw std::invalid_argument("Empty value not allowed");
+    }
+    column_index++;
+    return "";
   }
 
+  const std::string value =
+      reinterpret_cast<const char*>(sqlite3_column_text(stmt_, column_index));
+  if (value.empty() && !allow_empty) {
+    throw std::invalid_argument("Empty value not allowed");
+  }
+  column_index++;
+  return value;
+}
+
+int sqlite_row::get_int(int& column_index, bool allow_null) const {
+  if (column_index < 0 || column_index >= get_column_count()) {
+    throw std::out_of_range("Column index out of range");
+  }
+
+  if (sqlite3_column_type(stmt_, column_index) == SQLITE_NULL) {
+    if (!allow_null) {
+      throw std::invalid_argument("Null value not allowed");
+    }
+    column_index++;
+    return 0;
+  }
+  column_index++;
   return sqlite3_column_int(stmt_, column_index);
 }
 
-double sqlite_row::get_double(int column_index) const {
+double sqlite_row::get_double(int& column_index, bool allow_null) const {
   if (column_index < 0 || column_index >= get_column_count()) {
-    return 0.0;
+    throw std::out_of_range("Column index out of range");
   }
 
   if (sqlite3_column_type(stmt_, column_index) == SQLITE_NULL) {
+    if (!allow_null) {
+      throw std::invalid_argument("Null value not allowed");
+    }
+    column_index++;
     return 0.0;
   }
 
+  column_index++;
   return sqlite3_column_double(stmt_, column_index);
 }
 
-bool sqlite_row::get_bool(int column_index) const {
+bool sqlite_row::get_bool(int& column_index, bool allow_null) const {
   if (column_index < 0 || column_index >= get_column_count()) {
-    return false;
+    throw std::out_of_range("Column index out of range");
   }
 
   if (sqlite3_column_type(stmt_, column_index) == SQLITE_NULL) {
+    if (!allow_null) {
+      throw std::invalid_argument("Null value not allowed");
+    }
+    column_index++;
     return false;
   }
-
+  column_index++;
   return sqlite3_column_int(stmt_, column_index) != 0;
 }
 
-std::string sqlite_row::get_string(const std::string& column_name) const {
-  int column_index = get_column_index(column_name);
-  return get_string(column_index);
+std::string sqlite_row::get_uuid(const std::string& column_name,
+                                 bool allow_null, bool allow_empty) const {
+  int index = get_column_index(column_name);
+  return get_uuid(index, allow_null, allow_empty);
 }
 
-int sqlite_row::get_int(const std::string& column_name) const {
+std::string sqlite_row::get_string(const std::string& column_name,
+                                   bool allow_null, bool allow_empty) const {
   int column_index = get_column_index(column_name);
-  return get_int(column_index);
+  return get_string(column_index, allow_null, allow_empty);
 }
 
-double sqlite_row::get_double(const std::string& column_name) const {
+int sqlite_row::get_int(const std::string& column_name, bool allow_null) const {
   int column_index = get_column_index(column_name);
-  return get_double(column_index);
+  return get_int(column_index, allow_null);
 }
 
-bool sqlite_row::get_bool(const std::string& column_name) const {
+double sqlite_row::get_double(const std::string& column_name,
+                              bool allow_null) const {
   int column_index = get_column_index(column_name);
-  return get_bool(column_index);
+  return get_double(column_index, allow_null);
+}
+
+bool sqlite_row::get_bool(const std::string& column_name,
+                          bool allow_null) const {
+  int column_index = get_column_index(column_name);
+  return get_bool(column_index, allow_null);
 }
 
 bool sqlite_row::is_null(int column_index) const {

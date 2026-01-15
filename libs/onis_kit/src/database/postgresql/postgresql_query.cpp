@@ -15,17 +15,41 @@ postgresql_query::~postgresql_query() {}
 std::unique_ptr<database_result> postgresql_query::execute() {
   if (!prepared_) {
     set_last_error("Query not prepared");
-    return nullptr;
+    throw std::runtime_error("Query not prepared");
   }
 
-  // Execute the SQL directly
+  // If parameters were bound, use PQexecParams
+  if (!parameters_.empty()) {
+    std::vector<const char*> param_ptrs;
+    for (const auto& param : parameters_) {
+      param_ptrs.push_back(param.c_str());
+    }
+
+    PGresult* result =
+        PQexecParams(connection_, sql_.c_str(), parameters_.size(), nullptr,
+                     param_ptrs.data(), nullptr, nullptr, 0);
+
+    if (PQresultStatus(result) != PGRES_TUPLES_OK &&
+        PQresultStatus(result) != PGRES_COMMAND_OK) {
+      set_last_error("Query execution failed: " +
+                     std::string(PQresultErrorMessage(result)));
+      PQclear(result);
+      throw std::runtime_error(last_error_);
+    }
+
+    auto db_result = std::make_unique<postgresql_result>(result);
+    clear_last_error();
+    return db_result;
+  }
+
+  // Execute the SQL directly if no parameters
   PGresult* result = PQexec(connection_, sql_.c_str());
   if (PQresultStatus(result) != PGRES_TUPLES_OK &&
       PQresultStatus(result) != PGRES_COMMAND_OK) {
     set_last_error("Query execution failed: " +
                    std::string(PQresultErrorMessage(result)));
     PQclear(result);
-    return nullptr;
+    throw std::runtime_error(last_error_);
   }
 
   auto db_result = std::make_unique<postgresql_result>(result);
@@ -37,7 +61,7 @@ std::unique_ptr<database_result> postgresql_query::execute(
     const std::vector<std::string>& params) {
   if (!prepared_) {
     set_last_error("Query not prepared");
-    return nullptr;
+    throw std::runtime_error(last_error_);
   }
 
   // Convert string parameters to char* array for PostgreSQL
@@ -55,7 +79,7 @@ std::unique_ptr<database_result> postgresql_query::execute(
     set_last_error("Query execution failed: " +
                    std::string(PQresultErrorMessage(result)));
     PQclear(result);
-    return nullptr;
+    throw std::runtime_error(last_error_);
   }
 
   auto db_result = std::make_unique<postgresql_result>(result);
@@ -112,10 +136,24 @@ bool postgresql_query::execute_non_query(
 }
 
 bool postgresql_query::prepare(const std::string& sql) {
-  sql_ = sql;
+  sql_ = convert_placeholders(sql);
   prepared_ = true;
   clear_last_error();
   return true;
+}
+
+std::string postgresql_query::convert_placeholders(
+    const std::string& sql) const {
+  std::string result = sql;
+  int param_index = 1;
+  size_t pos = 0;
+  while ((pos = result.find('?', pos)) != std::string::npos) {
+    std::string replacement = "$" + std::to_string(param_index);
+    result.replace(pos, 1, replacement);
+    pos += replacement.length();
+    param_index++;
+  }
+  return result;
 }
 
 bool postgresql_query::bind_parameter(int index, const std::string& value) {

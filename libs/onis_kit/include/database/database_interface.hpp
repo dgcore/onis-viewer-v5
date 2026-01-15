@@ -40,16 +40,25 @@ public:
   virtual ~database_row() = default;
 
   /// Get value by column index
-  virtual std::string get_string(int column_index) const = 0;
-  virtual int get_int(int column_index) const = 0;
-  virtual double get_double(int column_index) const = 0;
-  virtual bool get_bool(int column_index) const = 0;
+  virtual std::string get_uuid(int& column_index, bool allow_null,
+                               bool allow_empty) const = 0;
+  virtual std::string get_string(int& column_index, bool allow_null,
+                                 bool allow_empty) const = 0;
+  virtual int get_int(int& column_index, bool allow_null) const = 0;
+  virtual double get_double(int& column_index, bool allow_null) const = 0;
+  virtual bool get_bool(int& column_index, bool allow_null) const = 0;
 
   /// Get value by column name
-  virtual std::string get_string(const std::string& column_name) const = 0;
-  virtual int get_int(const std::string& column_name) const = 0;
-  virtual double get_double(const std::string& column_name) const = 0;
-  virtual bool get_bool(const std::string& column_name) const = 0;
+  virtual std::string get_uuid(const std::string& column_name, bool allow_null,
+                               bool allow_empty) const = 0;
+  virtual std::string get_string(const std::string& column_name,
+                                 bool allow_null, bool allow_empty) const = 0;
+  virtual int get_int(const std::string& column_name,
+                      bool allow_null) const = 0;
+  virtual double get_double(const std::string& column_name,
+                            bool allow_null) const = 0;
+  virtual bool get_bool(const std::string& column_name,
+                        bool allow_null) const = 0;
 
   /// Check if value is null
   virtual bool is_null(int column_index) const = 0;

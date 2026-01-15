@@ -1,10 +1,7 @@
 #pragma once
 
 #include <drogon/HttpController.h>
-#include <nlohmann/json.hpp>
 #include "../../../include/services/requests/request_service.hpp"
-
-using json = nlohmann::json;
 
 ////////////////////////////////////////////////////////////////////////////////
 // drogon_http_controller
@@ -42,4 +39,9 @@ public:
 
 private:
   request_service_ptr rqsrv_;
+
+  void treat_post_request(
+      const drogon::HttpRequestPtr& req,
+      std::function<void(const drogon::HttpResponsePtr&)>& callback,
+      [[maybe_unused]] request_type type) const;
 };

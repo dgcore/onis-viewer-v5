@@ -33,6 +33,8 @@ set(ONIS_KIT_SOURCES
     src/database/sqlite/sqlite_connection.cpp
     src/database/sqlite/sqlite_query.cpp
     src/database/sqlite/sqlite_result.cpp
+    src/utilities/uuid.cpp
+    src/utilities/regex.cpp
 )
 
 # Header files

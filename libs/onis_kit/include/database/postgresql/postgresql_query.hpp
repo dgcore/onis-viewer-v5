@@ -29,6 +29,8 @@ public:
   virtual bool bind_parameter(int index, bool value) override;
   virtual void clear_parameters() override;
 
+  std::string convert_placeholders(const std::string& sql) const;
+
 private:
   PGconn* connection_;
   std::string sql_;
