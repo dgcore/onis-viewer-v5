@@ -115,7 +115,6 @@ bool sqlite_query::execute_non_query(const std::vector<std::string>& params) {
 
 bool sqlite_query::prepare(const std::string& sql) {
   finalize_statement();
-
   int result = sqlite3_prepare_v2(db_, sql.c_str(), -1, &stmt_, nullptr);
   if (result != SQLITE_OK) {
     set_last_error("Statement preparation failed: " +

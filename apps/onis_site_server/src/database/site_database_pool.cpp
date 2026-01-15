@@ -42,7 +42,7 @@ std::shared_ptr<site_database> site_database_pool::get_connection() {
   }
 
   // Pool is full or factory is not set
-  return nullptr;
+  throw std::runtime_error("Failed to get database connection");
 }
 
 void site_database_pool::return_connection(

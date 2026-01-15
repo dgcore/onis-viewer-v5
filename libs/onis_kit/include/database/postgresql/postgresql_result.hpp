@@ -16,14 +16,26 @@ public:
   virtual ~postgresql_row();
 
   // database_row interface implementation
-  virtual std::string get_string(int column_index) const override;
-  virtual int get_int(int column_index) const override;
-  virtual double get_double(int column_index) const override;
-  virtual bool get_bool(int column_index) const override;
-  virtual std::string get_string(const std::string& column_name) const override;
-  virtual int get_int(const std::string& column_name) const override;
-  virtual double get_double(const std::string& column_name) const override;
-  virtual bool get_bool(const std::string& column_name) const override;
+  virtual std::string get_uuid(int& column_index, bool allow_null,
+                               bool allow_empty) const override;
+  virtual std::string get_string(int& column_index, bool allow_null,
+                                 bool allow_empty) const override;
+  virtual int get_int(int& column_index, bool allow_null) const override;
+  virtual double get_double(int& column_index, bool allow_null) const override;
+  virtual bool get_bool(int& column_index, bool allow_null) const override;
+
+  virtual std::string get_uuid(const std::string& column_name, bool allow_null,
+                               bool allow_empty) const override;
+  virtual std::string get_string(const std::string& column_name,
+                                 bool allow_null,
+                                 bool allow_empty) const override;
+  virtual int get_int(const std::string& column_name,
+                      bool allow_null) const override;
+  virtual double get_double(const std::string& column_name,
+                            bool allow_null) const override;
+  virtual bool get_bool(const std::string& column_name,
+                        bool allow_null) const override;
+
   virtual bool is_null(int column_index) const override;
   virtual bool is_null(const std::string& column_name) const override;
   virtual int get_column_count() const override;

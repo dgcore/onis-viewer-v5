@@ -1,6 +1,7 @@
 #include "database/postgresql/postgresql_result.hpp"
 #include <libpq-fe.h>
 #include <iostream>
+#include "utilities/uuid.hpp"
 
 namespace onis_kit {
 namespace database {
@@ -13,80 +14,119 @@ postgresql_row::postgresql_row(PGresult* result, int row_index)
 
 postgresql_row::~postgresql_row() {}
 
-std::string postgresql_row::get_string(int column_index) const {
-  if (column_index < 0 || column_index >= PQnfields(result_)) {
-    return "";
+std::string postgresql_row::get_uuid(int& column_index, bool allow_null,
+                                     bool allow_empty) const {
+  std::string value = get_string(column_index, allow_null, allow_empty);
+  if (!value.empty() && !dgc::util::uuid::is_valid(value)) {
+    throw std::invalid_argument("Invalid UUID format");
   }
-
-  if (PQgetisnull(result_, row_index_, column_index)) {
-    return "";
-  }
-
-  const char* value = PQgetvalue(result_, row_index_, column_index);
-  return value ? value : "";
+  return value;
 }
 
-int postgresql_row::get_int(int column_index) const {
+std::string postgresql_row::get_string(int& column_index, bool allow_null,
+                                       bool allow_empty) const {
   if (column_index < 0 || column_index >= PQnfields(result_)) {
-    return 0;
+    throw std::out_of_range("Column index out of range");
   }
-
   if (PQgetisnull(result_, row_index_, column_index)) {
+    if (!allow_null) {
+      throw std::invalid_argument("Null value not allowed");
+    }
+    if (!allow_empty) {
+      throw std::invalid_argument("Empty value not allowed");
+    }
+    column_index++;
+    return "";
+  }
+  std::string value = PQgetvalue(result_, row_index_, column_index);
+  if (value.empty() && !allow_empty) {
+    throw std::invalid_argument("Empty value not allowed");
+  }
+  column_index++;
+  return value;
+}
+
+int postgresql_row::get_int(int& column_index, bool allow_null) const {
+  if (column_index < 0 || column_index >= PQnfields(result_)) {
+    throw std::out_of_range("Column index out of range");
+  }
+  if (PQgetisnull(result_, row_index_, column_index)) {
+    if (!allow_null) {
+      throw std::invalid_argument("Null value not allowed");
+    }
+    column_index++;
     return 0;
   }
-
   const char* value = PQgetvalue(result_, row_index_, column_index);
+  column_index++;
   return value ? std::stoi(value) : 0;
 }
 
-double postgresql_row::get_double(int column_index) const {
+double postgresql_row::get_double(int& column_index, bool allow_null) const {
   if (column_index < 0 || column_index >= PQnfields(result_)) {
-    return 0.0;
+    throw std::out_of_range("Column index out of range");
   }
 
   if (PQgetisnull(result_, row_index_, column_index)) {
+    if (!allow_null) {
+      throw std::invalid_argument("Null value not allowed");
+    }
+    column_index++;
     return 0.0;
   }
 
   const char* value = PQgetvalue(result_, row_index_, column_index);
+  column_index++;
   return value ? std::stod(value) : 0.0;
 }
 
-bool postgresql_row::get_bool(int column_index) const {
+bool postgresql_row::get_bool(int& column_index, bool allow_null) const {
   if (column_index < 0 || column_index >= PQnfields(result_)) {
-    return false;
+    throw std::out_of_range("Column index out of range");
   }
-
   if (PQgetisnull(result_, row_index_, column_index)) {
+    if (!allow_null) {
+      throw std::invalid_argument("Null value not allowed");
+    }
+    column_index++;
     return false;
   }
-
   const char* value = PQgetvalue(result_, row_index_, column_index);
-  if (!value)
-    return false;
-
-  std::string str_value(value);
-  return str_value == "t" || str_value == "true" || str_value == "1";
+  column_index++;
+  return value ? std::string(value) == "t" || std::string(value) == "true" ||
+                     std::string(value) == "1"
+               : false;
 }
 
-std::string postgresql_row::get_string(const std::string& column_name) const {
+std::string postgresql_row::get_uuid(const std::string& column_name,
+                                     bool allow_null, bool allow_empty) const {
   int column_index = get_column_index(column_name);
-  return get_string(column_index);
+  return get_uuid(column_index, allow_null, allow_empty);
 }
 
-int postgresql_row::get_int(const std::string& column_name) const {
+std::string postgresql_row::get_string(const std::string& column_name,
+                                       bool allow_null,
+                                       bool allow_empty) const {
   int column_index = get_column_index(column_name);
-  return get_int(column_index);
+  return get_string(column_index, allow_null, allow_empty);
 }
 
-double postgresql_row::get_double(const std::string& column_name) const {
+int postgresql_row::get_int(const std::string& column_name,
+                            bool allow_null) const {
   int column_index = get_column_index(column_name);
-  return get_double(column_index);
+  return get_int(column_index, allow_null);
 }
 
-bool postgresql_row::get_bool(const std::string& column_name) const {
+double postgresql_row::get_double(const std::string& column_name,
+                                  bool allow_null) const {
   int column_index = get_column_index(column_name);
-  return get_bool(column_index);
+  return get_double(column_index, allow_null);
+}
+
+bool postgresql_row::get_bool(const std::string& column_name,
+                              bool allow_null) const {
+  int column_index = get_column_index(column_name);
+  return get_bool(column_index, allow_null);
 }
 
 bool postgresql_row::is_null(int column_index) const {
