@@ -126,13 +126,13 @@ echo "-------------------"
 
 # 5. C++ formatting
 if command -v clang-format &> /dev/null; then
-    CPP_FILES=$(find shared/cpp/ apps/onis_site_server/ -name "*.cpp" -o -name "*.h" 2>/dev/null || true)
+    CPP_FILES=$(find shared/cpp/ apps/onis_site_server/ -type f \( -name "*.cpp" -o -name "*.hpp" -o -name "*.h" -o -name "*.cc" -o -name "*.cxx" \) ! -path "*/build/*" ! -path "*/.git/*" ! -path "*/_deps/*" 2>/dev/null || true)
     if [ -n "$CPP_FILES" ]; then
         run_check \
             "C++ formatting" \
-            "find shared/cpp/ apps/onis_site_server/ -name '*.cpp' -o -name '*.h' | xargs clang-format --dry-run --Werror" \
+            "find shared/cpp/ apps/onis_site_server/ -type f \( -name '*.cpp' -o -name '*.hpp' -o -name '*.h' -o -name '*.cc' -o -name '*.cxx' \) ! -path '*/build/*' ! -path '*/.git/*' ! -path '*/_deps/*' | xargs clang-format --dry-run --Werror" \
             "C++ code properly formatted" \
-            "C++ code poorly formatted - run 'find shared/cpp/ apps/onis_site_server/ -name \"*.cpp\" -o -name \"*.h\" | xargs clang-format -i'"
+            "C++ code poorly formatted - run './scripts/format_code.sh'"
     else
         success "No C++ files found (monorepo structure)"
         PASSED_CHECKS=$((PASSED_CHECKS + 1))
