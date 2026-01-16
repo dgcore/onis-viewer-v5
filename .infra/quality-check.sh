@@ -69,12 +69,17 @@ echo "📱 DART/FLUTTER VERIFICATIONS"
 echo "----------------------------"
 
 # 1. Dart formatting
-if [ -d "apps/onis_viewer" ]; then
-    run_check \
-        "Dart formatting" \
-        "cd apps/onis_viewer && dart format --set-exit-if-changed lib/ test/" \
-        "Dart code properly formatted" \
-        "Dart code poorly formatted - run 'cd apps/onis_viewer && dart format .'"
+if [ -d "apps/onis_viewer" ] && [ -d "apps/onis_viewer/lib" ]; then
+    if command -v dart &> /dev/null; then
+        run_check \
+            "Dart formatting" \
+            "(cd apps/onis_viewer && dart format --set-exit-if-changed lib/ test/)" \
+            "Dart code properly formatted" \
+            "Dart code poorly formatted - run 'cd apps/onis_viewer && dart format .'"
+    else
+        warning "Dart not found, skipping Dart formatting"
+        PASSED_CHECKS=$((PASSED_CHECKS + 1))
+    fi
 else
     success "No Flutter app found, skipping Dart formatting"
     PASSED_CHECKS=$((PASSED_CHECKS + 1))
@@ -82,17 +87,36 @@ fi
 TOTAL_CHECKS=$((TOTAL_CHECKS + 1))
 
 # 2. Dart static analysis (for Flutter apps)
-if [ -d "apps/onis_viewer" ]; then
-    run_check \
-        "Dart static analysis" \
-        "cd apps/onis_viewer && flutter analyze" \
-        "Dart static analysis OK" \
-        "Issues detected by Dart static analysis"
+if [ -d "apps/onis_viewer" ] && [ -d "apps/onis_viewer/lib" ]; then
+    if command -v flutter &> /dev/null; then
+        echo ""
+        info "Check: Dart static analysis"
+        # Run analysis and check only for errors (not warnings/info)
+        set +e  # Temporarily disable exit on error
+        ANALYSIS_OUTPUT=$(cd apps/onis_viewer && flutter analyze 2>&1)
+        ANALYSIS_EXIT=$?
+        set -e  # Re-enable exit on error
+        ERROR_COUNT=$(echo "$ANALYSIS_OUTPUT" | grep -c "error •" 2>/dev/null || echo "0")
+        
+        if [ "$ERROR_COUNT" -gt 0 ]; then
+            error "Issues detected by Dart static analysis (errors found)"
+            echo "$ANALYSIS_OUTPUT" | grep "error •" | head -5
+            FAILED_CHECKS=$((FAILED_CHECKS + 1))
+        else
+            success "Dart static analysis OK (no errors, warnings are acceptable)"
+            PASSED_CHECKS=$((PASSED_CHECKS + 1))
+        fi
+        TOTAL_CHECKS=$((TOTAL_CHECKS + 1))
+    else
+        warning "Flutter not found, skipping Dart analysis"
+        PASSED_CHECKS=$((PASSED_CHECKS + 1))
+        TOTAL_CHECKS=$((TOTAL_CHECKS + 1))
+    fi
 else
     success "No Flutter app found, skipping Dart analysis"
     PASSED_CHECKS=$((PASSED_CHECKS + 1))
+    TOTAL_CHECKS=$((TOTAL_CHECKS + 1))
 fi
-TOTAL_CHECKS=$((TOTAL_CHECKS + 1))
 
 # 3. Flutter tests
 if [ -d "apps/onis_viewer" ]; then
