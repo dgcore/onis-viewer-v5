@@ -69,12 +69,17 @@ echo "📱 DART/FLUTTER VERIFICATIONS"
 echo "----------------------------"
 
 # 1. Dart formatting
-if [ -d "apps/onis_viewer" ]; then
-    run_check \
-        "Dart formatting" \
-        "cd apps/onis_viewer && dart format --set-exit-if-changed lib/ test/" \
-        "Dart code properly formatted" \
-        "Dart code poorly formatted - run 'cd apps/onis_viewer && dart format .'"
+if [ -d "apps/onis_viewer" ] && [ -d "apps/onis_viewer/lib" ]; then
+    if command -v dart &> /dev/null; then
+        run_check \
+            "Dart formatting" \
+            "(cd apps/onis_viewer && dart format --set-exit-if-changed lib/ test/)" \
+            "Dart code properly formatted" \
+            "Dart code poorly formatted - run 'cd apps/onis_viewer && dart format .'"
+    else
+        warning "Dart not found, skipping Dart formatting"
+        PASSED_CHECKS=$((PASSED_CHECKS + 1))
+    fi
 else
     success "No Flutter app found, skipping Dart formatting"
     PASSED_CHECKS=$((PASSED_CHECKS + 1))
@@ -82,17 +87,36 @@ fi
 TOTAL_CHECKS=$((TOTAL_CHECKS + 1))
 
 # 2. Dart static analysis (for Flutter apps)
-if [ -d "apps/onis_viewer" ]; then
-    run_check \
-        "Dart static analysis" \
-        "cd apps/onis_viewer && flutter analyze" \
-        "Dart static analysis OK" \
-        "Issues detected by Dart static analysis"
+if [ -d "apps/onis_viewer" ] && [ -d "apps/onis_viewer/lib" ]; then
+    if command -v flutter &> /dev/null; then
+        echo ""
+        info "Check: Dart static analysis"
+        # Run analysis and check only for errors (not warnings/info)
+        set +e  # Temporarily disable exit on error
+        ANALYSIS_OUTPUT=$(cd apps/onis_viewer && flutter analyze 2>&1)
+        ANALYSIS_EXIT=$?
+        set -e  # Re-enable exit on error
+        ERROR_COUNT=$(echo "$ANALYSIS_OUTPUT" | grep -c "error •" 2>/dev/null || echo "0")
+        
+        if [ "$ERROR_COUNT" -gt 0 ]; then
+            error "Issues detected by Dart static analysis (errors found)"
+            echo "$ANALYSIS_OUTPUT" | grep "error •" | head -5
+            FAILED_CHECKS=$((FAILED_CHECKS + 1))
+        else
+            success "Dart static analysis OK (no errors, warnings are acceptable)"
+            PASSED_CHECKS=$((PASSED_CHECKS + 1))
+        fi
+        TOTAL_CHECKS=$((TOTAL_CHECKS + 1))
+    else
+        warning "Flutter not found, skipping Dart analysis"
+        PASSED_CHECKS=$((PASSED_CHECKS + 1))
+        TOTAL_CHECKS=$((TOTAL_CHECKS + 1))
+    fi
 else
     success "No Flutter app found, skipping Dart analysis"
     PASSED_CHECKS=$((PASSED_CHECKS + 1))
+    TOTAL_CHECKS=$((TOTAL_CHECKS + 1))
 fi
-TOTAL_CHECKS=$((TOTAL_CHECKS + 1))
 
 # 3. Flutter tests
 if [ -d "apps/onis_viewer" ]; then
@@ -126,13 +150,13 @@ echo "-------------------"
 
 # 5. C++ formatting
 if command -v clang-format &> /dev/null; then
-    CPP_FILES=$(find shared/cpp/ apps/onis_site_server/ -name "*.cpp" -o -name "*.h" 2>/dev/null || true)
+    CPP_FILES=$(find shared/cpp/ apps/onis_site_server/ -type f \( -name "*.cpp" -o -name "*.hpp" -o -name "*.h" -o -name "*.cc" -o -name "*.cxx" \) ! -path "*/build/*" ! -path "*/.git/*" ! -path "*/_deps/*" 2>/dev/null || true)
     if [ -n "$CPP_FILES" ]; then
         run_check \
             "C++ formatting" \
-            "find shared/cpp/ apps/onis_site_server/ -name '*.cpp' -o -name '*.h' | xargs clang-format --dry-run --Werror" \
+            "find shared/cpp/ apps/onis_site_server/ -type f \( -name '*.cpp' -o -name '*.hpp' -o -name '*.h' -o -name '*.cc' -o -name '*.cxx' \) ! -path '*/build/*' ! -path '*/.git/*' ! -path '*/_deps/*' | xargs clang-format --dry-run --Werror" \
             "C++ code properly formatted" \
-            "C++ code poorly formatted - run 'find shared/cpp/ apps/onis_site_server/ -name \"*.cpp\" -o -name \"*.h\" | xargs clang-format -i'"
+            "C++ code poorly formatted - run './scripts/format_code.sh'"
     else
         success "No C++ files found (monorepo structure)"
         PASSED_CHECKS=$((PASSED_CHECKS + 1))

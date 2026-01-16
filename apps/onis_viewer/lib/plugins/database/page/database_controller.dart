@@ -1,47 +1,96 @@
-import 'dart:async';
-import 'dart:math';
+/*import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
-import '../../../api/core/ov_api_core.dart';
 import '../../../api/request/async_request.dart';
 import '../../../core/database_source.dart';
 import '../../../core/models/study.dart';
 
+class DatabaseSourceState {
+  DatabaseSourceState(DatabaseSource source) {
+    loginState = source.createLoginState();
+  }
+  DatabaseSourceLoginState? loginState;
+  bool isConnected = false;
+  List<Study> studies = [];
+  List<Study> selectedStudies = [];
+  double scrollPosition = 0.0;
+  Map<RequestType, AsyncRequest?> pendingRequests = {};
+}
+
 class DatabaseController extends ChangeNotifier {
-  /// Static list to track all DatabaseController instances
-  static final List<DatabaseController> _instances = [];
-
-  // Studies per source: Map<sourceUid, List<Study>>
-  final Map<String, List<Study>> _studiesBySource = {};
-  // Selected studies per source: Map<sourceUid, List<Study>>
-  final Map<String, List<Study>> _selectedStudiesBySource = {};
-  // Scroll positions per source: Map<sourceUid, double>
-  final Map<String, double> _scrollPositionsBySource = {};
-  // Pending requests per source and request type: Map<sourceUid, Map<RequestType, AsyncRequest?>>
-  final Map<String, Map<RequestType, AsyncRequest?>> _pendingRequests = {};
-
+  // TO DELETE PROBABLY:
   String _searchQuery = '';
+  //final Function(String message)? _showError;
 
-  // Callback for showing error messages
-  final Function(String message)? _showError;
+  late final DatabaseSourceManager _databaseSourceManager;
+  final Map<String, DatabaseSourceState> _sourceStates = {};
 
   /// Stream subscription for disconnection events
-  StreamSubscription<String>? _disconnectionSubscription;
+  //StreamSubscription<String>? _disconnectionSubscription;
+
+  /// Stream subscriptions for source registration events
+  StreamSubscription<DatabaseSource>? _sourceRegisteredSubscription;
+  StreamSubscription<DatabaseSource>? _sourceUnregisteredSubscription;
 
   /// Constructor
-  DatabaseController({Function(String message)? showError})
-      : _showError = showError {
-    _instances.add(this);
+  DatabaseController() {
+    //_instances.add(this);
 
     // Subscribe to disconnection events and store the subscription
-    _disconnectionSubscription =
-        DatabaseSource.subscribeToDisconnection(_onSourceDisconnecting);
+    /*_disconnectionSubscription =
+        DatabaseSource.subscribeToDisconnection(_onSourceDisconnecting);*/
   }
 
+  /// Initialize the controller
+  Future<void> initialize() async {
+    //final api = OVApi();
+    _databaseSourceManager = DatabaseSourceManager();
+    _sourceRegisteredSubscription =
+        _databaseSourceManager.onSourceRegistered.listen(_onSourceRegistered);
+    _sourceUnregisteredSubscription = _databaseSourceManager
+        .onSourceUnregistered
+        .listen(_onSourceUnregistered);
+    // Register the existing sources:
+    final sources = _databaseSourceManager.allSources;
+    for (final source in sources) {
+      _onSourceRegistered(source);
+    }
+  }
+
+  /// Dispose the controller
+  @override
+  Future<void> dispose() async {
+    await _databaseSourceManager.cleanExit();
+    await _sourceRegisteredSubscription?.cancel();
+    await _sourceUnregisteredSubscription?.cancel();
+    _sourceRegisteredSubscription = null;
+    _sourceUnregisteredSubscription = null;
+
+    // Unsubscribe from disconnection events
+    /*await DatabaseSource.unsubscribeToDisconnection(_disconnectionSubscription);
+    _disconnectionSubscription = null;*/
+
+    // Cancel all pending requests
+    /*for (final sourceUid in _pendingRequests.keys.toList()) {
+      await _cancelAllRequestsForSource(sourceUid);
+    }*/
+    super.dispose();
+  }
+
+  void _onSourceRegistered(DatabaseSource source) {
+    _sourceStates[source.uid] = DatabaseSourceState(source);
+  }
+
+  void _onSourceUnregistered(DatabaseSource source) {
+    _sourceStates.remove(source.uid);
+  }
+
+  DatabaseSourceManager get sources => _databaseSourceManager;
+
   /// Handle source disconnection events
-  void _onSourceDisconnecting(String sourceUid) {
+  /*void _onSourceDisconnecting(String sourceUid) {
     debugPrint(
         'Source disconnecting: $sourceUid - cancelling pending requests');
 
@@ -80,105 +129,82 @@ class DatabaseController extends ChangeNotifier {
       // Re-throw to be caught by the catchError in _onSourceDisconnecting
       rethrow;
     }
-  }
+  }*/
 
   // Getters
   String get searchQuery => _searchQuery;
 
-  List<Study> getStudiesForSource(String sourceUid) {
-    return _studiesBySource[sourceUid] ?? [];
+  DatabaseSourceState? _getSourceState(String sourceUid) {
+    return _sourceStates.containsKey(sourceUid)
+        ? _sourceStates[sourceUid]
+        : null;
   }
 
-  /// Check if there are any studies selected for the given source
-  /// Returns true if at least one study is selected, false otherwise
+  bool isConnected(String sourceUid) {
+    final sourceState = _getSourceState(sourceUid);
+    return sourceState?.isConnected ?? false;
+  }
+
+  List<Study> getStudiesForSource(String sourceUid) {
+    final sourceState = _getSourceState(sourceUid);
+    return sourceState?.studies ?? [];
+  }
+
   bool hasSelectedStudies(String sourceUid) {
-    final selectedStudies = _selectedStudiesBySource[sourceUid];
-    return selectedStudies != null && selectedStudies.isNotEmpty;
+    final sourceState = _getSourceState(sourceUid);
+    return sourceState?.selectedStudies.isNotEmpty ?? false;
   }
 
   List<Study> getSelectedStudiesForSource(String sourceUid) {
-    return _selectedStudiesBySource[sourceUid] ?? [];
+    final sourceState = _getSourceState(sourceUid);
+    return sourceState?.selectedStudies ?? [];
   }
 
   double getScrollPositionForSource(String sourceUid) {
-    return _scrollPositionsBySource[sourceUid] ?? 0.0;
+    final sourceState = _getSourceState(sourceUid);
+    return sourceState?.scrollPosition ?? 0.0;
   }
 
   void saveScrollPositionForSource(String sourceUid, double position) {
-    _scrollPositionsBySource[sourceUid] = position;
-    debugPrint('Saved scroll position $position for source $sourceUid');
+    final sourceState = _getSourceState(sourceUid);
+    if (sourceState != null) {
+      sourceState.scrollPosition = position;
+    }
   }
 
-  List<Study> get allStudies {
-    return _studiesBySource.values.expand((studies) => studies).toList();
+  DatabaseSourceLoginState? getLoginState(String sourceUid) {
+    final sourceState = _getSourceState(sourceUid);
+    return sourceState?.loginState;
   }
+
+  //List<Study> get allStudies {
+  //return _studiesBySource.values.expand((studies) => studies).toList();
+  //return [];
+  // }
 
   int get totalStudyCount {
-    return _studiesBySource.values
-        .fold(0, (sum, studies) => sum + studies.length);
-  }
-
-  Future<void> initialize() async {
-    // Listen to source removal events to clear cache
-    final api = OVApi();
-    api.sources.onSourceUnregistered.listen(_onSourceRemoved);
-
-    // Listen to source registration events to clear cache for new sources
-    api.sources.onSourceRegistered.listen(_onSourceRegistered);
-
-    // No dummy studies - studies will be loaded per source as needed
-    debugPrint('DatabaseController initialized');
-  }
-
-  /// Handle source removal by clearing its cached data
-  void _onSourceRemoved(DatabaseSource source) {
-    debugPrint('Source removed, clearing cache for: ${source.uid}');
-    clearStudiesForSource(source.uid);
-    _scrollPositionsBySource.remove(source.uid);
-  }
-
-  /// Handle source registration by clearing any existing cache for the new source
-  void _onSourceRegistered(DatabaseSource source) {
-    debugPrint(
-        'Source registered, clearing any existing cache for: ${source.uid}');
-    clearStudiesForSource(source.uid);
-    _scrollPositionsBySource.remove(source.uid);
-  }
-
-  @override
-  Future<void> dispose() async {
-    // Unsubscribe from disconnection events
-    await DatabaseSource.unsubscribeToDisconnection(_disconnectionSubscription);
-    _disconnectionSubscription = null;
-
-    // Remove from instances list
-    _instances.remove(this);
-
-    // Cancel all pending requests
-    for (final sourceUid in _pendingRequests.keys.toList()) {
-      await _cancelAllRequestsForSource(sourceUid);
-    }
-    super.dispose();
+    //return _studiesBySource.values
+    //    .fold(0, (sum, studies) => sum + studies.length);
+    return 0;
   }
 
   Future<void> loadStudiesForSource(String sourceUid) async {
-    debugPrint('Loading studies for source: $sourceUid');
-    _studiesBySource[sourceUid] = [];
-    _selectedStudiesBySource[sourceUid] = [];
+    //_studiesBySource[sourceUid] = [];
+    //_selectedStudiesBySource[sourceUid] = [];
     notifyListeners();
   }
 
   void clearStudiesForSource(String sourceUid) {
-    _studiesBySource.remove(sourceUid);
-    _selectedStudiesBySource.remove(sourceUid);
+    //_studiesBySource.remove(sourceUid);
+    //_selectedStudiesBySource.remove(sourceUid);
     notifyListeners();
   }
 
   void addStudiesToSource(String sourceUid, List<Study> studies) {
-    if (!_studiesBySource.containsKey(sourceUid)) {
-      _studiesBySource[sourceUid] = [];
-    }
-    _studiesBySource[sourceUid]!.addAll(studies);
+    //if (!_studiesBySource.containsKey(sourceUid)) {
+    //  _studiesBySource[sourceUid] = [];
+    //}
+    //_studiesBySource[sourceUid]!.addAll(studies);
     notifyListeners();
   }
 
@@ -189,7 +215,7 @@ class DatabaseController extends ChangeNotifier {
 
   /// Cancel a pending request for a specific source and request type
   Future<void> _cancelRequest(String sourceUid, RequestType requestType) async {
-    final sourceRequests = _pendingRequests[sourceUid];
+    /*final sourceRequests = _pendingRequests[sourceUid];
     if (sourceRequests != null) {
       final request = sourceRequests[requestType];
       if (request != null) {
@@ -198,12 +224,12 @@ class DatabaseController extends ChangeNotifier {
         await request.cancel();
         sourceRequests[requestType] = null;
       }
-    }
+    }*/
   }
 
   /// Cancel all pending requests for a specific source
   Future<void> _cancelAllRequestsForSource(String sourceUid) async {
-    final sourceRequests = _pendingRequests[sourceUid];
+    /*final sourceRequests = _pendingRequests[sourceUid];
     if (sourceRequests != null) {
       for (final requestType in sourceRequests.keys.toList()) {
         final request = sourceRequests[requestType];
@@ -214,12 +240,12 @@ class DatabaseController extends ChangeNotifier {
           sourceRequests[requestType] = null;
         }
       }
-    }
+    }*/
   }
 
   /// Parse studies from response data
   List<Study> _parseStudiesFromResponse(Map<String, dynamic>? data) {
-    if (data == null || !data.containsKey('studies')) {
+    /*if (data == null || !data.containsKey('studies')) {
       return [];
     }
 
@@ -230,40 +256,41 @@ class DatabaseController extends ChangeNotifier {
 
     return studiesList.map((studyData) {
       return Study.fromMap(studyData as Map<String, dynamic>);
-    }).toList();
+    }).toList();*/
+    return [];
   }
 
   /// Show error message using the callback
-  void _showErrorMessage(String message) {
+  /*void _showErrorMessage(String message) {
     if (_showError != null) {
       _showError(message);
     } else {
       debugPrint('Error: $message');
     }
-  }
+  }*/
 
   void selectStudy(String sourceUid, Study study) {
-    if (!_selectedStudiesBySource.containsKey(sourceUid)) {
+    /*if (!_selectedStudiesBySource.containsKey(sourceUid)) {
       _selectedStudiesBySource[sourceUid] = [];
     }
     _selectedStudiesBySource[sourceUid]!.clear();
     _selectedStudiesBySource[sourceUid]!.add(study);
-    debugPrint('Selected study: ${study.name} for source: $sourceUid');
+    debugPrint('Selected study: ${study.name} for source: $sourceUid');*/
     notifyListeners();
   }
 
   void selectStudies(String sourceUid, List<Study> studies) {
-    if (!_selectedStudiesBySource.containsKey(sourceUid)) {
+    /*if (!_selectedStudiesBySource.containsKey(sourceUid)) {
       _selectedStudiesBySource[sourceUid] = [];
     }
     _selectedStudiesBySource[sourceUid]!.clear();
     _selectedStudiesBySource[sourceUid]!.addAll(studies);
-    debugPrint('Selected ${studies.length} studies for source: $sourceUid');
+    debugPrint('Selected ${studies.length} studies for source: $sourceUid');*/
     notifyListeners();
   }
 
   void clearSelectedStudies(String sourceUid) {
-    _selectedStudiesBySource[sourceUid]?.clear();
+    //_selectedStudiesBySource[sourceUid]?.clear();
     notifyListeners();
   }
 
@@ -271,7 +298,7 @@ class DatabaseController extends ChangeNotifier {
     debugPrint('Searching studies for source: $sourceUid');
 
     // 1. Cancel any pending request for this source
-    await _cancelAllRequestsForSource(sourceUid);
+    /*await _cancelAllRequestsForSource(sourceUid);
 
     // 2. Clear existing studies for this source
     clearStudiesForSource(sourceUid);
@@ -378,7 +405,7 @@ class DatabaseController extends ChangeNotifier {
     } finally {
       // 7. Clear the pending request
       _pendingRequests[sourceUid]![RequestType.findStudies] = null;
-    }
+    }*/
   }
 
   // Toolbar action methods
@@ -413,9 +440,10 @@ class DatabaseController extends ChangeNotifier {
   /// Check if search is available for the given source
   /// Returns true if the source is connected
   bool canSearch(String sourceUid) {
-    final api = OVApi();
+    /*final api = OVApi();
     final source = api.sources.findSourceByUid(sourceUid);
-    return source?.isActive ?? false;
+    return source?.isActive ?? false;*/
+    return false;
   }
 
   /// Check if import is available for the given source
@@ -427,10 +455,11 @@ class DatabaseController extends ChangeNotifier {
   /// Check if export is available for the given source
   /// Returns true if the source is connected and at least one study is selected
   bool canExport(String sourceUid) {
-    final api = OVApi();
+    /*final api = OVApi();
     final source = api.sources.findSourceByUid(sourceUid);
     if (source == null) return false;
-    return source.isActive && hasSelectedStudies(sourceUid);
+    return source.isActive && hasSelectedStudies(sourceUid);*/
+    return false;
   }
 
   /// Check if open is available for the given source
@@ -445,3 +474,4 @@ class DatabaseController extends ChangeNotifier {
     return canExport(sourceUid);
   }
 }
+*/

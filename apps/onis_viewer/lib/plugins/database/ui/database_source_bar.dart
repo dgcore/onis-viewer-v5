@@ -1,21 +1,22 @@
 import 'package:flutter/material.dart';
+import 'package:onis_viewer/plugins/database/public/database_api.dart';
 
 import '../../../api/core/ov_api_core.dart';
 import '../../../core/constants.dart';
 import '../../../core/database_source.dart';
 
 class DatabaseSourceBar extends StatefulWidget {
-  final DatabaseSource? selectedSource;
-  final ValueChanged<DatabaseSource>? onSourceSelected;
-  final VoidCallback? onAddSource;
-  final VoidCallback? onRefreshSources;
+  //final DatabaseSource? selectedSource;
+  //final ValueChanged<DatabaseSource>? onSourceSelected;
+  //final VoidCallback? onAddSource;
+//  final VoidCallback? onRefreshSources;
 
   const DatabaseSourceBar({
     super.key,
-    this.selectedSource,
-    this.onSourceSelected,
-    this.onAddSource,
-    this.onRefreshSources,
+    //this.selectedSource,
+    //this.onSourceSelected,
+    //this.onAddSource,
+    //this.onRefreshSources,
   });
 
   @override
@@ -33,51 +34,54 @@ class DatabaseSourceBar extends StatefulWidget {
 }
 
 class _DatabaseSourceBarState extends State<DatabaseSourceBar> {
-  final OVApi _api = OVApi();
-  late final DatabaseSourceManager _manager;
+  //final OVApi _api = OVApi();
+  DatabaseApi? _dbApi;
+  //late final DatabaseSourceManager _manager;
   final Set<String> _expanded = <String>{};
-  DatabaseSource? _selected;
+  //DatabaseSource? _selected;
 
   // Static reference to the current instance for direct access
-  static _DatabaseSourceBarState? _currentInstance;
+  //static _DatabaseSourceBarState? _currentInstance;
 
   @override
   void initState() {
     super.initState();
-    _manager = _api.sources;
-    _selected = widget.selectedSource;
-    _manager.addListener(_onManagerChanged);
+    _dbApi = OVApi().plugins.getPublicApi<DatabaseApi>('onis_database_plugin');
+
+    //_manager = _api.sources;
+    //_selected = widget.selectedSource;
+    //_manager.addListener(_onManagerChanged);
 
     // Register this instance as the current one
-    _currentInstance = this;
+    //_currentInstance = this;
   }
 
   @override
   void didUpdateWidget(covariant DatabaseSourceBar oldWidget) {
     super.didUpdateWidget(oldWidget);
     // Only override local selection if parent provides a non-null selection
-    if (widget.selectedSource != null && widget.selectedSource != _selected) {
+    /*if (widget.selectedSource != null && widget.selectedSource != _selected) {
       _selected = widget.selectedSource;
-    }
+    }*/
   }
 
-  void _onManagerChanged() {
+  /*void _onManagerChanged() {
     if (mounted) setState(() {});
-  }
+  }*/
 
   @override
   void dispose() {
-    _manager.removeListener(_onManagerChanged);
+    //_manager.removeListener(_onManagerChanged);
     // Clear the static reference if this is the current instance
-    if (_currentInstance == this) {
+    /*if (_currentInstance == this) {
       _currentInstance = null;
-    }
+    }*/
     super.dispose();
   }
 
   /// Static method to expand a node by UID
   static void expandNode(String uid, {bool expandChildren = false}) {
-    _currentInstance?.setState(() {
+    /*_currentInstance?.setState(() {
       _currentInstance!._expanded.add(uid);
 
       if (expandChildren) {
@@ -91,14 +95,14 @@ class _DatabaseSourceBarState extends State<DatabaseSourceBar> {
           }
         }
       }
-    });
+    });*/
   }
 
   /// Static method to collapse a node by UID
   static void collapseNode(String uid) {
-    _currentInstance?.setState(() {
+    /*_currentInstance?.setState(() {
       _currentInstance!._expanded.remove(uid);
-    });
+    });*/
   }
 
   @override
@@ -146,7 +150,7 @@ class _DatabaseSourceBarState extends State<DatabaseSourceBar> {
             ),
           ),
           IconButton(
-            onPressed: widget.onRefreshSources,
+            onPressed: null, //widget.onRefreshSources,
             icon: const Icon(
               Icons.refresh,
               color: OnisViewerConstants.textSecondaryColor,
@@ -157,7 +161,7 @@ class _DatabaseSourceBarState extends State<DatabaseSourceBar> {
             constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
           ),
           IconButton(
-            onPressed: widget.onAddSource,
+            onPressed: null, //widget.onAddSource,
             icon: const Icon(
               Icons.add,
               color: OnisViewerConstants.textSecondaryColor,
@@ -173,7 +177,9 @@ class _DatabaseSourceBarState extends State<DatabaseSourceBar> {
   }
 
   Widget _buildSourcesTree() {
-    final roots = _manager.rootSources;
+    final sourceController = _dbApi?.sourceController;
+    final roots =
+        sourceController == null ? [] : sourceController.sources.rootSources;
     if (roots.isEmpty) {
       return const Center(
         child: Text(
@@ -191,7 +197,7 @@ class _DatabaseSourceBarState extends State<DatabaseSourceBar> {
   }
 
   Widget _buildSourceNode(DatabaseSource source, {required int depth}) {
-    final isSelected = _selected?.uid == source.uid;
+    final isSelected = _dbApi?.sourceController.selectedSource == source;
     final isExpanded = _expanded.contains(source.uid);
     final hasChildren = source.subSources.isNotEmpty;
 
@@ -242,10 +248,12 @@ class _DatabaseSourceBarState extends State<DatabaseSourceBar> {
           selectedTileColor:
               OnisViewerConstants.surfaceColor.withValues(alpha: 0.12),
           onTap: () {
-            setState(() {
+            _dbApi?.sourceController.selectSourceByUid(source.uid);
+
+            /*setState(() {
               _selected = source;
             });
-            widget.onSourceSelected?.call(source);
+            widget.onSourceSelected?.call(source);*/
           },
         ),
         if (hasChildren && isExpanded)
@@ -256,7 +264,10 @@ class _DatabaseSourceBarState extends State<DatabaseSourceBar> {
   }
 
   Widget _buildFooter() {
-    final total = _manager.allSources.length;
+    final sourceController = _dbApi?.sourceController;
+    final total = sourceController == null
+        ? 0
+        : sourceController.sources.allSources.length;
     return Container(
       height: 40,
       padding: const EdgeInsets.symmetric(

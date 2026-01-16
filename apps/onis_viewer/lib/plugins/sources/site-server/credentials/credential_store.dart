@@ -4,10 +4,10 @@ import 'package:flutter/services.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 class SiteServerCredentials {
-  final String username;
-  final String password;
-  final bool remember;
-  const SiteServerCredentials({
+  String username;
+  String password;
+  bool remember;
+  SiteServerCredentials({
     required this.username,
     required this.password,
     required this.remember,

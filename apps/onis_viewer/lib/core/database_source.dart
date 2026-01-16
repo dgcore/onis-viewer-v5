@@ -5,20 +5,41 @@ import 'package:flutter/widgets.dart';
 
 import '../api/request/async_request.dart';
 
-// Note: SiteSource import removed to avoid circular dependency
-// We'll use runtime type checking instead
+enum ConnectionStatus {
+  loggingIn,
+  loggedIn,
+  disconnecting,
+  disconnected,
+}
+
+class DatabaseSourceLoginState extends ChangeNotifier {
+  ConnectionStatus _status = ConnectionStatus.disconnected;
+  String? _errorMessage;
+
+  ConnectionStatus get status => _status;
+  String? get errorMessage => _errorMessage;
+
+  void setStatus(ConnectionStatus value,
+      {bool notify = true, String? errorMessage}) {
+    if (_status != value || errorMessage != this.errorMessage) {
+      _status = value;
+      _errorMessage = errorMessage;
+      if (notify) notifyListeners();
+    }
+  }
+}
 
 /// Represents a pending disconnection operation
-class PendingDisconnection {
+/*class PendingDisconnection {
   final Completer<void> completer;
   int remainingSubscribers;
 
   PendingDisconnection(this.completer, this.remainingSubscribers);
-}
+}*/
 
 /// Represents a database source with hierarchical structure
 /// Each source can have sub-sources and maintains a weak reference to its parent
-class DatabaseSource extends ChangeNotifier {
+abstract class DatabaseSource extends ChangeNotifier {
   /// Unique identifier for this source
   final String uid;
 
@@ -28,17 +49,22 @@ class DatabaseSource extends ChangeNotifier {
   /// Weak reference to the parent source (null if root)
   WeakReference<DatabaseSource>? _parentRef;
 
+  /// Weak reference to the source manager
+  WeakReference<DatabaseSourceManager>? _managerRef;
+
   /// List of sub-sources
   final List<DatabaseSource> _subSources = [];
 
+  final Map<RequestType, List<AsyncRequest>> _requests = {};
+
   /// Whether this source is currently active/connected
-  bool _isActive = false;
+  //final bool _isActive = false;
 
   /// Additional metadata for this source
   final Map<String, dynamic> _metadata = {};
 
   /// Stream controller for disconnection events
-  static final StreamController<String> _disconnectionController =
+  /*static final StreamController<String> _disconnectionController =
       StreamController<String>.broadcast();
 
   /// Stream for disconnection events (source UID)
@@ -46,25 +72,25 @@ class DatabaseSource extends ChangeNotifier {
     _subscriberCount++;
     debugPrint('New subscriber added. Total subscribers: $_subscriberCount');
     return _disconnectionController.stream;
-  }
+  }*/
 
   /// Track the number of active subscribers
-  static int _subscriberCount = 0;
+  //static int _subscriberCount = 0;
 
   /// Map to track pending disconnections by source UID
-  static final Map<String, PendingDisconnection> _pendingDisconnections = {};
+  //static final Map<String, PendingDisconnection> _pendingDisconnections = {};
 
   /// Subscribe to disconnection events and return the subscription
-  static StreamSubscription<String> subscribeToDisconnection(
+  /*static StreamSubscription<String> subscribeToDisconnection(
       Function(String) onDisconnecting) {
     _subscriberCount++;
     debugPrint(
         'Subscribed to disconnection events. Total subscribers: $_subscriberCount');
     return _disconnectionController.stream.listen(onDisconnecting);
-  }
+  }*/
 
   /// Unsubscribe from disconnection events
-  static Future<void> unsubscribeToDisconnection(
+  /*static Future<void> unsubscribeToDisconnection(
       StreamSubscription<String>? subscription) async {
     if (subscription != null) {
       await subscription.cancel();
@@ -72,10 +98,10 @@ class DatabaseSource extends ChangeNotifier {
       debugPrint(
           'Unsubscribed from disconnection events. Total subscribers: $_subscriberCount');
     }
-  }
+  }*/
 
   /// Emit a disconnection event for this source and return a completer
-  Future<void> emitDisconnecting() async {
+  /*Future<void> emitDisconnecting() async {
     debugPrint('Emitting disconnection event for source: $uid');
 
     // Create a pending disconnection
@@ -94,10 +120,10 @@ class DatabaseSource extends ChangeNotifier {
 
     // Wait for this specific disconnection to complete
     await completer.future;
-  }
+  }*/
 
   /// Signal that a disconnection subscriber has completed its tasks
-  static void signalDisconnectionComplete(String sourceUid) {
+  /*static void signalDisconnectionComplete(String sourceUid) {
     debugPrint('Disconnection subscriber completed for source: $sourceUid');
 
     final pendingDisconnection = _pendingDisconnections[sourceUid];
@@ -118,7 +144,7 @@ class DatabaseSource extends ChangeNotifier {
         _pendingDisconnections.remove(sourceUid);
       }
     }
-  }
+  }*/
 
   /// Public constructor for a database source (without parent)
   /// Parent relationships should be managed by DatabaseSourceManager
@@ -133,19 +159,6 @@ class DatabaseSource extends ChangeNotifier {
     }
   }
 
-  /// Internal constructor for creating sources with parent (used by manager)
-  /*DatabaseSource._withParent({
-    required this.uid,
-    required String name,
-    required DatabaseSource parent,
-    Map<String, dynamic>? metadata,
-  })  : _name = name,
-        _parentRef = WeakReference(parent) {
-    if (metadata != null) {
-      _metadata.addAll(metadata);
-    }
-  }*/
-
   /// Get the name of this source
   String get name => _name;
 
@@ -157,14 +170,31 @@ class DatabaseSource extends ChangeNotifier {
     }
   }
 
+  void addRequest(AsyncRequest request) {
+    debugPrint('---------- Adding request: ${request.requestType}');
+    final requestList = _requests.putIfAbsent(request.requestType, () => []);
+    requestList.add(request);
+  }
+
+  bool removeRequest(AsyncRequest request) {
+    debugPrint('---------- Removing request: ${request.requestType}');
+    final requestList = _requests[request.requestType];
+    if (requestList == null) return false;
+    final removed = requestList.remove(request);
+    return removed;
+  }
+
   /// Get the parent source (weak reference)
   DatabaseSource? get parent => _parentRef?.target;
+
+  /// Get the source manager (weak reference)
+  DatabaseSourceManager? get manager => _managerRef?.target;
 
   /// Get the list of sub-sources (read-only)
   List<DatabaseSource> get subSources => List.unmodifiable(_subSources);
 
   /// Get whether this source is active
-  bool get isActive => _isActive;
+  /*bool get isActive => _isActive;
 
   /// Set whether this source is active
   set isActive(bool value) {
@@ -172,7 +202,7 @@ class DatabaseSource extends ChangeNotifier {
       _isActive = value;
       notifyListeners();
     }
-  }
+  }*/
 
   /// Get the metadata map
   Map<String, dynamic> get metadata => Map.unmodifiable(_metadata);
@@ -194,11 +224,13 @@ class DatabaseSource extends ChangeNotifier {
     }
   }
 
+  /// Abstract getter for the login state
+  /// Must be implemented by subclasses (like a pure virtual method in C++)
+  DatabaseSourceLoginState get loginState;
+
   /// Optional UI panel for authentication/login when the source is inactive
   /// Default is null; plugins can override to provide a custom panel.
-  /// When provided and [isActive] is false, the application may render this
-  /// panel instead of the normal content area.
-  Widget? buildLoginPanel(BuildContext context) => null;
+  Widget? buildLoginPanel(BuildContext context, bool useKeyChain) => null;
 
   /// Optional UI panel for connection/properties (e.g., URL, instance name)
   /// Default is null; plugins can override to provide a custom panel.
@@ -224,17 +256,17 @@ class DatabaseSource extends ChangeNotifier {
 
   /// Get the current username for this source (if applicable)
   /// Default implementation returns null
-  String? get currentUsername => null;
+  //String? get currentUsername => null;
 
   /// Check if this source is currently disconnecting
   /// Default implementation returns false
-  bool get isDisconnecting => false;
+  /*bool get isDisconnecting => false;
 
   /// Disconnect from this source
   /// Default implementation returns a completed future
   Future<void> disconnect() async {
     // Default implementation - subclasses should override
-  }
+  }*/
 
   /// Get all descendants of this source (recursive)
   List<DatabaseSource> get allDescendants {
@@ -256,40 +288,28 @@ class DatabaseSource extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Get all sources in the subtree (including this source)
-  /*List<DatabaseSource> get subtree {
-    final sources = <DatabaseSource>[this];
-    sources.addAll(allDescendants);
-    return sources;
+  /// Internal: set or clear the manager weak reference
+  void _setManagerInternal(DatabaseSourceManager? manager) {
+    final currentManager = _managerRef?.target;
+    if (identical(currentManager, manager)) {
+      return;
+    }
+    _managerRef = manager != null ? WeakReference(manager) : null;
   }
 
-  /// Find a source by UID in the entire subtree
-  DatabaseSource? findInSubtree(String uid) {
-    if (this.uid == uid) {
-      return this;
-    }
-    for (final subSource in _subSources) {
-      final found = subSource.findInSubtree(uid);
-      if (found != null) {
-        return found;
-      }
-    }
-    return null;
-  }*/
-
-  /*@override
-  bool operator ==(Object other) {
-    if (identical(this, other)) return true;
-    return other is DatabaseSource && other.uid == uid;
+  Future<void> disconnect() async {
+    loginState.setStatus(ConnectionStatus.disconnecting);
+    await waitForPendingRequests();
+    loginState.setStatus(ConnectionStatus.disconnected);
   }
 
-  @override
-  int get hashCode => uid.hashCode;
-
-  @override
-  String toString() {
-    return 'DatabaseSource(uid: $uid, name: $name, parent: ${parent?.uid}, subSources: ${_subSources.length})';
-  }*/
+  Future<void> waitForPendingRequests() async {
+    const pollInterval = Duration(milliseconds: 10);
+    while (_requests.values.any((list) => list.isNotEmpty)) {
+      _requests.forEach((type, list) {});
+      await Future.delayed(pollInterval);
+    }
+  }
 }
 
 /// Manager class for handling database sources
@@ -319,44 +339,6 @@ class DatabaseSourceManager extends ChangeNotifier {
   List<DatabaseSource> get allSources =>
       List.unmodifiable(_sourcesByUid.values);
 
-  /// Create a basic source (legacy method for backward compatibility)
-  /// This creates a DatabaseSource with optional parent
-  /*DatabaseSource createSource({
-    required String uid,
-    required String name,
-    String? parentUid,
-    Map<String, dynamic>? metadata,
-  }) {
-    if (_sourcesByUid.containsKey(uid)) {
-      throw ArgumentError('Source with UID $uid already exists');
-    }
-
-    DatabaseSource? parent;
-    if (parentUid != null) {
-      parent = _sourcesByUid[parentUid];
-      if (parent == null) {
-        throw ArgumentError(
-            'Parent source with UID $parentUid not found in manager');
-      }
-    }
-
-    final source = parent != null
-        ? DatabaseSource._withParent(
-            uid: uid,
-            name: name,
-            parent: parent,
-            metadata: metadata,
-          )
-        : DatabaseSource(
-            uid: uid,
-            name: name,
-            metadata: metadata,
-          );
-
-    _registerSource(source);
-    return source;
-  }*/
-
   /// Register an existing source with the manager
   /// This is the preferred way to add sources to the manager
   void registerSource(DatabaseSource source, {String? parentUid}) {
@@ -364,7 +346,6 @@ class DatabaseSourceManager extends ChangeNotifier {
       throw ArgumentError(
           'Source with UID ${source.uid} already exists in manager');
     }
-
     if (parentUid != null) {
       final parent = _sourcesByUid[parentUid];
       if (parent == null) {
@@ -373,36 +354,21 @@ class DatabaseSourceManager extends ChangeNotifier {
       }
       _setParent(source, parent);
     }
-
     _registerSource(source);
   }
-
-  /// Set the parent of a source (manager-controlled)
-  /*void setParent(DatabaseSource source, String parentUid) {
-    final parent = _sourcesByUid[parentUid];
-    if (parent == null) {
-      throw ArgumentError(
-          'Parent source with UID $parentUid not found in manager');
-    }
-    _setParent(source, parent);
-  }
-
-  /// Remove the parent of a source (make it a root source)
-  void removeParent(DatabaseSource source) {
-    if (source.parent != null) {
-      source.parent!._removeSubSourceInternal(source);
-      _rootSources.add(source);
-      notifyListeners();
-    }
-  }*/
 
   /// Internal method to register a source
   void _registerSource(DatabaseSource source) {
     _sourcesByUid[source.uid] = source;
+    // Set the manager weak reference
+    source._setManagerInternal(this);
     if (source.parent == null) {
       _rootSources.add(source);
     }
-    _sourceRegisteredController.add(source);
+    // Only add to stream if controller is not closed
+    if (!_sourceRegisteredController.isClosed) {
+      _sourceRegisteredController.add(source);
+    }
     notifyListeners();
   }
 
@@ -420,8 +386,32 @@ class DatabaseSourceManager extends ChangeNotifier {
     parent._addSubSourceInternal(source);
   }
 
+  Future<void> removeSource(DatabaseSource source) async {
+    if (_sourcesByUid.remove(source.uid) != null) {
+      while (source.subSources.isNotEmpty) {
+        final subSource = source.subSources.removeAt(0);
+        await removeSource(subSource);
+      }
+      await source.disconnect();
+      if (source.parent == null) {
+        _rootSources.remove(source);
+      } else {
+        // Use internal method to maintain relationship integrity
+        source.parent!._removeSubSourceInternal(source);
+      }
+      // Clear parent and manager of the removed source
+      source._setParentInternal(null);
+      source._setManagerInternal(null);
+      // Only add to stream if controller is not closed
+      if (!_sourceUnregisteredController.isClosed) {
+        _sourceUnregisteredController.add(source);
+      }
+      notifyListeners();
+    }
+  }
+
   /// Remove a source from the manager
-  void removeSource(DatabaseSource source) {
+  /*void removeSource(DatabaseSource source) {
     if (_sourcesByUid.remove(source.uid) != null) {
       if (source.parent == null) {
         _rootSources.remove(source);
@@ -434,19 +424,21 @@ class DatabaseSourceManager extends ChangeNotifier {
       for (final descendant in source.allDescendants) {
         _sourcesByUid.remove(descendant.uid);
         descendant._setParentInternal(null);
+        descendant._setManagerInternal(null);
       }
 
-      // Clear parent of the removed source
+      // Clear parent and manager of the removed source
       source._setParentInternal(null);
+      source._setManagerInternal(null);
 
       _sourceUnregisteredController.add(source);
       notifyListeners();
     }
-  }
+  }*/
 
   /// Remove a source from the manager, disconnecting it first if needed
   /// Returns a Future that completes when the source is fully removed
-  Future<void> removeSourceWithDisconnect(DatabaseSource source) async {
+  /*Future<void> removeSourceWithDisconnect(DatabaseSource source) async {
     // Check if source needs disconnection
     if (source.isActive) {
       try {
@@ -466,22 +458,14 @@ class DatabaseSourceManager extends ChangeNotifier {
 
     // Now remove the source
     removeSource(source);
-  }
+  }*/
 
   /// Remove a source by UID, disconnecting it first if needed
   /// Returns a Future that completes when the source is fully removed
-  Future<void> removeSourceByUidWithDisconnect(String uid) async {
+  /*Future<void> removeSourceByUidWithDisconnect(String uid) async {
     final source = _sourcesByUid[uid];
     if (source != null) {
       await removeSourceWithDisconnect(source);
-    }
-  }
-
-  /// Remove a source by UID
-  /*void removeSourceByUid(String uid) {
-    final source = _sourcesByUid[uid];
-    if (source != null) {
-      removeSource(source);
     }
   }*/
 
@@ -490,28 +474,32 @@ class DatabaseSourceManager extends ChangeNotifier {
     return _sourcesByUid[uid];
   }
 
-  /// Get all active sources
-  /*List<DatabaseSource> get activeSources {
-    return _sourcesByUid.values.where((source) => source.isActive).toList();
+  Future<void> clear() async {
+    while (_rootSources.isNotEmpty) {
+      await removeSource(_rootSources.removeAt(0));
+    }
   }
 
-  /// Get all inactive sources
-  List<DatabaseSource> get inactiveSources {
-    return _sourcesByUid.values.where((source) => !source.isActive).toList();
-  }*/
-
   /// Clear all sources
-  void clear() {
+  /*void clear() {
+    // Clear manager references from all sources before clearing
+    for (final source in _sourcesByUid.values) {
+      source._setManagerInternal(null);
+    }
     _rootSources.clear();
     _sourcesByUid.clear();
     notifyListeners();
-  }
+  }*/
 
   /// Clean exit: disconnect all active sources before clearing
   /// Returns a Future that completes when all sources are properly disconnected
-  Future<void> cleanExit() async {
-    final activeSources =
-        _sourcesByUid.values.where((source) => source.isActive).toList();
+  /*Future<void> removeAllSources() async {
+    while (_rootSources.isNotEmpty) {
+      final source = _rootSources.removeAt(0);
+      //removeSource(source);
+    }*/
+  /*final activeSources =
+        _sourcesByUid.values.where((so  urce) => source.isActive).toList();
 
     // Disconnect all active sources concurrently
     final disconnectFutures = activeSources.map((source) async {
@@ -534,8 +522,8 @@ class DatabaseSourceManager extends ChangeNotifier {
     await Future.wait(disconnectFutures);
 
     // Now clear all sources
-    clear();
-  }
+    clear();*/
+  //}
 
   @override
   void dispose() {
@@ -543,16 +531,4 @@ class DatabaseSourceManager extends ChangeNotifier {
     _sourceUnregisteredController.close();
     super.dispose();
   }
-
-  /// Get sources by metadata value
-  /*List<DatabaseSource> getSourcesByMetadata(String key, dynamic value) {
-    return _sourcesByUid.values
-        .where((source) => source.getMetadata(key) == value)
-        .toList();
-  }
-
-  @override
-  String toString() {
-    return 'DatabaseSourceManager(rootSources: ${_rootSources.length}, totalSources: ${_sourcesByUid.length})';
-  }*/
 }
