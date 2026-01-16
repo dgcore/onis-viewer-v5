@@ -1,14 +1,18 @@
 import 'dart:core';
 
 import 'package:flutter/material.dart';
-import 'package:onis_viewer/api/ov_api.dart';
+import 'package:onis_viewer/plugins/sources/site-server/credentials/credential_store.dart';
+import 'package:onis_viewer/plugins/sources/site-server/ui/site_server_login_panel.dart';
 
 import '../../../api/request/async_request.dart';
 import '../../../core/database_source.dart';
-import 'credentials/credential_store.dart';
 import 'request/site_async_request.dart';
 import 'ui/site_server_connection_panel.dart';
-import 'ui/site_server_login_panel.dart';
+
+class SiteSourceLoginState extends DatabaseSourceLoginState {
+  SiteServerCredentials credentials =
+      SiteServerCredentials(username: '', password: '', remember: false);
+}
 
 /// Represents different types of child sources that can be created under a site source
 enum SiteChildSourceType {
@@ -31,7 +35,7 @@ class SiteChildSource extends DatabaseSource {
     super.metadata,
   }) {
     // Child sources are active by default since they represent available data
-    isActive = true;
+    //isActive = true;
   }
 
   /// Set the parent site source reference
@@ -41,6 +45,11 @@ class SiteChildSource extends DatabaseSource {
 
   /// Get the parent site source (if available)
   SiteSource? get parentSite => _parentSiteRef?.target;
+
+  /// Get the login state from the parent site source
+  @override
+  DatabaseSourceLoginState get loginState =>
+      parentSite?.loginState ?? DatabaseSourceLoginState();
 
   /// Get the type as a display string
   String get typeDisplayName {
@@ -75,7 +84,7 @@ class SiteChildSource extends DatabaseSource {
   }
 
   /// Get the current username from the parent site source
-  @override
+  /*@override
   String? get currentUsername {
     final parentSite = this.parentSite;
     if (parentSite != null) {
@@ -89,7 +98,7 @@ class SiteChildSource extends DatabaseSource {
   bool get isDisconnecting {
     final parentSite = this.parentSite;
     return parentSite?.isDisconnecting ?? false;
-  }
+  }*/
 
   /// Create an AsyncRequest for the specified request type
   /// Overrides the base class method to create SiteAsyncRequest instances
@@ -122,27 +131,20 @@ class SiteSource extends DatabaseSource {
   SiteSource({required super.uid, required super.name, super.metadata})
       : super();
 
-  // Track last used credentials and pending login per source
-  String? lastUsername;
-  String? lastPassword;
-  bool lastRemember = false;
-  bool isLoggingIn = false;
-  bool _isDisconnecting = false;
-
   /// Map to store SiteAsyncRequest instances
-  /// First key: source UID, Second key: RequestType
-  final Map<String, Map<RequestType, List<SiteAsyncRequest>>> requests = {};
+  //final Map<RequestType, List<AsyncRequest>> _requests = {};
 
-  /// Get the current logged-in username (if any)
+  final DatabaseSourceLoginState _loginState = SiteSourceLoginState();
+
   @override
-  String? get currentUsername => lastUsername;
+  DatabaseSourceLoginState get loginState => _loginState;
 
   /// Get whether the source is currently disconnecting
-  @override
-  bool get isDisconnecting => _isDisconnecting;
+  //@override
+  //bool get isDisconnecting => _isDisconnecting;
 
   /// Get whether this source is a root site source (always true for SiteSource)
-  bool get isRootSite => true;
+  //bool get isRootSite => true;
 
   /// Create an AsyncRequest for the specified request type
   /// Overrides the base class method to create SiteAsyncRequest instances
@@ -181,19 +183,22 @@ class SiteSource extends DatabaseSource {
 
   /// Disconnect from the source
   @override
+  @override
   Future<void> disconnect() async {
-    if (_isDisconnecting) return;
-    _isDisconnecting = true;
-    notifyListeners();
+    await super.disconnect();
+
+    //if (_isDisconnecting) return;
+    //_isDisconnecting = true;
+    //notifyListeners();
 
     // Emit disconnection event and wait for subscribers to complete
-    await emitDisconnecting();
+    //await emitDisconnecting();
 
     // Simulate slow server response for disconnect
     //await Future.delayed(const Duration(seconds: 10));
 
     // Remove all child sources that were created during login
-    final api = OVApi();
+    /*final api = OVApi();
     final manager = api.sources;
 
     // Get all child sources of this site source using weak references
@@ -213,6 +218,7 @@ class SiteSource extends DatabaseSource {
     lastPassword = null;
     lastRemember = false;
     isLoggingIn = false;
+    lastErrorMessage = null;
     _isDisconnecting = false;
 
     debugPrint(
@@ -225,33 +231,56 @@ class SiteSource extends DatabaseSource {
     final dbApi = api.plugins.getPublicApi('onis_database_plugin');
     if (dbApi != null) {
       dbApi.checkAndFixSelection(uid);
-    }
+    }*/
   }
+
+  /// Update credentials (called when user types in login fields)
+  /*void updateCredentials({
+    String? username,
+    String? password,
+    bool? remember,
+  }) {
+    if (username != null) {
+      lastUsername = username;
+    }
+    if (password != null) {
+      lastPassword = password;
+    }
+    if (remember != null) {
+      lastRemember = remember;
+    }
+    // Defer notifyListeners to avoid calling setState during build
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      notifyListeners();
+    });
+  }*/
 
   /// Authenticate with the site server
   Future<void> login({
-    required String username,
-    required String password,
-    required bool remember,
+    required bool useKeyChain,
   }) async {
-    lastUsername = username;
-    lastPassword = password;
-    lastRemember = remember;
-    isLoggingIn = true;
-    notifyListeners();
-
+    final siteLoginState = loginState as SiteSourceLoginState;
+    final credentials = siteLoginState.credentials;
+    AsyncRequest? request;
     try {
+      if (siteLoginState.status != ConnectionStatus.disconnected) {
+        throw Exception('The source is not disconnected.');
+      }
       // Create authentication request
-      final request = createRequest(RequestType.login, {
-        'username': username,
-        'password': password,
+      request = createRequest(RequestType.login, {
+        'username': credentials.username,
+        'password': credentials.password,
       });
-
       if (request == null) {
         throw Exception('Failed to create authentication request');
       }
+      addRequest(request);
 
       // Send the authentication request and wait for response
+      loginState.setStatus(ConnectionStatus.loggingIn, errorMessage: null);
+
+      // TEST: Wait 10 seconds without blocking GUI
+      //await Future.delayed(const Duration(seconds: 10));
       final response = await request.send();
 
       if (!response.isSuccess) {
@@ -264,81 +293,100 @@ class SiteSource extends DatabaseSource {
         throw Exception('Authentication failed: Invalid response from server');
       }
 
+      loginState.setStatus(ConnectionStatus.loggedIn, errorMessage: null);
+      removeRequest(request);
+
       // Store or clear credentials based on remember flag
-      if (remember) {
+      if (useKeyChain && credentials.remember) {
         await SiteServerCredentialStore.save(
           uid,
-          username: username,
-          password: password,
+          username: credentials.username,
+          password: credentials.password,
           remember: true,
         );
       } else {
         await SiteServerCredentialStore.clear(uid);
       }
 
-      // Mark source as active
-      isActive = true;
-
       // Create child sources after successful authentication
       createChildSources();
 
       // Auto-expand the site source node in the source tree
-      final api = OVApi();
+      /*final api = OVApi();
       final dbApi = api.plugins.getPublicApi('onis_database_plugin');
       if (dbApi != null) {
         dbApi.expandSourceNode(uid, expand: true, expandChildren: true);
-      }
+      }*/
     } catch (e) {
-      // Authentication failed
-      isActive = false;
-      lastUsername = null;
-      lastPassword = null;
-      lastRemember = false;
-      rethrow; // Re-throw the exception so the UI can handle it
-    } finally {
-      // Reset logging-in flag
-      isLoggingIn = false;
-      notifyListeners();
+      loginState.setStatus(ConnectionStatus.disconnected,
+          errorMessage: e.toString());
+      if (request != null) removeRequest(request);
     }
   }
 
   @override
-  Widget? buildLoginPanel(BuildContext context) {
-    // Only show login panel if not authenticated and no child sources exist
-    if (isActive || subSources.isNotEmpty) {
-      return null;
+  Widget? buildLoginPanel(BuildContext context, bool useKeyChain) {
+    final siteLoginState = loginState as SiteSourceLoginState;
+    final credentials = siteLoginState.credentials;
+
+    // Helper function to build the login panel with given initial values
+    Widget buildPanel(
+        String initialUsername, String initialPassword, bool initialRemember) {
+      return AnimatedBuilder(
+        animation: siteLoginState,
+        builder: (context, _) => SiteServerLoginPanel(
+          initialUsername: initialUsername,
+          initialPassword: initialPassword,
+          initialRemember: initialRemember,
+          initialSubmitting:
+              siteLoginState.status == ConnectionStatus.loggingIn,
+          initialErrorMessage: siteLoginState.errorMessage,
+          instanceName: name,
+          onCredentialsChanged: (username, password, remember) {
+            /*updateCredentials(
+              username: username,
+              password: password,
+              remember: remember,
+            );*/
+          },
+          onSubmitAsync: (username, password, remember) async {
+            credentials.username = username;
+            credentials.password = password;
+            credentials.remember = remember;
+            await login(useKeyChain: useKeyChain);
+            siteLoginState.notifyListeners();
+          },
+        ),
+      );
     }
+
+    String initialUsername = credentials.username;
+    String initialPassword = credentials.password;
+    bool initialRemember = credentials.remember;
 
     return KeyedSubtree(
       key: ValueKey<String>('login-$uid'),
-      child: FutureBuilder<SiteServerCredentials?>(
-        future: SiteServerCredentialStore.load(uid),
-        builder: (context, snapshot) {
-          final saved = snapshot.data;
-          final initialUsername = isLoggingIn
-              ? (lastUsername ?? saved?.username)
-              : (saved?.username);
-          final initialPassword = isLoggingIn
-              ? (lastPassword ?? saved?.password)
-              : (saved?.password);
-          final initialRemember =
-              isLoggingIn ? lastRemember : (saved?.remember ?? false);
-          return SiteServerLoginPanel(
-            initialUsername: initialUsername,
-            initialPassword: initialPassword,
-            initialRemember: initialRemember,
-            initialSubmitting: isLoggingIn,
-            instanceName: name,
-            onSubmitAsync: (username, password, remember) async {
-              await login(
-                username: username,
-                password: password,
-                remember: remember,
-              );
-            },
-          );
-        },
-      ),
+      child: useKeyChain
+          ? FutureBuilder<SiteServerCredentials?>(
+              future: SiteServerCredentialStore.load(uid),
+              builder: (context, snapshot) {
+                final saved = snapshot.data;
+                // Always prefer lastUsername, lastPassword, lastRemember if they exist
+                // This ensures credentials persist even after failed login attempts
+                if (initialUsername.isEmpty) {
+                  initialUsername = saved?.username ?? "";
+                  initialPassword = saved?.password ?? "";
+                  initialRemember = saved?.remember ?? false;
+                }
+                return buildPanel(
+                    initialUsername, initialPassword, initialRemember);
+              },
+            )
+          : buildPanel(
+              initialUsername,
+              initialPassword,
+              initialRemember,
+            ),
     );
   }
 
@@ -389,7 +437,7 @@ class SiteSource extends DatabaseSource {
   void createChildSources() {
     // Create partition source as a child of this site source
 
-    final partitionsFolder = SiteChildSource(
+    /*final partitionsFolder = SiteChildSource(
       uid: '${uid}_partitions',
       name: 'Partitions',
       type: SiteChildSourceType.partitionFolder,
@@ -431,6 +479,6 @@ class SiteSource extends DatabaseSource {
 
     debugPrint('Created child sources for site: $name');
     debugPrint('- Partitions folder: ${partitionsFolder.name}');
-    debugPrint('- Partitions: ${partition1.name}, ${partition2.name}');
+    debugPrint('- Partitions: ${partition1.name}, ${partition2.name}');*/
   }
 }

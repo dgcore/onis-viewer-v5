@@ -1,16 +1,18 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:onis_viewer/plugins/database/controller/source_controller.dart';
+import 'package:onis_viewer/plugins/database/public/source_controller_interface.dart';
 
-import '../../api/core/ov_api_core.dart';
-import '../../core/database_source.dart';
+//import '../../api/core/ov_api_core.dart';
+//import '../../core/database_source.dart';
 import '../../core/page_type.dart';
 import '../../core/plugin_interface.dart';
 import 'page/database_page.dart';
 import 'public/database_api.dart';
-import 'ui/database_source_bar.dart';
+//import 'ui/database_source_bar.dart';
 
-class _DatabaseApiImpl implements DatabaseApi {
+/*class _DatabaseApiImpl implements DatabaseApi {
   final _selectionController = StreamController<DatabaseSource?>.broadcast();
   DatabaseSource? _selected;
 
@@ -38,7 +40,7 @@ class _DatabaseApiImpl implements DatabaseApi {
 
   /// Select an alternative source when the current selection is no longer available
   void _selectAlternativeSource([String? destroyedSourceUid]) {
-    final manager = OVApi().sources;
+    /*final manager = OVApi().sources;
     final allSources = manager.allSources;
 
     if (allSources.isEmpty) {
@@ -82,13 +84,13 @@ class _DatabaseApiImpl implements DatabaseApi {
 
     // If no active sources, select the first available source
     _selected = allSources.first;
-    debugPrint('Selected alternative source: ${_selected!.name}');
+    debugPrint('Selected alternative source: ${_selected!.name}');*/
   }
 
   /// Check if the currently selected source still exists and select alternative if needed
   @override
   void checkAndFixSelection([String? destroyedSourceUid]) {
-    if (_selected == null) {
+    /*if (_selected == null) {
       _selectAlternativeSource(destroyedSourceUid);
       if (_selected != null) {
         _selectionController.add(_selected);
@@ -105,7 +107,7 @@ class _DatabaseApiImpl implements DatabaseApi {
           'Currently selected source no longer exists, selecting alternative');
       _selectAlternativeSource(destroyedSourceUid);
       _selectionController.add(_selected);
-    }
+    }*/
   }
 
   @override
@@ -123,6 +125,28 @@ class _DatabaseApiImpl implements DatabaseApi {
     } else {
       DatabaseSourceBar.collapseNode(uid);
     }
+  }
+}
+*/
+
+class _DatabaseApiImpl implements DatabaseApi {
+  final _sourceController = SourceController();
+
+  @override
+  ISourceController get sourceController => _sourceController;
+
+  Future<void> initialize() async {
+    await _sourceController.initialize();
+  }
+
+  Future<void> dispose() async {
+    debugPrint('---------- _DatabaseApiImpl.dispose() called');
+    debugPrint(
+        '---------- Calling sources.clear(), rootSources count: ${_sourceController.sources.rootSources.length}');
+    await _sourceController.sources.clear();
+    debugPrint('---------- sources.clear() completed');
+    _sourceController.dispose();
+    debugPrint('---------- _DatabaseApiImpl.dispose() completed');
   }
 }
 
@@ -172,13 +196,19 @@ class DatabasePlugin implements OnisViewerPlugin {
     PageType.register(databasePageType);
     // Create public API implementation
     _api = _DatabaseApiImpl();
+    await _api!.initialize();
   }
 
   @override
   Future<void> dispose() async {
+    debugPrint('---------- DatabasePlugin.dispose() called');
     // Unregister the page type (includes page creator)
     PageType.unregister(databasePageType.id);
+    debugPrint('---------- Calling _api.dispose()');
+    await _api!.dispose();
+    debugPrint('---------- _api.dispose() completed');
     _api = null;
+    debugPrint('---------- DatabasePlugin.dispose() completed');
   }
 
   @override

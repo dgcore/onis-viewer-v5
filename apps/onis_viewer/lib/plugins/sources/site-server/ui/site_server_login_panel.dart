@@ -14,6 +14,9 @@ class SiteServerLoginPanel extends StatefulWidget {
   final Future<void> Function(String username, String password, bool remember)?
       onSubmitAsync;
   final bool initialSubmitting;
+  final String? initialErrorMessage;
+  final void Function(String username, String password, bool remember)?
+      onCredentialsChanged;
 
   const SiteServerLoginPanel({
     super.key,
@@ -26,6 +29,8 @@ class SiteServerLoginPanel extends StatefulWidget {
     this.initialRemember = false,
     this.onSubmitAsync,
     this.initialSubmitting = false,
+    this.initialErrorMessage,
+    this.onCredentialsChanged,
   });
 
   @override
@@ -41,6 +46,9 @@ class _SiteServerLoginPanelState extends State<SiteServerLoginPanel>
   bool _remember = false;
   bool _canSubmit = false;
   bool _isSubmitting = false;
+  String? _errorMessage;
+  bool _isInitialized = false;
+  bool _isUpdatingFromWidget = false;
 
   void _recomputeCanSubmit() {
     final can = _userController.text.trim().isNotEmpty &&
@@ -49,6 +57,14 @@ class _SiteServerLoginPanelState extends State<SiteServerLoginPanel>
       setState(() => _canSubmit = can);
     } else {
       _canSubmit = can;
+    }
+    // Update credentials in source as user types (only after initialization and not during widget updates)
+    if (_isInitialized && !_isUpdatingFromWidget) {
+      widget.onCredentialsChanged?.call(
+        _userController.text,
+        _passwordController.text,
+        _remember,
+      );
     }
   }
 
@@ -59,9 +75,18 @@ class _SiteServerLoginPanelState extends State<SiteServerLoginPanel>
     _passwordController.text = widget.initialPassword ?? '';
     _remember = widget.initialRemember;
     _isSubmitting = widget.initialSubmitting;
+    _errorMessage = widget.initialErrorMessage;
     _recomputeCanSubmit();
     _userController.addListener(_recomputeCanSubmit);
     _passwordController.addListener(_recomputeCanSubmit);
+    // Mark as initialized after the first frame to prevent callbacks during build
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        setState(() {
+          _isInitialized = true;
+        });
+      }
+    });
   }
 
   @override
@@ -70,13 +95,29 @@ class _SiteServerLoginPanelState extends State<SiteServerLoginPanel>
     if (widget.initialUsername != oldWidget.initialUsername ||
         widget.initialPassword != oldWidget.initialPassword ||
         widget.initialRemember != oldWidget.initialRemember) {
-      _userController.text = widget.initialUsername ?? '';
-      _passwordController.text = widget.initialPassword ?? '';
-      _remember = widget.initialRemember;
-      _recomputeCanSubmit();
+      _isUpdatingFromWidget = true;
+      setState(() {
+        _userController.text = widget.initialUsername ?? '';
+        _passwordController.text = widget.initialPassword ?? '';
+        _remember = widget.initialRemember;
+      });
+      // Recompute can submit after setState completes
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          _isUpdatingFromWidget = false;
+          _recomputeCanSubmit();
+        }
+      });
     }
     if (widget.initialSubmitting != oldWidget.initialSubmitting) {
-      _isSubmitting = widget.initialSubmitting;
+      setState(() {
+        _isSubmitting = widget.initialSubmitting;
+      });
+    }
+    if (widget.initialErrorMessage != oldWidget.initialErrorMessage) {
+      setState(() {
+        _errorMessage = widget.initialErrorMessage;
+      });
     }
   }
 
@@ -242,10 +283,41 @@ class _SiteServerLoginPanelState extends State<SiteServerLoginPanel>
               size: 18,
               color: OnisViewerConstants.textSecondaryColor,
             ),
-            onPressed: () =>
-                setState(() => _isPasswordHidden = !_isPasswordHidden),
+            onPressed: _isSubmitting
+                ? null
+                : () => setState(() => _isPasswordHidden = !_isPasswordHidden),
           ),
         ),
+        if (_errorMessage != null) ...[
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.red.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.red.withValues(alpha: 0.3)),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.error_outline,
+                  size: 18,
+                  color: Colors.red,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    _errorMessage!,
+                    style: const TextStyle(
+                      color: Colors.red,
+                      fontSize: 13,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
         const SizedBox(height: 24),
         Row(
           children: [
@@ -264,13 +336,19 @@ class _SiteServerLoginPanelState extends State<SiteServerLoginPanel>
                   ? null
                   : (widget.onSubmitAsync != null
                       ? () async {
-                          setState(() => _isSubmitting = true);
+                          setState(() {
+                            _isSubmitting = true;
+                            _errorMessage = null; // Clear previous error
+                          });
                           try {
                             await widget.onSubmitAsync!.call(
                               _userController.text,
                               _passwordController.text,
                               _remember,
                             );
+                          } catch (e) {
+                            // Error message is handled by the source and will be displayed
+                            // when the widget rebuilds via notifyListeners()
                           } finally {
                             if (mounted) setState(() => _isSubmitting = false);
                           }
@@ -356,7 +434,17 @@ class _SiteServerLoginPanelState extends State<SiteServerLoginPanel>
                 height: 18,
                 child: Checkbox(
                   value: _remember,
-                  onChanged: (v) => setState(() => _remember = v ?? false),
+                  onChanged: _isSubmitting
+                      ? null
+                      : (v) {
+                          setState(() => _remember = v ?? false);
+                          // Update credentials in source when remember checkbox changes
+                          widget.onCredentialsChanged?.call(
+                            _userController.text,
+                            _passwordController.text,
+                            v ?? false,
+                          );
+                        },
                   materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   visualDensity: VisualDensity.compact,
                 ),

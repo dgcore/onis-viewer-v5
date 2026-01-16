@@ -1,8 +1,6 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:onis_viewer/core/models/study.dart';
-import 'package:onis_viewer/plugins/database/ui/study_list_view.dart';
 
 import '../../../api/core/ov_api_core.dart';
 import '../../../core/constants.dart';
@@ -13,7 +11,7 @@ import '../public/database_api.dart';
 import '../ui/database_source_bar.dart';
 import '../ui/database_toolbar.dart';
 import '../ui/resizable_source_bar.dart';
-import 'database_controller.dart';
+//import 'database_controller.dart';
 
 /// Database management page
 class DatabasePage extends BasePage {
@@ -29,44 +27,52 @@ class DatabasePage extends BasePage {
 }
 
 class _DatabasePageState extends BasePageState<DatabasePage> {
-  late DatabaseController _controller;
+  //late DatabaseController _controller;
   DatabaseApi? _dbApi;
-  StreamSubscription<DatabaseSource?>? _selectionSub;
-  DatabaseSource? _selectedSource;
-  VoidCallback? _sourceListener;
+  //StreamSubscription<DatabaseSource?>? _selectionSub;
+  //DatabaseSource? _selectedSource;
+  //VoidCallback? _sourceListener;
 
   @override
   Future<void> initializePage() async {
-    _controller = DatabaseController();
-    await _controller.initialize();
+    //_controller = DatabaseController();
+    //await _controller.initialize();
     _dbApi = OVApi().plugins.getPublicApi<DatabaseApi>('onis_database_plugin');
-    _selectionSub = _dbApi?.onSelectionChanged.listen((source) {
-      if (!mounted) return;
-      // Remove listener from previous source
-      _selectedSource?.removeListener(_sourceListener!);
-      _selectedSource = source;
-      // Add listener to new source
-      if (source != null) {
-        _sourceListener = () {
-          if (mounted) setState(() {});
-        };
-        source.addListener(_sourceListener!);
-      }
-      setState(() {});
-    });
+    //_selectionSub = _dbApi?.onSelectionChanged.listen((source) {
+    //if (!mounted) return;
+    // Remove listener from previous source
+    //_selectedSource?.removeListener(_sourceListener!);
+    //_selectedSource = source;
+    // Add listener to new source
+    //if (source != null) {
+    //  _sourceListener = () {
+    //    if (mounted) setState(() {});
+    //  };
+    //  source.addListener(_sourceListener!);
+    // }
+    // Defer setState to after the current build phase completes
+    //WidgetsBinding.instance.addPostFrameCallback((_) {
+    // if (mounted) setState(() {});
+    //});
+    //});
   }
 
   @override
   Future<void> disposePage() async {
-    await _controller.dispose();
-    await _selectionSub?.cancel();
-    _selectedSource?.removeListener(_sourceListener!);
+    if (_dbApi != null) {
+      _dbApi!.sourceController.dispose();
+    }
+
+    //await _controller.dispose();
+    //await _selectionSub?.cancel();
+//    _selectedSource?.removeListener(_sourceListener!);
   }
 
   @override
   Widget buildPageContent() {
+    final sourceController = _dbApi?.sourceController;
     return AnimatedBuilder(
-      animation: _controller,
+      animation: sourceController as Listenable,
       builder: (context, child) {
         return _buildContent();
       },
@@ -77,34 +83,33 @@ class _DatabasePageState extends BasePageState<DatabasePage> {
   Widget? buildPageHeader() {
     // Return the database toolbar as the custom page header
     // Use AnimatedBuilder to rebuild when controller changes
+    final sourceController = _dbApi?.sourceController;
     return AnimatedBuilder(
-      animation: _controller,
+      animation: sourceController as Listenable,
       builder: (context, child) {
         // Get the selected source to determine capabilities
-        final selected = _dbApi?.selectedSource;
+        final selected = sourceController!.selectedSource;
 
         return DatabaseToolbar(
-          onPreferences: () => _controller.openPreferences(),
-          onImport: () => _controller.importData(),
-          onExport: () => _controller.exportData(),
-          onTransfer: () => _controller.transferData(),
-          onOpen: () => _controller.openDatabaseFromToolbar(),
+          onPreferences: () => {},
+          onImport: () => {},
+          onExport: () => {},
+          onTransfer: () => {},
+          onOpen: () => {},
           selectedLocation: 'Local computer',
           onSearch: () {
-            final selected = _dbApi?.selectedSource;
+            /*final selected = _dbApi?.selectedSource;
             if (selected != null) {
               _controller.onSearch(selected.uid);
-            }
+            }*/
           },
-          canOpen: selected != null ? _controller.canOpen(selected.uid) : false,
-          canImport:
-              selected != null ? _controller.canImport(selected.uid) : false,
-          canExport:
-              selected != null ? _controller.canExport(selected.uid) : false,
-          canTransfer:
-              selected != null ? _controller.canTransfer(selected.uid) : false,
-          canSearch:
-              selected != null ? _controller.canSearch(selected.uid) : false,
+          canOpen: selected != null ? true : false,
+          canImport: selected != null ? true : false,
+          canExport: selected != null ? true : false,
+          canTransfer: selected != null ? true : false,
+          canSearch: selected != null
+              ? /*_controller.canSearch(selected.uid)*/ true
+              : false,
         );
       },
     );
@@ -112,10 +117,28 @@ class _DatabasePageState extends BasePageState<DatabasePage> {
 
   /// Build the main content area
   Widget _buildContent() {
-    final selected = _dbApi?.selectedSource;
-    final loginPanel =
-        selected?.isActive == false ? selected?.buildLoginPanel(context) : null;
-
+    final sourceController = _dbApi?.sourceController;
+    final selected = sourceController?.selectedSource;
+    Widget? loginPanel;
+    if (selected != null) {
+      if (selected.loginState.status != ConnectionStatus.loggedIn) {
+        loginPanel = selected.buildLoginPanel(context, true);
+      }
+      /*DatabaseSourceLoginState? loginState =
+          sourceController!.getLoginState(selected.uid);
+      if (loginState != null &&
+          loginState.status != ConnectionStatus.loggedIn) {
+        loginPanel = selected.buildLoginPanel(
+          context,
+          loginState,
+          (AsyncRequest? request) {
+            if (request != null) {
+              //sourceController?.addPendingRequest(request);
+            }
+          },
+        );
+      }*/
+    }
     final rightPanel = selected == null
         ? _buildNoSelectionPlaceholder()
         : (loginPanel ?? _buildDatabaseDetails());
@@ -128,17 +151,17 @@ class _DatabasePageState extends BasePageState<DatabasePage> {
           minWidth: 250,
           maxWidth: 500,
           child: DatabaseSourceBar(
-            selectedSource: selected,
-            onSourceSelected: (source) {
-              _dbApi?.selectSourceByUid(source.uid);
-            },
-            onAddSource: () {
+              //selectedSource: selected,
+              //onSourceSelected: (source) {
+              //_dbApi?.selectSourceByUid(source.uid);
+              //},
+              //onAddSource: () {
               // TODO: Handle add source
-            },
-            onRefreshSources: () {
+              //},
+              //onRefreshSources: () {
               // TODO: Handle refresh sources
-            },
-          ),
+              //},
+              ),
         ),
 
         // Spacing between source bar and right panel
@@ -173,7 +196,7 @@ class _DatabasePageState extends BasePageState<DatabasePage> {
   /// Build the database details panel
   Widget _buildDatabaseDetails() {
     // Always show the study list, but with different header based on selection
-    final selected = _dbApi?.selectedSource;
+    /*final selected = _dbApi?.selectedSource;
     final username = selected?.currentUsername;
     final isDisconnecting = selected?.isDisconnecting ?? false;
 
@@ -222,15 +245,17 @@ class _DatabasePageState extends BasePageState<DatabasePage> {
           _controller.saveScrollPositionForSource(selected.uid, position);
         }
       },
-    );
+    );*/
+    return Container();
   }
 
   @override
   List<Widget> buildToolbarItems() {
+    //final sourceController = _dbApi?.sourceController;
     return [
       // Database-specific toolbar items
       IconButton(
-        onPressed: _controller.showSettings,
+        onPressed: null, //_controller.showSettings,
         icon: const Icon(Icons.settings),
         tooltip: 'Database Settings',
       ),
@@ -239,10 +264,14 @@ class _DatabasePageState extends BasePageState<DatabasePage> {
 
   @override
   List<Widget> buildFooterItems() {
+    final sourceController = _dbApi?.sourceController;
+    if (sourceController == null) {
+      return [];
+    }
     return [
       // Database-specific footer items
       Text(
-        '${_controller.totalStudyCount} studies',
+        '${sourceController.totalStudyCount} studies',
         style: const TextStyle(
           fontSize: 12,
           color: OnisViewerConstants.textSecondaryColor,
@@ -253,9 +282,8 @@ class _DatabasePageState extends BasePageState<DatabasePage> {
 
   @override
   String getPageStatus() {
-    final dbApi =
-        OVApi().plugins.getPublicApi<DatabaseApi>('onis_database_plugin');
-    final selected = dbApi?.selectedSource;
+    final sourceController = _dbApi?.sourceController;
+    final selected = sourceController?.selectedSource;
     if (selected == null) {
       return 'Database: None selected';
     }

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:onis_viewer/api/core/ov_api_core.dart';
+import 'package:onis_viewer/plugins/database/public/database_api.dart';
 import 'package:onis_viewer/plugins/sources/site-server/site_source.dart';
 
 import '../../../core/plugin_interface.dart';
@@ -34,28 +35,28 @@ class SiteServerPlugin implements OnisViewerPlugin {
     // Future: register source types, services, and any background tasks here
     debugPrint('SiteServerPlugin initialized');
 
-    final api = OVApi();
-
-    // Register root site server sources (without child sources initially)
-    final siteServerSource = SiteSource(
+    final dbApi =
+        OVApi().plugins.getPublicApi<DatabaseApi>('onis_database_plugin');
+    if (dbApi != null) {
+      dbApi.sourceController.sources.registerSource(SiteSource(
         uid: 'site_server_1',
         name: 'Site Server 1',
-        metadata: {'type': 'site_server', 'url': 'http://localhost:8080'});
-    api.sources.registerSource(siteServerSource);
-
-    final siteServerSource2 = SiteSource(
+        metadata: {'type': 'site_server', 'url': 'http://localhost:8080'},
+      ));
+      dbApi.sourceController.sources.registerSource(SiteSource(
         uid: 'site_server_2',
         name: 'Site Server 2',
-        metadata: {'type': 'site_server', 'url': 'http://localhost:8080'});
-    api.sources.registerSource(siteServerSource2);
-
-    debugPrint(
-        'Registered 2 site server sources (child sources will be created after authentication)');
+        metadata: {'type': 'site_server', 'url': 'http://localhost:8080'},
+      ));
+      debugPrint(
+          'Registered 2 site server sources (child sources will be created after authentication)');
+    }
   }
 
   @override
   Future<void> dispose() async {
     // Future: cleanup resources, timers, or subscriptions here
+    debugPrint('SiteServerPlugin disposed');
   }
 
   @override
