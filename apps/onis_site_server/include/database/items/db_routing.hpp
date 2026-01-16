@@ -2,7 +2,7 @@
 
 #include "db_item.hpp"
 
-using json = nlohmann::json;
+using json = Json::Value;
 
 #define AR_ENABLE_KEY "enable"
 #define AR_FAILURE_MANAGEMENT_KEY "failure_management"
@@ -70,7 +70,7 @@ const s32 type_backup = 1;
 
 struct routing_rule {
   static void create(json& item, u32 flags) {
-    if (!item.is_object()) {
+    if (!item.isObject()) {
       throw std::invalid_argument("routing_rule is not an object");
     }
     item.clear();
@@ -102,7 +102,7 @@ struct routing_rule {
 
   static void verify(const json& input, bool with_seq) {
     onis::database::item::verify_seq_version_flags(input, with_seq);
-    u32 flags = input[BASE_FLAGS_KEY].get<u32>();
+    u32 flags = input[BASE_FLAGS_KEY].asUInt();
     if (flags & onis::server::info_auto_routing_rule_active)
       onis::database::item::verify_integer_value(input, RR_ACTIVE_KEY, false, 0,
                                                  1);
@@ -111,7 +111,7 @@ struct routing_rule {
                                                 false, 64);
     if (flags & info_auto_routing_rule_type) {
       onis::database::item::verify_integer_value(input, RR_TYPE_KEY, false);
-      s32 value = input[RR_TYPE_KEY].get<s32>();
+      s32 value = input[RR_TYPE_KEY].asInt();
       if (value != onis::server::type_standard &&
           value != onis::server::type_backup) {
         throw std::invalid_argument("routing_rule type is invalid");
@@ -133,7 +133,7 @@ struct routing_rule {
                                                 false, 64);
     if (flags & onis::server::info_auto_routing_rule_type) {
       onis::database::item::verify_integer_value(input, RR_TYPE_KEY, false);
-      s32 value = input[RR_TYPE_KEY].get<s32>();
+      s32 value = input[RR_TYPE_KEY].asInt();
       if (value != onis::server::type_standard &&
           value != onis::server::type_backup) {
         throw std::invalid_argument("routing_rule type is invalid");
@@ -174,7 +174,7 @@ struct routing_rule {
 
 struct routing {
   static void create(json& item, u32 flags) {
-    if (!item.is_object()) {
+    if (!item.isObject()) {
       throw std::invalid_argument("routing is not an object");
     }
     item.clear();
@@ -201,7 +201,7 @@ struct routing {
 
   static void verify(const json& input, bool with_seq) {
     onis::database::item::verify_seq_version_flags(input, with_seq);
-    u32 flags = input[BASE_FLAGS_KEY].get<u32>();
+    u32 flags = input[BASE_FLAGS_KEY].asUInt();
     if (flags & info_auto_routing_enable)
       onis::database::item::verify_integer_value(input, AR_ENABLE_KEY, false, 0,
                                                  1);
@@ -228,7 +228,7 @@ struct routing {
 
 struct routing_line {
   static void create(json& item, u32 flags) {
-    if (!item.is_object()) {
+    if (!item.isObject()) {
       throw std::invalid_argument("routing_line is not an object");
     }
     item.clear();

@@ -25,8 +25,16 @@ set(JSONCPP_ROOT "/opt/homebrew/opt/jsoncpp")
 set(JSONCPP_INCLUDE_DIRS "${JSONCPP_ROOT}/include")
 set(JSONCPP_LIBRARIES "${JSONCPP_ROOT}/lib/libjsoncpp.dylib")
 
-# Find nlohmann/json (installed via Homebrew)
-find_package(nlohmann_json REQUIRED)
+# Using JsonCPP only (required by Drogon)
+
+# Find OpenSSL (required by jwt-cpp)
+# Try Homebrew OpenSSL first (common on macOS)
+if(EXISTS "/opt/homebrew/opt/openssl")
+    set(OPENSSL_ROOT_DIR "/opt/homebrew/opt/openssl")
+elseif(EXISTS "/usr/local/opt/openssl")
+    set(OPENSSL_ROOT_DIR "/usr/local/opt/openssl")
+endif()
+find_package(OpenSSL REQUIRED)
 
 # Find jwt-cpp
 include(FetchContent)
@@ -88,7 +96,8 @@ target_link_libraries(onis_site_server PRIVATE
     pq
     ${DROGON_LIBRARIES}
     ${JSONCPP_LIBRARIES}
-    nlohmann_json::nlohmann_json
+    OpenSSL::SSL
+    OpenSSL::Crypto
     jwt-cpp::jwt-cpp
     # Add other libraries as needed:
     # ${DCMTK_LIBRARIES}

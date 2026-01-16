@@ -20,7 +20,7 @@ void site_database::find_permissions_items(json& output, u32 flags) {
   // Process result
   if (result->has_rows()) {
     while (auto row = result->get_next_row()) {
-      json item = json::object();
+      json item = Json::Value(Json::objectValue);
       onis::database::permission::create(item, flags);
       item[BASE_SEQ_KEY] = row->get_uuid("id", false, false);
       try {
@@ -28,7 +28,7 @@ void site_database::find_permissions_items(json& output, u32 flags) {
       } catch (const std::exception& e) {
         item[PM_TYPE_KEY] = row->get_int("type", false);
       }
-      output.push_back(std::move(item));
+      output.append(std::move(item));
     }
   }
 }

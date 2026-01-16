@@ -158,17 +158,17 @@ void site_database::find_user_for_session(const std::string& site_seq,
   read_user_record(*row, flags, true, nullptr, output);
 
   // verify the password:
-  std::string hashed_pwd = output[US_PASSWORD_KEY].get<std::string>();
+  std::string hashed_pwd = output[US_PASSWORD_KEY].asString();
   // if (!argon2_verify_password(password, hashed_pwd))
   // res.set(OSRSP_REFUSED, EOS_PERMISSION, "", OSFALSE);
 
-  if (output.contains(US_PASSWORD_KEY))
+  if (output.isMember(US_PASSWORD_KEY))
     output[US_PASSWORD_KEY] = "xxxxxxxxxx";
   if (flags & onis::database::info_user_permissions)
-    get_user_permissions(output[BASE_SEQ_KEY].get<std::string>(),
+    get_user_permissions(output[BASE_SEQ_KEY].asString(),
                          output[US_PERMISSION_KEY]);
   if (flags & onis::database::info_user_membership)
-    get_user_membership(output[BASE_SEQ_KEY].get<std::string>(),
+    get_user_membership(output[BASE_SEQ_KEY].asString(),
                         output[US_MEMBERSHIP_KEY]);
   /*if (flags & onis::server::info_user_partition_access &&
       res.status == OSRSP_SUCCESS)
@@ -198,10 +198,10 @@ void site_database::get_user_permissions(const std::string& seq, json& output) {
 
   // Process result
   while (auto row = result->get_next_row()) {
-    json permission = json::object();
+    json permission = Json::Value(Json::objectValue);
     permission["id"] = row->get_string("name", false, false);
     permission["value"] = row->get_int("value", false);
-    output.push_back(std::move(permission));
+    output.append(std::move(permission));
   }
 }
 
@@ -218,6 +218,6 @@ void site_database::get_user_membership(const std::string& seq, json& output) {
 
   // Process result
   while (auto row = result->get_next_row()) {
-    output.push_back(row->get_uuid("parent_id", false, false));
+    output.append(row->get_uuid("parent_id", false, false));
   }
 }

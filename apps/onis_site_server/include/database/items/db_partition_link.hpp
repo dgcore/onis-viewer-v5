@@ -2,7 +2,7 @@
 
 #include "db_item.hpp"
 
-using json = nlohmann::json;
+using json = Json::Value;
 
 #define PPL_ALBUM_KEY "album"
 #define PPL_PATIENT_KEY "patient"
@@ -33,7 +33,7 @@ namespace onis::database {
 
 struct partition_patient_link {
   static void create(json& link) {
-    if (!link.is_object()) {
+    if (!link.isObject()) {
       throw std::invalid_argument("partition_patient_link is not an object");
     }
     link.clear();
@@ -49,7 +49,7 @@ struct partition_patient_link {
 
 struct partition_study_link {
   static void create(json& link) {
-    if (!link.is_object()) {
+    if (!link.isObject()) {
       throw std::invalid_argument("partition_study_link is not an object");
     }
     link.clear();
@@ -68,7 +68,7 @@ struct partition_study_link {
 
 struct partition_series_link {
   static void create(json& link) {
-    if (!link.is_object()) {
+    if (!link.isObject()) {
       throw std::invalid_argument("partition_series_link is not an object");
     }
     link.clear();
@@ -82,7 +82,7 @@ struct partition_series_link {
 
 struct partition_image_link {
   static void create(json& link) {
-    if (!link.is_object()) {
+    if (!link.isObject()) {
       throw std::invalid_argument("partition_image_link is not an object");
     }
     link.clear();

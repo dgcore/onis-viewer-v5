@@ -3,7 +3,7 @@
 #include "./db_album.hpp"
 #include "./db_smart_album.hpp"
 
-using json = nlohmann::json;
+using json = Json::Value;
 
 #define PT_NAME_KEY "name"
 #define PT_DESC_KEY "desc"
@@ -52,7 +52,7 @@ const s32 info_partition_smart_albums = 256;
 
 struct album_access_item {
   static void create(json& album) {
-    if (!album.is_object()) {
+    if (!album.isObject()) {
       throw std::invalid_argument("album_access_item is not an object");
     }
     album.clear();
@@ -72,7 +72,7 @@ struct album_access_item {
 
 struct partition_access_item {
   static void create(json& partition) {
-    if (!partition.is_object()) {
+    if (!partition.isObject()) {
       throw std::invalid_argument("partition_access_item is not an object");
     }
     partition.clear();
@@ -80,7 +80,7 @@ struct partition_access_item {
     partition[PTAI_TYPE_KEY] = 0;
     partition[PTAI_MODE_KEY] = 0;
     partition[PTAI_PERMISSION_KEY] = 0;
-    partition[PTAI_ALBUMS_KEY] = json::array();
+    partition[PTAI_ALBUMS_KEY] = Json::Value(Json::arrayValue);
   }
 
   static void verify(const json& input) {
@@ -93,7 +93,7 @@ struct partition_access_item {
     onis::database::item::verify_array_value(input, PTAI_ALBUMS_KEY, false);
     for (const auto& album : input[PTAI_ALBUMS_KEY])
       album_access_item::verify(album);
-    s32 value = input[PTAI_MODE_KEY].get<s32>();
+    s32 value = input[PTAI_MODE_KEY].asInt();
     if (value != 256) {
       value &= ~2;
       value &= ~4;
@@ -112,14 +112,14 @@ struct partition_access {
   static const s32 limited_access = 256;
 
   static void create(json& access) {
-    if (!access.is_object()) {
+    if (!access.isObject()) {
       throw std::invalid_argument("partition_access is not an object");
     }
     access.clear();
     access[PTA_ACTIVE_KEY] = 1;
     access[PTA_INHERIT_KEY] = 0;
     access[PTA_MODE_KEY] = 0;
-    access[PTA_PARTITIONS_KEY] = json::array();
+    access[PTA_PARTITIONS_KEY] = Json::Value(Json::arrayValue);
   }
 
   static void verify(const json& input) {
@@ -131,7 +131,7 @@ struct partition_access {
     onis::database::item::verify_array_value(input, PTA_PARTITIONS_KEY, false);
     for (const auto& partition : input[PTA_PARTITIONS_KEY])
       partition_access_item::verify(partition);
-    s32 value = input[PTA_MODE_KEY].get<s32>();
+    s32 value = input[PTA_MODE_KEY].asInt();
     if (value != 256) {
       value &= ~partition_access::all_partitions;
       value &= ~partition_access::all_albums;
@@ -159,7 +159,7 @@ struct partition {
   static const s32 conflict_study_desc = 64;
 
   static void create(json& partition, u32 flags) {
-    if (!partition.is_object()) {
+    if (!partition.isObject()) {
       throw std::invalid_argument("partition is not an object");
     }
     partition.clear();
@@ -175,7 +175,7 @@ struct partition {
       if (flags & info_partition_status)
         partition[PT_STATUS_KEY] = 0;
       if (flags & info_partition_parameters) {
-        json param(json::object());
+        json param(Json::objectValue);
         param[PT_OVERWRITE_MODE_KEY] = no_overwrite_failure;
         param[PT_PID_MODE_KEY] = 0;
         param[PT_DEF_PID_KEY] = "Default";
@@ -185,22 +185,22 @@ struct partition {
         param[PT_RQ_LIMIT] = 500;
         param[PT_RQ_REJECT] = 1;
         param[PT_STREAM_DATA] = 0;
-        partition[PT_PARAM_KEY] = param.dump();
+        partition[PT_PARAM_KEY] = onis::database::json_to_string(param);
       }
       if (flags & info_partition_volume)
         partition[PT_VOLUME_KEY] = "";
       if (flags & info_partition_conflict)
         partition[PT_HAVE_CONFLICT_KEY] = 0;
       if (flags & info_partition_albums)
-        partition[PT_ALBUMS_KEY] = json::array();
+        partition[PT_ALBUMS_KEY] = Json::Value(Json::arrayValue);
       if (flags & info_partition_smart_albums)
-        partition[PT_SMART_ALBUMS_KEY] = json::array();
+        partition[PT_SMART_ALBUMS_KEY] = Json::Value(Json::arrayValue);
     }
   }
 
   static void verify(const json& input, bool with_seq) {
     onis::database::item::verify_seq_version_flags(input, with_seq);
-    u32 flags = input[BASE_FLAGS_KEY].get<u32>();
+    u32 flags = input[BASE_FLAGS_KEY].asUInt();
     if (flags & info_partition_name)
       onis::database::item::verify_string_value(input, PT_NAME_KEY, false,
                                                 false, 64);
@@ -216,13 +216,16 @@ struct partition {
                                                 false);
       json param;
       try {
-        param = json::parse(input[PT_PARAM_KEY].get<std::string>());
+        Json::Reader reader;
+        if (!reader.parse(input[PT_PARAM_KEY].asString(), param)) {
+          throw std::invalid_argument("Invalid param format");
+        }
       } catch (...) {
         throw std::invalid_argument("Invalid parameters for partition.");
       }
       onis::database::item::verify_integer_value(param, PT_OVERWRITE_MODE_KEY,
                                                  false, 0, 1);
-      s32 value = param[PT_OVERWRITE_MODE_KEY].get<s32>();
+      s32 value = param[PT_OVERWRITE_MODE_KEY].asInt();
       if (value != no_overwrite_failure && value != no_overwrite_success) {
         throw std::invalid_argument("Invalid overwrite mode for partition.");
       }
@@ -232,13 +235,13 @@ struct partition {
                                                 true, 64);
       onis::database::item::verify_integer_value(param, PT_CONFLICT_MODE_KEY,
                                                  false, 0, 2);
-      value = param[PT_CONFLICT_MODE_KEY].get<s32>();
+      value = param[PT_CONFLICT_MODE_KEY].asInt();
       if (value != reject_if_conflict && value != send_to_conflict_list) {
         throw std::invalid_argument("Invalid conflict mode for partition.");
       }
       onis::database::item::verify_integer_value(
           param, PT_CONFLICT_CRITERIA_KEY, false, 0);
-      value = param[PT_CONFLICT_CRITERIA_KEY].get<s32>();
+      value = param[PT_CONFLICT_CRITERIA_KEY].asInt();
       value &= ~conflict_patient_name;
       value &= ~conflict_patient_birthdate;
       value &= ~conflict_patient_sex;

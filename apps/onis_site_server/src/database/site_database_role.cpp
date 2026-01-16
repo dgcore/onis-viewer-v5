@@ -95,10 +95,10 @@ void site_database::find_role_by_seq(const std::string& seq, u32 flags,
       // TODO: Implement permissions, membership, partition access, and dicom
       // access
       if (flags & onis::database::info_role_permissions)
-        get_role_permissions(output[BASE_SEQ_KEY].get<std::string>(),
+        get_role_permissions(output[BASE_SEQ_KEY].asString(),
                              output[RO_PERMISSION_KEY]);
       if (flags & onis::database::info_role_membership)
-        get_role_membership(output[BASE_SEQ_KEY].get<std::string>(),
+        get_role_membership(output[BASE_SEQ_KEY].asString(),
                             output[RO_MEMBERSHIP_KEY]);
       /*if (flags & onis::database::info_role_partition_access)
         find_partition_access(OSTRUE, output[BASE_SEQ_KEY].asString(),
@@ -143,15 +143,15 @@ void site_database::find_roles_for_site(const std::string& site_seq, u32 flags,
   // Process result
   if (result->has_rows()) {
     while (auto row = result->get_next_row()) {
-      json item = json::object();
+      json item = Json::Value(Json::objectValue);
       read_role_record(*row, flags, nullptr, item);
       // TODO: Implement permissions, membership, partition access, and dicom
       // access
       if (flags & onis::database::info_role_permissions)
-        get_role_permissions(item[BASE_SEQ_KEY].get<std::string>(),
+        get_role_permissions(item[BASE_SEQ_KEY].asString(),
                              item[RO_PERMISSION_KEY]);
       if (flags & onis::database::info_role_membership)
-        get_role_membership(item[BASE_SEQ_KEY].get<std::string>(),
+        get_role_membership(item[BASE_SEQ_KEY].asString(),
                             item[RO_MEMBERSHIP_KEY]);
       /*if (flags & onis::database::info_role_partition_access)
         find_partition_access(OSTRUE, item[BASE_SEQ_KEY].asString(),
@@ -161,7 +161,7 @@ void site_database::find_roles_for_site(const std::string& site_seq, u32 flags,
         find_dicom_access(OSTRUE, item[BASE_SEQ_KEY].asString(),
                           onis::db::nolock, item[RO_DICOM_ACCESS_KEY], NULL,
                           OSTRUE);*/
-      output.push_back(std::move(item));
+      output.append(std::move(item));
     }
   }
 }
@@ -172,7 +172,7 @@ void site_database::find_roles_for_site(const std::string& site_seq, u32 flags,
 
 void site_database::create_role(const std::string& site_seq, const json& input,
                                 json& output, u32 out_flags) {
-  u32 in_flags = input[BASE_FLAGS_KEY].get<u32>();
+  u32 in_flags = input[BASE_FLAGS_KEY].asUInt();
   std::string seq = dgc::util::uuid::generate_random_uuid();
   std::string sql = "INSERT INTO pacs_roles (id, site_id";
   if (in_flags & onis::database::info_role_name)
@@ -211,18 +211,17 @@ void site_database::create_role(const std::string& site_seq, const json& input,
   bind_parameter(query, index, seq, "seq");
   bind_parameter(query, index, site_seq, "site_seq");
   if (in_flags & onis::database::info_role_name)
-    bind_parameter(query, index, input[RO_NAME_KEY].get<std::string>(), "name");
+    bind_parameter(query, index, input[RO_NAME_KEY].asString(), "name");
   if (in_flags & onis::database::info_role_active)
-    bind_parameter(query, index, input[RO_ACTIVE_KEY].get<int>(), "active");
+    bind_parameter(query, index, input[RO_ACTIVE_KEY].asInt(), "active");
   if (in_flags & onis::database::info_role_inherit)
-    bind_parameter(query, index, input[RO_INHERIT_KEY].get<int>(), "inherit");
+    bind_parameter(query, index, input[RO_INHERIT_KEY].asInt(), "inherit");
   if (in_flags & onis::database::info_role_description)
-    bind_parameter(query, index, input[RO_DESC_KEY].get<std::string>(),
-                   "description");
+    bind_parameter(query, index, input[RO_DESC_KEY].asString(), "description");
   if (in_flags & onis::database::info_role_pref_set) {
-    bind_parameter(query, index, input[RO_PREFSET_INHERIT_KEY].get<int>(),
+    bind_parameter(query, index, input[RO_PREFSET_INHERIT_KEY].asInt(),
                    "inherit_pref");
-    bind_parameter(query, index, input[RO_PREFSET_ID_KEY].get<std::string>(),
+    bind_parameter(query, index, input[RO_PREFSET_ID_KEY].asString(),
                    "pref_id");
   }
 
@@ -239,7 +238,7 @@ void site_database::modify_role(const json& role) {
   // construct the sql command:
   std::string sql = "UPDATE pacs_roles SET ";
   std::string values;
-  u32 flags = role[BASE_FLAGS_KEY].get<u32>();
+  u32 flags = role[BASE_FLAGS_KEY].asUInt();
   if (flags & onis::database::info_role_name)
     values += ", name=?";
   if (flags & onis::database::info_role_description)
@@ -259,26 +258,24 @@ void site_database::modify_role(const json& role) {
 
     s32 index = 1;
     if (flags & onis::database::info_role_name) {
-      bind_parameter(query, index, role[RO_NAME_KEY].get<std::string>(),
-                     "name");
+      bind_parameter(query, index, role[RO_NAME_KEY].asString(), "name");
     }
     if (flags & onis::database::info_role_description) {
-      bind_parameter(query, index, role[RO_DESC_KEY].get<std::string>(),
-                     "description");
+      bind_parameter(query, index, role[RO_DESC_KEY].asString(), "description");
     }
     if (flags & onis::database::info_role_active) {
-      bind_parameter(query, index, role[RO_ACTIVE_KEY].get<int>(), "active");
+      bind_parameter(query, index, role[RO_ACTIVE_KEY].asInt(), "active");
     }
     if (flags & onis::database::info_role_inherit) {
-      bind_parameter(query, index, role[RO_INHERIT_KEY].get<int>(), "inherit");
+      bind_parameter(query, index, role[RO_INHERIT_KEY].asInt(), "inherit");
     }
     if (flags & onis::database::info_role_pref_set) {
-      bind_parameter(query, index, role[RO_PREFSET_INHERIT_KEY].get<int>(),
+      bind_parameter(query, index, role[RO_PREFSET_INHERIT_KEY].asInt(),
                      "inherit_pref");
-      bind_parameter(query, index, role[RO_PREFSET_ID_KEY].get<std::string>(),
+      bind_parameter(query, index, role[RO_PREFSET_ID_KEY].asString(),
                      "pref_id");
     }
-    bind_parameter(query, index, role[BASE_SEQ_KEY].get<std::string>(), "seq");
+    bind_parameter(query, index, role[BASE_SEQ_KEY].asString(), "seq");
 
     // Execute query and check if any rows were affected
     execute_and_check_affected(query, "Role not found");
@@ -286,12 +283,14 @@ void site_database::modify_role(const json& role) {
 
   // update the permissions:
   if (flags & onis::database::info_role_permissions) {
-    for (const auto& permission : role[RO_PERMISSION_KEY]) {
-      std::string name = permission["id"].get<std::string>();
-      s32 value = permission["value"].get<int>();
+    const auto& permissions = role[RO_PERMISSION_KEY];
+    for (Json::ArrayIndex i = 0; i < permissions.size(); ++i) {
+      const auto& permission = permissions[i];
+      std::string name = permission["id"].asString();
+      s32 value = permission["value"].asInt();
       std::string perm_seq = find_role_permission_seq(name);
-      modify_role_permission_value(role[BASE_SEQ_KEY].get<std::string>(),
-                                   perm_seq, value, true);
+      modify_role_permission_value(role[BASE_SEQ_KEY].asString(), perm_seq,
+                                   value, true);
     }
   }
 
@@ -300,12 +299,14 @@ void site_database::modify_role(const json& role) {
     // remove all existing membership:
     std::string sql = "DELETE FROM pacs_role_membership WHERE role_id=?";
     auto query = prepare_query(sql, "delete_role_membership");
-    query->bind_parameter(1, role[BASE_SEQ_KEY].get<std::string>());
+    query->bind_parameter(1, role[BASE_SEQ_KEY].asString());
     execute_query(query);
 
     // insert the membership one by one:
-    for (const std::string parent_id : role[RO_MEMBERSHIP_KEY]) {
-      std::string child_id = role[BASE_SEQ_KEY].get<std::string>();
+    const auto& membership = role[RO_MEMBERSHIP_KEY];
+    for (Json::ArrayIndex i = 0; i < membership.size(); ++i) {
+      std::string parent_id = membership[i].asString();
+      std::string child_id = role[BASE_SEQ_KEY].asString();
       check_circular_membership(parent_id, child_id);
 
       // insert the membership:
@@ -378,10 +379,10 @@ void site_database::get_role_permissions(const std::string& seq, json& output) {
 
   // Process result
   while (auto row = result->get_next_row()) {
-    json permission = json::object();
+    json permission = Json::Value(Json::objectValue);
     permission["id"] = row->get_string("name", false, false);
     permission["value"] = row->get_int("value", false);
-    output.push_back(std::move(permission));
+    output.append(std::move(permission));
   }
 }
 
@@ -470,7 +471,7 @@ void site_database::get_role_membership(const std::string& seq, json& output) {
 
   // Process result
   while (auto row = result->get_next_row()) {
-    output.push_back(row->get_uuid("PARENT_ID", false, false));
+    output.append(row->get_uuid("PARENT_ID", false, false));
   }
 }
 

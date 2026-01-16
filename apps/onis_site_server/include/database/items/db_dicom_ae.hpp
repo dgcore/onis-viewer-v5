@@ -3,7 +3,7 @@
 #include "../../../libs/onis_kit/include/utilities/regex.hpp"
 #include "db_dicom_client.hpp"
 
-using json = nlohmann::json;
+using json = Json::Value;
 
 #define DCMAE_TITLE_KEY "ae"
 #define DCMAE_STATUS_KEY "status"
@@ -23,7 +23,7 @@ const s32 ae_type_local = 0;
 
 struct dicom_ae {
   static void create(json& ae, u32 flags) {
-    if (!ae.is_object()) {
+    if (!ae.isObject()) {
       throw std::invalid_argument("dicom_ae is not an object");
     }
     ae.clear();

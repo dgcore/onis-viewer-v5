@@ -2,7 +2,7 @@
 
 #include "db_item.hpp"
 
-using json = nlohmann::json;
+using json = Json::Value;
 
 #define SA_NAME_KEY "name"
 #define SA_DESC_KEY "desc"
@@ -31,7 +31,7 @@ struct smart_album {
   const s32 cp_less_or_equal = 7;
 
   static void create(json& album, u32 flags) {
-    if (!album.is_object()) {
+    if (!album.isObject()) {
       throw std::invalid_argument("smart_album is not an object");
     }
     album.clear();
@@ -46,16 +46,16 @@ struct smart_album {
       if (flags & info_smart_album_status)
         album[SA_STATUS_KEY] = "";
       if (flags & info_smart_album_criteria) {
-        json param = json::object();
-        album[SA_CRITERIA_KEY] = param.dump();
+        json param = Json::Value(Json::objectValue);
+        album[SA_CRITERIA_KEY] = onis::database::json_to_string(param);
       }
     }
   }
 
   static void verify_criteria_group(const json& input) {
     onis::database::item::verify_integer_value(input, "op", false);
-    bool have_groups = input.contains("groups");
-    bool have_criteria = input.contains("criteria");
+    bool have_groups = input.isMember("groups");
+    bool have_criteria = input.isMember("criteria");
     if ((have_groups && have_criteria)) {
       throw std::invalid_argument(
           "Smart album criteria group and criteria cannot be used together");
@@ -82,7 +82,7 @@ struct smart_album {
 
   static void verify(const json& input, bool with_seq, u32 must_flags) {
     onis::database::item::verify_seq_version_flags(input, with_seq);
-    u32 flags = input[BASE_FLAGS_KEY].get<u32>();
+    u32 flags = input[BASE_FLAGS_KEY].asUInt();
     onis::database::item::check_must_flags(flags, must_flags);
     if (flags & info_smart_album_name)
       onis::database::item::verify_string_value(input, SA_NAME_KEY, false,
@@ -96,12 +96,11 @@ struct smart_album {
     if (flags & info_smart_album_criteria) {
       onis::database::item::verify_string_value(input, SA_CRITERIA_KEY, false,
                                                 true);
-      const std::string& value = input[SA_CRITERIA_KEY].get<std::string>();
+      const std::string& value = input[SA_CRITERIA_KEY].asString();
       if (value.length()) {
         json criteria;
-        try {
-          criteria = json::parse(value);
-        } catch (...) {
+        Json::Reader reader;
+        if (!reader.parse(value, criteria)) {
           throw std::invalid_argument("Invalid criteria format");
         }
         verify_criteria_group(criteria);

@@ -2,7 +2,7 @@
 
 #include "db_item.hpp"
 
-using json = nlohmann::json;
+using json = Json::Value;
 
 #define CP_ENABLE_KEY "enable"
 #define CP_UPDATE_KEY "update"
@@ -20,7 +20,7 @@ const s32 info_compression_update = 16;
 
 struct compression {
   static void create(json& compression, u32 flags) {
-    if (!compression.is_object()) {
+    if (!compression.isObject()) {
       throw std::invalid_argument("compression is not an object");
     }
     compression.clear();
@@ -42,7 +42,7 @@ struct compression {
 
   static void verify(const json& input, bool with_seq) {
     onis::database::item::verify_seq_version_flags(input, with_seq);
-    u32 flags = input[BASE_FLAGS_KEY].get<u32>();
+    u32 flags = input[BASE_FLAGS_KEY].asUInt();
     if (flags & info_compression_enable)
       onis::database::item::verify_integer_value(input, CP_ENABLE_KEY, false, 0,
                                                  1);

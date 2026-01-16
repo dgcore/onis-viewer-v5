@@ -2,7 +2,7 @@
 
 #include "db_item.hpp"
 
-using json = nlohmann::json;
+using json = Json::Value;
 
 #define DCMCLT_STATUS_KEY "status"
 #define DCMCLT_AE_KEY "ae"
@@ -42,7 +42,7 @@ const s32 info_dicom_client_status = 1024;
 
 struct dicom_client {
   static void create(json& client, u32 flags) {
-    if (!client.is_object()) {
+    if (!client.isObject()) {
       throw std::invalid_argument("dicom_client is not an object");
     }
     client.clear();
@@ -78,7 +78,7 @@ struct dicom_client {
 
   static void verify(const json& input, bool with_seq, u32 must_flags) {
     onis::database::item::verify_seq_version_flags(input, with_seq);
-    u32 flags = input[BASE_FLAGS_KEY].get<u32>();
+    u32 flags = input[BASE_FLAGS_KEY].asUInt();
     onis::database::item::check_must_flags(flags, must_flags);
 
     if (flags & info_dicom_client_status)

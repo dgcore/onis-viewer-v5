@@ -3,7 +3,7 @@
 #include "./db_dicom_access.hpp"
 #include "./db_partition.hpp"
 
-using json = nlohmann::json;
+using json = Json::Value;
 
 #define RO_NAME_KEY "name"
 #define RO_DESC_KEY "desc"
@@ -30,7 +30,7 @@ const s32 info_role_pref_set = 512;
 
 struct role {
   static void create(json& item, u32 flags) {
-    if (!item.is_object()) {
+    if (!item.isObject()) {
       throw std::invalid_argument("role is not an object");
     }
     item.clear();
@@ -42,19 +42,19 @@ struct role {
     if (flags & info_role_description)
       item[RO_DESC_KEY] = "";
     if (flags & info_role_permissions)
-      item[RO_PERMISSION_KEY] = json::array();
+      item[RO_PERMISSION_KEY] = Json::Value(Json::arrayValue);
     if (flags & info_role_active)
       item[RO_ACTIVE_KEY] = 0;
     if (flags & info_role_inherit)
       item[RO_INHERIT_KEY] = 0;
     if (flags & info_role_membership)
-      item[RO_MEMBERSHIP_KEY] = json::array();
+      item[RO_MEMBERSHIP_KEY] = Json::Value(Json::arrayValue);
     if (flags & info_role_partition_access) {
-      item[RO_PARTITION_ACCESS_KEY] = json::object();
+      item[RO_PARTITION_ACCESS_KEY] = Json::Value(Json::objectValue);
       onis::database::partition_access::create(item[RO_PARTITION_ACCESS_KEY]);
     }
     if (flags & info_role_dicom_access) {
-      item[RO_DICOM_ACCESS_KEY] = json::object();
+      item[RO_DICOM_ACCESS_KEY] = Json::Value(Json::objectValue);
       onis::database::dicom_access::create(item[RO_DICOM_ACCESS_KEY]);
     }
     if (flags & info_role_pref_set) {
@@ -65,7 +65,7 @@ struct role {
 
   static void verify(const json& input, bool with_seq, u32 must_flags) {
     onis::database::item::verify_seq_version_flags(input, with_seq);
-    u32 flags = input[BASE_FLAGS_KEY].get<u32>();
+    u32 flags = input[BASE_FLAGS_KEY].asUInt();
     onis::database::item::check_must_flags(flags, must_flags);
     if (flags & info_role_name)
       onis::database::item::verify_string_value(input, RO_NAME_KEY, false,

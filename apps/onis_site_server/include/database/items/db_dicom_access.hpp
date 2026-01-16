@@ -2,7 +2,7 @@
 
 #include "db_item.hpp"
 
-using json = nlohmann::json;
+using json = Json::Value;
 
 #define DA_ACTIVE_KEY "active"
 #define DA_INHERIT_KEY "inherit"
@@ -16,14 +16,14 @@ struct dicom_access {
   static const s32 limited_access = 256;
 
   static void create(json& access) {
-    if (!access.is_object()) {
+    if (!access.isObject()) {
       throw std::invalid_argument("dicom_access is not an object");
     }
     access.clear();
     access[DA_ACTIVE_KEY] = 1;
     access[DA_INHERIT_KEY] = 0;
     access[DA_MODE_KEY] = 0;
-    access[DA_CLIENTS_KEY] = json::array();
+    access[DA_CLIENTS_KEY] = Json::Value(Json::arrayValue);
   }
 
   static void verify(const json& input) {
@@ -33,7 +33,7 @@ struct dicom_access {
                                                1);
     onis::database::item::verify_integer_value(input, DA_MODE_KEY, false, 0,
                                                256);
-    u32 mode = input[DA_MODE_KEY].get<u32>();
+    u32 mode = input[DA_MODE_KEY].asUInt();
     if (mode != 256) {
       mode &= ~all_clients;
       mode &= ~limited_access;

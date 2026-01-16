@@ -1,7 +1,7 @@
 #pragma once
 
+#include <json/json.h>
 #include <memory>
-#include <nlohmann/json.hpp>
 #include <optional>
 #include <string>
 #include <vector>
@@ -10,7 +10,7 @@
 #include "sql_builder.hpp"
 
 using namespace dgc;
-using json = nlohmann::json;
+using json = Json::Value;
 using onis::database::lock_mode;
 
 class site_database {

@@ -2,7 +2,7 @@
 
 #include "./db_item.hpp"
 
-using json = nlohmann::json;
+using json = Json::Value;
 
 #define PA_SEQ_KEY "seq"
 #define PA_UID_KEY "uid"
@@ -37,7 +37,7 @@ const s32 info_patient_creation = 64;
 
 struct patient {
   static void create(json& patient, u32 flags, bool for_client) {
-    if (!patient.is_object()) {
+    if (!patient.isObject()) {
       throw std::invalid_argument("patient is not an object");
     }
     patient.clear();
@@ -80,7 +80,7 @@ struct patient {
 
   static void verify(const json& input, bool with_seq, bool for_client) {
     onis::database::item::verify_seq_version_flags(input, with_seq);
-    u32 flags = input[BASE_FLAGS_KEY].get<u32>();
+    u32 flags = input[BASE_FLAGS_KEY].asUInt();
     if (flags & info_patient_charset)
       onis::database::item::verify_string_value(input, PA_CHARSET_KEY, true,
                                                 true, 255);
@@ -130,42 +130,42 @@ struct patient {
 static void
 copy(const json& input, u32 flags, bool for_client, json& output) {
   create(output, flags, for_client);
-  output[BASE_UID_KEY] = input[BASE_UID_KEY].get<std::string>();
-  u32 input_flags = input[BASE_FLAGS_KEY].get<u32>();
+  output[BASE_UID_KEY] = input[BASE_UID_KEY].asString();
+  u32 input_flags = input[BASE_FLAGS_KEY].asUInt();
 
   if (flags & info_patient_charset) {
     if ((input_flags & info_patient_charset) == 0)
       throw std::invalid_argument("input_flags & info_patient_charset == 0");
-    output[PA_CHARSET_KEY] = input[PA_CHARSET_KEY].get<std::string>();
+    output[PA_CHARSET_KEY] = input[PA_CHARSET_KEY].asString();
   }
 
   if (flags & info_patient_name) {
     if ((input_flags & info_patient_name) == 0)
       throw std::invalid_argument("input_flags & info_patient_name == 0");
-    output[PA_NAME_KEY] = input[PA_NAME_KEY].get<std::string>();
-    output[PA_IDEOGRAM_KEY] = input[PA_IDEOGRAM_KEY].get<std::string>();
-    output[PA_PHONETIC_KEY] = input[PA_PHONETIC_KEY].get<std::string>();
+    output[PA_NAME_KEY] = input[PA_NAME_KEY].asString();
+    output[PA_IDEOGRAM_KEY] = input[PA_IDEOGRAM_KEY].asString();
+    output[PA_PHONETIC_KEY] = input[PA_PHONETIC_KEY].asString();
   }
 
   if (flags & info_patient_birthdate) {
     if ((input_flags & info_patient_birthdate) == 0)
       throw std::invalid_argument("input_flags & info_patient_birthdate == 0");
-    output[PA_BDATE_KEY] = input[PA_BDATE_KEY].get<std::string>();
-    output[PA_BTIME_KEY] = input[PA_BTIME_KEY].get<std::string>();
+    output[PA_BDATE_KEY] = input[PA_BDATE_KEY].asString();
+    output[PA_BTIME_KEY] = input[PA_BTIME_KEY].asString();
   }
 
   if (flags & info_patient_sex) {
     if ((input_flags & info_patient_sex) == 0)
       throw std::invalid_argument("input_flags & info_patient_sex == 0");
-    output[PA_SEX_KEY] = input[PA_SEX_KEY].get<std::string>();
+    output[PA_SEX_KEY] = input[PA_SEX_KEY].asString();
   }
 
   if (flags & info_patient_statistics) {
     if ((input_flags & info_patient_statistics) == 0)
       throw std::invalid_argument("input_flags & info_patient_statistics == 0");
-    output[PA_STCNT_KEY] = input[PA_STCNT_KEY].get<s32>();
-    output[PA_SRCNT_KEY] = input[PA_SRCNT_KEY].get<s32>();
-    output[PA_IMCNT_KEY] = input[PA_IMCNT_KEY].get<s32>();
+    output[PA_STCNT_KEY] = input[PA_STCNT_KEY].asInt();
+    output[PA_SRCNT_KEY] = input[PA_SRCNT_KEY].asInt();
+    output[PA_IMCNT_KEY] = input[PA_IMCNT_KEY].asInt();
   }
 
   if (flags & info_patient_status) {

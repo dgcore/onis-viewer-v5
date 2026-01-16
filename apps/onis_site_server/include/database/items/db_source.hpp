@@ -2,7 +2,7 @@
 
 #include "db_item.hpp"
 
-using json = nlohmann::json;
+using json = Json::Value;
 
 #define SO_NAME_KEY "name"
 #define SO_SOURCE_ID_KEY "source_id"
@@ -27,7 +27,7 @@ static const s32 type_smart_album = 6;
 
 struct source {
   static void create(json& item, u32 flags) {
-    if (!item.is_object()) {
+    if (!item.isObject()) {
       throw std::invalid_argument("source is not an object");
     }
     item.clear();
@@ -46,7 +46,7 @@ struct source {
 
   static void verify(const json& input, bool with_seq) {
     onis::database::item::verify_seq_version_flags(input, with_seq);
-    u32 flags = input[BASE_FLAGS_KEY].get<u32>();
+    u32 flags = input[BASE_FLAGS_KEY].asUInt();
     if (flags != 0) {
       onis::database::item::verify_string_value(input, SO_NAME_KEY, false,
                                                 false, 64);

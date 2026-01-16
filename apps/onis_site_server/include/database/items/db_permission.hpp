@@ -2,7 +2,7 @@
 
 #include "db_item.hpp"
 
-using json = nlohmann::json;
+using json = Json::Value;
 
 #define PM_NAME_KEY "name"
 #define PM_TYPE_KEY "type"
@@ -14,7 +14,7 @@ const s32 info_permission_type = 4;
 
 struct permission {
   static void create(json& item, u32 flags) {
-    if (!item.is_object()) {
+    if (!item.isObject()) {
       throw std::invalid_argument("permission is not an object");
     }
     item.clear();
@@ -30,7 +30,7 @@ struct permission {
 
 static void verify(const json& input, bool with_seq) {
   onis::database::item::verify_seq_version_flags(input, with_seq);
-  u32 flags = input[BASE_FLAGS_KEY].get<u32>();
+  u32 flags = input[BASE_FLAGS_KEY].asUInt();
   if (flags & info_permission_name)
     onis::database::item::verify_string_value(input, PM_NAME_KEY, false, false,
                                               64);
