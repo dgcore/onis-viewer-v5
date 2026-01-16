@@ -41,10 +41,10 @@ void site_database::read_media_record(onis_kit::database::database_row& rec,
     output[ME_PATH_KEY] = rec.get_string(ME_PATH_KEY);
     output[ME_RATIO_KEY] = rec.get_double(ME_RATIO_KEY);
     output[ME_STATUS_KEY] = rec.get_int(ME_STATUS_KEY);
-    folder = output[ME_PATH_KEY].get<std::string>();
-    ratio = output[ME_RATIO_KEY].get<double>();
+    folder = output[ME_PATH_KEY].asString();
+    ratio = output[ME_RATIO_KEY].asDouble();
   } else if (flags & onis::database::info_media_statistics) {
-    json tmp(json::object());
+    json tmp(Json::Value(Json::objectValue));
     folder = rec.get_string(ME_PATH_KEY);
     ratio = rec.get_double(ME_RATIO_KEY);
   }
@@ -101,9 +101,9 @@ void site_database::get_volume_media_list(const std::string& volume_seq,
   // Process result
   if (result->has_rows()) {
     while (auto row = result->get_next_row()) {
-      json media = json::object();
+      json media = Json::Value(Json::objectValue);
       read_media_record(*row, flags, nullptr, nullptr, media);
-      output.push_back(std::move(media));
+      output.append(std::move(media));
     }
   }
 }

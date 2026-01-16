@@ -2,7 +2,7 @@
 
 #include "db_item.hpp"
 
-using json = nlohmann::json;
+using json = Json::Value;
 
 #define RPT_STATUS_KEY "status"
 #define RPT_READING_DOC_KEY "rdoc"
@@ -32,7 +32,7 @@ const s32 info_report_update = 512;
 
 struct report {
   static void create(json& item, u32 flags) {
-    if (!item.is_object()) {
+    if (!item.isObject()) {
       throw std::invalid_argument("report is not an object");
     }
     item.clear();
@@ -69,7 +69,7 @@ struct report {
 
 static void verify(const json& input, bool with_seq, u32 must_flags) {
   onis::database::item::verify_seq_version_flags(input, with_seq);
-  u32 flags = input[BASE_FLAGS_KEY].get<u32>();
+  u32 flags = input[BASE_FLAGS_KEY].asUInt();
   onis::server::item::check_must_flags(flags, must_flags, res);
 
   if (flags & info_report_status)

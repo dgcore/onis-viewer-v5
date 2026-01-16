@@ -2,7 +2,7 @@
 
 #include "db_item.hpp"
 
-using json = nlohmann::json;
+using json = Json::Value;
 
 #define PFI_NAME_KEY "name"
 #define PFI_DESC_KEY "desc"
@@ -22,7 +22,7 @@ const s32 info_pref_item_data = 16;
 
 struct preference_item {
   static void create(json& item, u32 flags) {
-    if (!item.is_object()) {
+    if (!item.isObject()) {
       throw std::invalid_argument("preference_item is not an object");
     }
     item.clear();
@@ -49,7 +49,7 @@ struct preference_item {
 
 static void verify(const json& input, bool with_seq) {
   onis::database::item::verify_seq_version_flags(input, with_seq);
-  u32 flags = input[BASE_FLAGS_KEY].get<u32>();
+  u32 flags = input[BASE_FLAGS_KEY].asUInt();
 
   onis::database::item::check_must_flags(flags, must_flags, res);
   onis::database::item::verify_string_value(input, PFI_TYPE_KEY, false, false);

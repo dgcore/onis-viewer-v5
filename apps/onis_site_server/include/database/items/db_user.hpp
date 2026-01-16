@@ -3,7 +3,7 @@
 #include "db_dicom_access.hpp"
 #include "db_partition.hpp"
 
-using json = nlohmann::json;
+using json = Json::Value;
 
 #define US_LOGIN_KEY "login"
 #define US_ACTIVE_KEY "active"
@@ -50,7 +50,7 @@ const s32 info_user_pref_set = 32768;
 
 struct user {
   static void create(json& item, u32 flags) {
-    if (!item.is_object()) {
+    if (!item.isObject()) {
       throw std::invalid_argument("user is not an object");
     }
     item[BASE_SEQ_KEY] = "";
@@ -87,17 +87,17 @@ struct user {
       item[US_FAX_KEY] = "";
     }
     if (flags & info_user_permissions)
-      item[US_PERMISSION_KEY] = json::array();
+      item[US_PERMISSION_KEY] = Json::Value(Json::arrayValue);
     if (flags & info_user_membership)
-      item[US_MEMBERSHIP_KEY] = json::array();
+      item[US_MEMBERSHIP_KEY] = Json::Value(Json::arrayValue);
 
     if (flags & info_user_partition_access) {
-      item[US_PARTITION_ACCESS_KEY] = json::object();
+      item[US_PARTITION_ACCESS_KEY] = Json::Value(Json::objectValue);
       onis::database::partition_access::create(item[US_PARTITION_ACCESS_KEY]);
     }
 
     if (flags & info_user_dicom_access) {
-      item[US_DICOM_ACCESS_KEY] = json::object();
+      item[US_DICOM_ACCESS_KEY] = Json::Value(Json::objectValue);
       onis::database::dicom_access::create(item[US_DICOM_ACCESS_KEY]);
     }
     if (flags & info_user_pref_set) {
@@ -109,7 +109,7 @@ struct user {
 
   static void verify(const json& input, bool with_seq, u32 must_flags) {
     onis::database::item::verify_seq_version_flags(input, with_seq);
-    u32 flags = input[BASE_FLAGS_KEY].get<u32>();
+    u32 flags = input[BASE_FLAGS_KEY].asUInt();
     onis::database::item::check_must_flags(flags, must_flags);
 
     if (flags & info_user_login)

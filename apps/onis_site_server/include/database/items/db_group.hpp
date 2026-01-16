@@ -2,7 +2,7 @@
 
 #include "db_item.hpp"
 
-using json = nlohmann::json;
+using json = Json::Value;
 
 #define GR_NAME_KEY "name"
 #define GR_DESC_KEY "desc"
@@ -22,7 +22,7 @@ const s32 info_user_group_partition = 128;
 
 struct group {
   static void create(json& item, u32 flags) {
-    if (!item.is_object()) {
+    if (!item.isObject()) {
       throw std::invalid_argument("group is not an object");
     }
     item.clear();
@@ -37,7 +37,7 @@ struct group {
       item[GR_STATUS_KEY] = 0;
     if (flags & info_user_group_partition) {
       item[GR_PARTITION_MODE_KEY] = 0;
-      item[GR_PARTITION_LIST_KEY] = json::array();
+      item[GR_PARTITION_LIST_KEY] = Json::Value(Json::arrayValue);
     }
     if (flags & info_user_group_role) {
       item[GR_ROLE_MODE_KEY] = 0;
@@ -47,7 +47,7 @@ struct group {
 
   static void verify(const json& input, bool with_seq) {
     onis::database::item::verify_seq_version_flags(input, with_seq);
-    u32 flags = input[BASE_FLAGS_KEY].get<u32>();
+    u32 flags = input[BASE_FLAGS_KEY].asUInt();
     if (flags & info_user_group_name)
       onis::database::item::verify_string_value(input, GR_NAME_KEY, false,
                                                 false, 64);

@@ -131,9 +131,9 @@ void site_database::find_volumes_for_site(const std::string& site_seq,
   // Process result
   if (result->has_rows()) {
     while (auto row = result->get_next_row()) {
-      json volume = json::object();
+      json volume = Json::Value(Json::objectValue);
       read_volume_record(*row, flags, nullptr, volume);
-      output.push_back(std::move(volume));
+      output.append(std::move(volume));
     }
   }
 }
@@ -146,7 +146,7 @@ void site_database::create_volume(const std::string& site_seq,
                                   const json& input, json& output,
                                   u32 out_flags) {
   // construct the sql command:
-  u32 in_flags = input[BASE_FLAGS_KEY].get<u32>();
+  u32 in_flags = input[BASE_FLAGS_KEY].asUInt();
   std::string seq = dgc::util::uuid::generate_random_uuid();
   std::string sql = "INSERT INTO PACS_VOLUMES (ID, SITE_ID";
   if (in_flags & onis::database::info_volume_name)
@@ -166,11 +166,10 @@ void site_database::create_volume(const std::string& site_seq,
   bind_parameter(query, index, seq, "seq");
   bind_parameter(query, index, site_seq, "site_seq");
   if (in_flags & onis::database::info_volume_name) {
-    bind_parameter(query, index, input[VO_NAME_KEY].get<std::string>(), "name");
+    bind_parameter(query, index, input[VO_NAME_KEY].asString(), "name");
   }
   if (in_flags & onis::database::info_volume_description) {
-    bind_parameter(query, index, input[VO_DESC_KEY].get<std::string>(),
-                   "description");
+    bind_parameter(query, index, input[VO_DESC_KEY].asString(), "description");
   }
 
   // Excute query:
@@ -186,7 +185,7 @@ void site_database::create_volume(const std::string& site_seq,
 void site_database::modify_volume(const json& volume) {
   std::string sql =
       "UPDATE pacs_volumes SET";  // name = ?, path = ? WHERE id = ?";
-  u32 flags = volume[BASE_FLAGS_KEY].get<u32>();
+  u32 flags = volume[BASE_FLAGS_KEY].asUInt();
   std::string values = "";
   if (flags & onis::database::info_volume_name)
     values += ", name=?";
@@ -202,15 +201,13 @@ void site_database::modify_volume(const json& volume) {
     // Bind the seq parameter
     s32 index = 1;
     if (flags & onis::database::info_volume_name) {
-      bind_parameter(query, index, volume[VO_NAME_KEY].get<std::string>(),
-                     "name");
+      bind_parameter(query, index, volume[VO_NAME_KEY].asString(), "name");
     }
     if (flags & onis::database::info_volume_description) {
-      bind_parameter(query, index, volume[VO_DESC_KEY].get<std::string>(),
+      bind_parameter(query, index, volume[VO_DESC_KEY].asString(),
                      "description");
     }
-    bind_parameter(query, index, volume[BASE_SEQ_KEY].get<std::string>(),
-                   "seq");
+    bind_parameter(query, index, volume[BASE_SEQ_KEY].asString(), "seq");
 
     // Execute query and check if any rows were affected
     execute_and_check_affected(query, "Volume not found");
@@ -222,8 +219,7 @@ void site_database::modify_volume(const json& volume) {
     sql = "DELETE FROM PACS_MEDIA WHERE VOLUME_ID=?";
     auto query = prepare_query(sql, "delete_volume");
     int index = 1;
-    bind_parameter(query, index, volume[BASE_SEQ_KEY].get<std::string>(),
-                   "seq");
+    bind_parameter(query, index, volume[BASE_SEQ_KEY].asString(), "seq");
     execute_query(query);
 
     // insert the media one by one:
@@ -236,20 +232,15 @@ void site_database::modify_volume(const json& volume) {
       auto query = prepare_query(sql, "create_media");
       index = 1;
       bind_parameter(query, index, seq, "seq");
-      bind_parameter(query, index, volume[BASE_SEQ_KEY].get<std::string>(),
-                     "site_id");
-      bind_parameter(query, index,
-                     volume[VO_MEDIA_KEY][i][ME_TYPE_KEY].get<s32>(), "type");
-      bind_parameter(query, index,
-                     volume[VO_MEDIA_KEY][i][ME_NUM_KEY].get<s32>(), "num");
-      bind_parameter(query, index,
-                     volume[VO_MEDIA_KEY][i][ME_PATH_KEY].get<std::string>(),
-                     "path");
-      bind_parameter(query, index,
-                     volume[VO_MEDIA_KEY][i][ME_RATIO_KEY].get<f32>(), "ratio");
-      bind_parameter(query, index,
-                     volume[VO_MEDIA_KEY][i][ME_STATUS_KEY].get<s32>(),
-                     "status");
+      bind_parameter(query, index, volume[BASE_SEQ_KEY].asString(), "site_id");
+      const auto& media_item =
+          volume[VO_MEDIA_KEY][static_cast<Json::ArrayIndex>(i)];
+      bind_parameter(query, index, media_item[ME_TYPE_KEY].asInt(), "type");
+      bind_parameter(query, index, media_item[ME_NUM_KEY].asInt(), "num");
+      bind_parameter(query, index, media_item[ME_PATH_KEY].asString(), "path");
+      bind_parameter(query, index, media_item[ME_RATIO_KEY].asDouble(),
+                     "ratio");
+      bind_parameter(query, index, media_item[ME_STATUS_KEY].asInt(), "status");
       execute_and_check_affected(query, "Media not created");
     }
   }

@@ -1,10 +1,8 @@
 #include "../../../include/services/config/config_service.hpp"
+#include <json/json.h>
 #include <fstream>
 #include <iostream>
-#include <nlohmann/json.hpp>
 #include <sstream>
-
-using json = nlohmann::json;
 
 ////////////////////////////////////////////////////////////////////////////////
 // config_service class
@@ -57,40 +55,63 @@ bool config_service::load_config(const std::string& config_file_path) {
   }
 
   try {
-    json j = json::parse(file);
+    Json::Value j;
+    Json::Reader reader;
+    if (!reader.parse(file, j)) {
+      last_error_ = "JSON parsing error: " + reader.getFormattedErrorMessages();
+      return false;
+    }
 
     // Parse database configuration
-    if (j.contains("database")) {
-      auto& db = j["database"];
-      db_config_.host = db.value("host", "localhost");
-      db_config_.port = db.value("port", 5432);
-      db_config_.database_name = db.value("database_name", "onis_site_db");
-      db_config_.user = db.value("user", "postgres");
-      db_config_.password = db.value("password", "");
-      db_config_.type = db.value("type", "postgresql");
+    if (j.isMember("database")) {
+      const auto& db = j["database"];
+      db_config_.host =
+          db.isMember("host") ? db["host"].asString() : "localhost";
+      db_config_.port = db.isMember("port") ? db["port"].asInt() : 5432;
+      db_config_.database_name = db.isMember("database_name")
+                                     ? db["database_name"].asString()
+                                     : "onis_site_db";
+      db_config_.user =
+          db.isMember("user") ? db["user"].asString() : "postgres";
+      db_config_.password =
+          db.isMember("password") ? db["password"].asString() : "";
+      db_config_.type =
+          db.isMember("type") ? db["type"].asString() : "postgresql";
     }
 
     // Parse HTTP configuration
-    if (j.contains("http")) {
-      auto& http = j["http"];
-      http_config_.http_port = http.value("http_port", 5556);
-      http_config_.https_port = http.value("https_port", 5555);
+    if (j.isMember("http")) {
+      const auto& http = j["http"];
+      http_config_.http_port =
+          http.isMember("http_port") ? http["http_port"].asInt() : 5556;
+      http_config_.https_port =
+          http.isMember("https_port") ? http["https_port"].asInt() : 5555;
 
       // Parse nested SSL configuration
-      if (http.contains("ssl")) {
-        auto& ssl = http["ssl"];
-        http_config_.ssl_enabled = ssl.value("enabled", true);
+      if (http.isMember("ssl")) {
+        const auto& ssl = http["ssl"];
+        http_config_.ssl_enabled =
+            ssl.isMember("enabled") ? ssl["enabled"].asBool() : true;
         http_config_.ssl_certificate_file =
-            ssl.value("certificate_file", "certificates/certificate.crt");
+            ssl.isMember("certificate_file")
+                ? ssl["certificate_file"].asString()
+                : "certificates/certificate.crt";
         http_config_.ssl_private_key_file =
-            ssl.value("private_key_file", "certificates/private.key");
+            ssl.isMember("private_key_file")
+                ? ssl["private_key_file"].asString()
+                : "certificates/private.key";
       } else {
         // Fallback to top-level SSL settings if nested structure not found
-        http_config_.ssl_enabled = http.value("ssl_enabled", true);
+        http_config_.ssl_enabled =
+            http.isMember("ssl_enabled") ? http["ssl_enabled"].asBool() : true;
         http_config_.ssl_certificate_file =
-            http.value("certificate_file", "certificates/certificate.crt");
+            http.isMember("certificate_file")
+                ? http["certificate_file"].asString()
+                : "certificates/certificate.crt";
         http_config_.ssl_private_key_file =
-            http.value("private_key_file", "certificates/private.key");
+            http.isMember("private_key_file")
+                ? http["private_key_file"].asString()
+                : "certificates/private.key";
       }
     }
 
@@ -98,7 +119,7 @@ bool config_service::load_config(const std::string& config_file_path) {
     last_error_ = "";
     return true;
 
-  } catch (const json::exception& e) {
+  } catch (const std::exception& e) {
     last_error_ = "JSON parsing error: " + std::string(e.what());
     return false;
   } catch (const std::exception& e) {
@@ -109,7 +130,7 @@ bool config_service::load_config(const std::string& config_file_path) {
 
 bool config_service::save_config(const std::string& config_file_path) {
   try {
-    json j;
+    Json::Value j;
 
     // Database configuration
     j["database"]["host"] = db_config_.host;
@@ -133,7 +154,11 @@ bool config_service::save_config(const std::string& config_file_path) {
       return false;
     }
 
-    file << j.dump(2);  // Pretty print with 2 spaces indentation
+    // Pretty print with 2 spaces indentation
+    Json::StreamWriterBuilder builder;
+    builder["indentation"] = "  ";
+    std::unique_ptr<Json::StreamWriter> writer(builder.newStreamWriter());
+    writer->write(j, &file);
     file.close();
 
     last_error_ = "";

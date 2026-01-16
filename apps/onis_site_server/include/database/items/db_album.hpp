@@ -2,7 +2,7 @@
 
 #include "db_item.hpp"
 
-using json = nlohmann::json;
+using json = Json::Value;
 
 #define AL_NAME_KEY "name"
 #define AL_DESC_KEY "desc"
@@ -16,7 +16,7 @@ const s32 info_album_status = 8;
 
 struct album {
   static void create(json& album, u32 flags) {
-    if (!album.is_object()) {
+    if (!album.isObject()) {
       throw std::invalid_argument("album is not an object");
     }
     album.clear();
@@ -35,7 +35,7 @@ struct album {
 
   static void verify(const json& input, bool with_seq, u32 must_flags) {
     onis::database::item::verify_seq_version_flags(input, with_seq);
-    u32 flags = input[BASE_FLAGS_KEY].get<u32>();
+    u32 flags = input[BASE_FLAGS_KEY].asUInt();
     onis::database::item::check_must_flags(flags, must_flags);
 
     if (flags & onis::database::info_album_name) {

@@ -1,11 +1,11 @@
 #pragma once
 
+#include <json/json.h>
 #include <functional>
 #include <memory>
 #include <mutex>
-#include <nlohmann/json.hpp>
 
-using json = nlohmann::json;
+using json = Json::Value;
 
 ////////////////////////////////////////////////////////////////////////////////
 // request_type enum

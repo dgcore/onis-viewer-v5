@@ -21,23 +21,23 @@ void request_service::process_authenticate_request(
   request_database db(this);
 
   // Read input:
-  std::string username = req->input_json["username"].get<std::string>();
-  std::string password = req->input_json["password"].get<std::string>();
+  std::string username = req->input_json["username"].asString();
+  std::string password = req->input_json["password"].asString();
 
   // Get the site:
-  json site(json::object());
+  json site(Json::objectValue);
   db->find_single_site(0, onis::database::lock_mode::NO_LOCK, nullptr, site);
 
   // Try to get a user from the authentication info:
-  json user(json::object());
-  db->find_user_for_session(site[BASE_SEQ_KEY].get<std::string>(), username,
-                            password, onis::database::info_all, user);
+  json user(Json::objectValue);
+  db->find_user_for_session(site[BASE_SEQ_KEY].asString(), username, password,
+                            onis::database::info_all, user);
 
   // generate a token for the session:
   auto now = std::chrono::system_clock::now();
   auto token = jwt::create()
-                   .set_issuer("onis_site_server")                      // iss
-                   .set_subject(user[BASE_SEQ_KEY].get<std::string>())  // sub
+                   .set_issuer("onis_site_server")              // iss
+                   .set_subject(user[BASE_SEQ_KEY].asString())  // sub
                    .set_audience("onis_api")  // aud (optional but recommended)
                    .set_issued_at(now)        // iat
                    .set_expires_at(now + std::chrono::hours{1})  // exp
@@ -46,17 +46,17 @@ void request_service::process_authenticate_request(
 
   // create the user session:
   request_session_ptr session = request_session::create(token);
-  session->site_id = site[BASE_SEQ_KEY].get<std::string>();
-  session->user_id = user[BASE_SEQ_KEY].get<std::string>();
-  session->login = user[US_LOGIN_KEY].get<std::string>();
-  session->superuser = user[US_SUPERUSER_KEY].get<int>() != 0;
+  session->site_id = site[BASE_SEQ_KEY].asString();
+  session->user_id = user[BASE_SEQ_KEY].asString();
+  session->login = user[US_LOGIN_KEY].asString();
+  session->superuser = user[US_SUPERUSER_KEY].asInt() != 0;
 
   // Register the session:
   register_session(session);
 
   // Add the user to the output:
   req->write_output([&](json& output) {
-    output["user"] = json::object();
+    output["user"] = Json::Value(Json::objectValue);
     onis::database::user::create(
         output["user"],
         onis::database::info_user_login | onis::database::info_user_identity);

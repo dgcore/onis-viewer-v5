@@ -2,7 +2,7 @@
 
 #include "db_item.hpp"
 
-using json = nlohmann::json;
+using json = Json::Value;
 
 #define LC_NAME_KEY "name"
 #define LC_TYPE_KEY "loctype"
@@ -25,7 +25,7 @@ const s32 info_location_password = 512;
 
 struct location {
   static void create(json& item, u32 flags) {
-    if (!item.is_object()) {
+    if (!item.isObject()) {
       throw std::invalid_argument("location is not an object");
     }
     item.clear();
@@ -52,12 +52,12 @@ struct location {
 
   static void verify(const json& input, bool with_seq) {
     onis::database::item::verify_seq_version_flags(input, with_seq);
-    u32 flags = input[BASE_FLAGS_KEY].get<u32>();
+    u32 flags = input[BASE_FLAGS_KEY].asUInt();
     s32 type = -1;
     if (flags & info_location_type) {
       onis::database::item::verify_integer_value(input, LC_TYPE_KEY, false, 0,
                                                  1);
-      type = input[LC_TYPE_KEY].get<s32>();
+      type = input[LC_TYPE_KEY].asInt();
     }
     if (flags & info_location_name)
       onis::database::item::verify_string_value(input, LC_NAME_KEY, false,

@@ -2,7 +2,7 @@
 
 #include "db_media.hpp"
 
-using json = nlohmann::json;
+using json = Json::Value;
 
 #define VO_NAME_KEY "name"
 #define VO_DESC_KEY "desc"
@@ -16,7 +16,7 @@ const s32 info_volume_media = 8;
 
 struct volume {
   static void create(json& volume, u32 flags) {
-    if (!volume.is_object()) {
+    if (!volume.isObject()) {
       throw std::invalid_argument("volume is not an object");
     }
     volume.clear();
@@ -28,13 +28,13 @@ struct volume {
     if (flags & info_volume_description)
       volume[VO_DESC_KEY] = "";
     if (flags & info_volume_media)
-      volume[VO_MEDIA_KEY] = json::array();
+      volume[VO_MEDIA_KEY] = Json::Value(Json::arrayValue);
   }
 
   static void verify(const json& input, bool with_seq, bool with_media_seq,
                      u32 must_flags) {
     onis::database::item::verify_seq_version_flags(input, with_seq);
-    u32 flags = input[BASE_FLAGS_KEY].get<u32>();
+    u32 flags = input[BASE_FLAGS_KEY].asUInt();
     onis::database::item::check_must_flags(flags, must_flags);
     if (flags & info_volume_name)
       onis::database::item::verify_string_value(input, VO_NAME_KEY, false,

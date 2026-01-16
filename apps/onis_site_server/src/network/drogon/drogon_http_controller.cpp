@@ -52,12 +52,11 @@ void http_drogon_controller::treat_post_request(
     std::function<void(const drogon::HttpResponsePtr&)>& callback,
     [[maybe_unused]] request_type type) const {
   drogon::HttpResponsePtr resp;
-  auto& json = req->getJsonObject();
-  if (json != nullptr) {
+  auto& json_obj = req->getJsonObject();
+  if (json_obj != nullptr) {
     request_data_ptr data = request_data::create(type);
-    Json::StreamWriterBuilder builder;
-    std::string json_str = Json::writeString(builder, *json);
-    data->input_json = nlohmann::json::parse(json_str);
+    // Direct assignment - both use JsonCPP (Json::Value)
+    data->input_json = *json_obj;
     rqsrv_->process_request(data);
     resp = drogon::HttpResponse::newHttpResponse();
     resp->setStatusCode(drogon::HttpStatusCode::k400BadRequest);

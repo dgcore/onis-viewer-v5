@@ -2,7 +2,7 @@
 
 #include "db_item.hpp"
 
-using json = nlohmann::json;
+using json = Json::Value;
 
 #define ME_TYPE_KEY "media_type"
 #define ME_NUM_KEY "num"
@@ -30,7 +30,7 @@ const s32 info_media_statistics = 4;
 
 struct media {
   static void create(json& media, u32 flags) {
-    if (!media.is_object()) {
+    if (!media.isObject()) {
       throw std::invalid_argument("media is not an object");
     }
     media.clear();
@@ -52,7 +52,7 @@ struct media {
 
   static void verify(const json& input, bool with_seq) {
     onis::database::item::verify_seq_version_flags(input, with_seq);
-    u32 flags = input[BASE_FLAGS_KEY].get<u32>();
+    u32 flags = input[BASE_FLAGS_KEY].asUInt();
     if (flags & info_media_data) {
       onis::database::item::verify_integer_value(input, ME_TYPE_KEY, false);
       onis::database::item::verify_integer_value(input, ME_NUM_KEY, false);
@@ -62,14 +62,14 @@ struct media {
                                                          false, 0.0, 100.0);
       onis::database::item::verify_integer_value(input, ME_STATUS_KEY, false);
 
-      s32 value = input[ME_TYPE_KEY].get<s32>();
+      s32 value = input[ME_TYPE_KEY].asInt();
       if (value != media_for_any && value != media_for_images &&
           value != media_for_reports && value != media_for_temp &&
           value != media_for_logs) {
         throw std::invalid_argument("Invalid media type");
       }
 
-      value = input[ME_STATUS_KEY].get<s32>();
+      value = input[ME_STATUS_KEY].asInt();
       if (value != media_full && value != media_available &&
           value != media_not_found && value != media_unknown) {
         throw std::invalid_argument("Invalid media status");

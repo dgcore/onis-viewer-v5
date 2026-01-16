@@ -2,7 +2,7 @@
 
 #include "db_item.hpp"
 
-using json = nlohmann::json;
+using json = Json::Value;
 
 #define RPTT_NAME_KEY "name"
 #define RPTT_VERSION_KEY "template_version"
@@ -20,7 +20,7 @@ const s32 info_report_template_filters = 32;
 
 struct report_template {
   static void create(json& item, u32 flags) {
-    if (!item.is_object()) {
+    if (!item.isObject()) {
       throw std::invalid_argument("report_template is not an object");
     }
     item.clear();
@@ -42,7 +42,7 @@ struct report_template {
 
 static void verify(const json& input, bool with_seq, u32 must_flags) {
   onis::database::item::verify_seq_version_flags(input, with_seq);
-  u32 flags = input[BASE_FLAGS_KEY].get<u32>();
+  u32 flags = input[BASE_FLAGS_KEY].asUInt();
   onis::database::item::check_must_flags(flags, must_flags, res);
 
   if (flags & info_report_template_name)

@@ -4,9 +4,11 @@
 #include "onis_kit/include/core/types.hpp"
 #include "onis_kit/include/utilities/regex.hpp"
 
+#include <json/json.h>
 #include <limits>
-#include <nlohmann/json.hpp>
+#include <memory>
 #include <regex>
+#include <sstream>
 
 #define BASE_VERSION_KEY "version"
 #define BASE_FLAGS_KEY "flags"
@@ -15,10 +17,20 @@
 
 namespace onis::database {
 
-using json = nlohmann::json;
+using json = Json::Value;
 using namespace dgc;
 
 const u32 info_all = 0xFFFFFFFF;
+
+// Helper function to convert Json::Value to string (replaces .dump())
+inline std::string json_to_string(const Json::Value& value) {
+  Json::StreamWriterBuilder builder;
+  builder["indentation"] = "";
+  std::unique_ptr<Json::StreamWriter> writer(builder.newStreamWriter());
+  std::ostringstream oss;
+  writer->write(value, &oss);
+  return oss.str();
+}
 
 class item {
 public:
@@ -26,17 +38,17 @@ public:
   ~item() {}
 
   static inline bool pre_verify(const json& input, const char* key,
-                                const json::value_t& type, bool allow_null) {
+                                const Json::ValueType& type, bool allow_null) {
     // check if the key is null
     bool is_null = false;
     if (key == nullptr)
-      is_null = input.is_null();
+      is_null = input.isNull();
     else {
-      if (!input.contains(key)) {
+      if (!input.isMember(key)) {
         throw std::invalid_argument("Missing required key: " +
                                     std::string(key));
       }
-      is_null = input[key].is_null();
+      is_null = input[key].isNull();
     }
 
     // Treat null value:
@@ -62,11 +74,11 @@ public:
   static inline void verify_string_value(
       const json& input, const char* key, bool allow_null, bool allow_empty,
       size_t max_length = std::numeric_limits<size_t>::max()) {
-    if (pre_verify(input, key, json::value_t::string, allow_null))
+    if (pre_verify(input, key, Json::stringValue, allow_null))
       return;
     const json& input_ref = key == nullptr ? input : input[key];
-    if (!input_ref.is_null()) {
-      const std::string& value = input_ref.get<std::string>();
+    if (!input_ref.isNull()) {
+      const std::string value = input_ref.asString();
       if (!allow_empty && value.empty()) {
         throw std::invalid_argument("Empty string not allowed for key: " +
                                     std::string(key));
@@ -82,11 +94,11 @@ public:
   static inline void verify_string_value(const json& input, const char* key,
                                          bool allow_null, bool allow_empty,
                                          const std::string& regex_value) {
-    if (pre_verify(input, key, json::value_t::string, allow_null))
+    if (pre_verify(input, key, Json::stringValue, allow_null))
       return;
     const json& input_ref = key == nullptr ? input : input[key];
-    if (!input_ref.is_null()) {
-      const std::string& value = input_ref.get<std::string>();
+    if (!input_ref.isNull()) {
+      const std::string value = input_ref.asString();
       if (!allow_empty && value.empty()) {
         throw std::invalid_argument("Empty string not allowed for key: " +
                                     std::string(key));
@@ -97,11 +109,11 @@ public:
 
   static inline void verify_uuid_value(const json& input, const char* key,
                                        bool allow_null, bool allow_empty) {
-    if (pre_verify(input, key, json::value_t::string, allow_null))
+    if (pre_verify(input, key, Json::stringValue, allow_null))
       return;
     const json& input_ref = key == nullptr ? input : input[key];
-    if (!input_ref.is_null()) {
-      const std::string& value = input_ref.get<std::string>();
+    if (!input_ref.isNull()) {
+      const std::string value = input_ref.asString();
       if (!allow_empty && value.empty()) {
         throw std::invalid_argument("Empty UUID not allowed for key: " +
                                     std::string(key));
@@ -119,18 +131,18 @@ public:
 
   static inline void verify_boolean_value(const json& input, const char* key,
                                           bool allow_null) {
-    pre_verify(input, key, json::value_t::boolean, allow_null);
+    pre_verify(input, key, Json::booleanValue, allow_null);
   }
 
   static inline void verify_integer_value(
       const json& input, const char* key, bool allow_null,
       s32 min_value = std::numeric_limits<s32>::min(),
       s32 max_value = std::numeric_limits<s32>::max()) {
-    if (pre_verify(input, key, json::value_t::number_integer, allow_null))
+    if (pre_verify(input, key, Json::intValue, allow_null))
       return;
     const json& input_ref = key == nullptr ? input : input[key];
-    if (!input_ref.is_null()) {
-      s32 value = input_ref.get<s32>();
+    if (!input_ref.isNull()) {
+      s32 value = input_ref.asInt();
       if (value < min_value || value > max_value) {
         throw std::invalid_argument(
             "Integer value out of range for key: " + std::string(key) +
@@ -155,11 +167,11 @@ public:
       const json& input, const char* key, bool allow_null,
       float min_value = std::numeric_limits<float>::lowest(),
       float max_value = std::numeric_limits<float>::max()) {
-    if (pre_verify(input, key, json::value_t::number_float, allow_null))
+    if (pre_verify(input, key, Json::realValue, allow_null))
       return;
     const json& input_ref = key == nullptr ? input : input[key];
-    if (!input_ref.is_null()) {
-      float value = input_ref.get<float>();
+    if (!input_ref.isNull()) {
+      float value = static_cast<float>(input_ref.asDouble());
       if (value < min_value || value > max_value) {
         throw std::invalid_argument(
             "Float value out of range for key: " + std::string(key) +
@@ -172,11 +184,11 @@ public:
   static inline void verify_unsigned_integer_value(
       const json& input, const char* key, bool allow_null, u32 min_value = 0,
       u32 max_value = std::numeric_limits<u32>::max()) {
-    if (pre_verify(input, key, json::value_t::number_unsigned, allow_null))
+    if (pre_verify(input, key, Json::uintValue, allow_null))
       return;
     const json& input_ref = key == nullptr ? input : input[key];
-    if (!input_ref.is_null()) {
-      u32 value = input_ref.get<u32>();
+    if (!input_ref.isNull()) {
+      u32 value = input_ref.asUInt();
       if (value < min_value || value > max_value) {
         throw std::invalid_argument(
             "Unsigned integer value out of range for key: " + std::string(key) +
@@ -188,11 +200,11 @@ public:
 
   static inline void verify_array_value(const json& input, const char* key,
                                         bool allow_null) {
-    if (pre_verify(input, key, json::value_t::array, allow_null))
+    if (pre_verify(input, key, Json::arrayValue, allow_null))
       return;
     const json& input_ref = key == nullptr ? input : input[key];
-    if (!input_ref.is_null()) {
-      if (!input_ref.is_array()) {
+    if (!input_ref.isNull()) {
+      if (!input_ref.isArray()) {
         throw std::invalid_argument("Expected array value for key: " +
                                     std::string(key));
       }
@@ -209,7 +221,7 @@ public:
                                               false);
     onis::database::item::verify_unsigned_integer_value(input, BASE_FLAGS_KEY,
                                                         false);
-    std::string version = input[BASE_VERSION_KEY].get<std::string>();
+    std::string version = input[BASE_VERSION_KEY].asString();
     if (version != "1.0.0") {
       throw std::invalid_argument("Invalid version for key: " +
                                   std::string(BASE_VERSION_KEY));
