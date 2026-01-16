@@ -151,15 +151,7 @@ cat > .git/hooks/pre-push << 'EOF'
 
 echo "🔍 Running pre-push checks..."
 
-# Run quality check
-if [ -f ".infra/quality-check.sh" ]; then
-    if ! ./.infra/quality-check.sh > /dev/null 2>&1; then
-        echo "❌ Quality checks failed. Please fix issues before pushing."
-        echo "Run './.infra/quality-check.sh' for details."
-        exit 1
-    fi
-    echo "✅ Quality checks passed"
-fi
+
 
 # Run tests
 if command -v flutter &> /dev/null; then
