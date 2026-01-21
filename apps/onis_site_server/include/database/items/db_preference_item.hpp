@@ -14,14 +14,14 @@ using json = Json::Value;
 
 namespace onis::database {
 
-const s32 info_pref_item_name = 1;
-const s32 info_pref_item_status = 2;
-const s32 info_pref_item_description = 4;
-const s32 info_pref_item_shortcut = 8;
-const s32 info_pref_item_data = 16;
+const std::int32_t info_pref_item_name = 1;
+const std::int32_t info_pref_item_status = 2;
+const std::int32_t info_pref_item_description = 4;
+const std::int32_t info_pref_item_shortcut = 8;
+const std::int32_t info_pref_item_data = 16;
 
 struct preference_item {
-  static void create(json& item, u32 flags) {
+  static void create(json& item, std::uint32_t flags) {
     if (!item.isObject()) {
       throw std::invalid_argument("preference_item is not an object");
     }
@@ -49,7 +49,7 @@ struct preference_item {
 
 static void verify(const json& input, bool with_seq) {
   onis::database::item::verify_seq_version_flags(input, with_seq);
-  u32 flags = input[BASE_FLAGS_KEY].asUInt();
+  std::uint32_t flags = input[BASE_FLAGS_KEY].asUInt();
 
   onis::database::item::check_must_flags(flags, must_flags, res);
   onis::database::item::verify_string_value(input, PFI_TYPE_KEY, false, false);

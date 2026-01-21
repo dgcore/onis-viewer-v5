@@ -1,6 +1,6 @@
 #include "../../include/core/event.hpp"
 
-namespace dgc {
+namespace onis {
 
 //-----------------------------------------------------------------------------
 // event
@@ -27,7 +27,7 @@ void event::signal() {
   _condition.notify_all();
 }
 
-bool event::wait(u32 millisec) {
+bool event::wait(std::uint32_t millisec) {
   std::unique_lock<std::mutex> lock(_mutex);
   if (_is_signaled) {
     return true;
@@ -46,4 +46,4 @@ bool event::is_signaled() {
   return _is_signaled;
 }
 
-}  // namespace dgc
+}  // namespace onis

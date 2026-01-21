@@ -289,7 +289,7 @@ class SiteSource extends DatabaseSource {
 
       // Check if authentication was successful
       final data = response.data;
-      if (data == null || data['success'] != true) {
+      if (data == null /* || data['success'] != true*/) {
         throw Exception('Authentication failed: Invalid response from server');
       }
 

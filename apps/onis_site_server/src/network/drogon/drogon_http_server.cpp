@@ -36,7 +36,7 @@ drogon_http_server::~drogon_http_server() {
 //------------------------------------------------------------------------------
 
 void drogon_http_server::init_instance() {
-  dgc::thread::init_instance();
+  onis::thread::init_instance();
   std::cout << "drogon_http_server: init_instance" << std::endl;
 
   controller_ = http_drogon_controller::create(rqsrv_);
@@ -49,7 +49,7 @@ void drogon_http_server::exit_instance() {
   if (th_.joinable()) {
     th_.join();
   }
-  dgc::thread::exit_instance();
+  onis::thread::exit_instance();
 }
 
 //------------------------------------------------------------------------------

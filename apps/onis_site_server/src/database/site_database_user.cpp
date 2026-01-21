@@ -16,7 +16,8 @@ using onis::database::lock_mode;
 // Utilities
 //------------------------------------------------------------------------------
 
-std::string site_database::get_user_columns(u32 flags, bool add_table_name) {
+std::string site_database::get_user_columns(std::uint32_t flags,
+                                            bool add_table_name) {
   std::string prefix = add_table_name ? "pacs_users." : "";
   if (flags == onis::database::info_all) {
     return prefix + "id, " + prefix + "site_id, " + prefix + "login, " +
@@ -58,7 +59,7 @@ std::string site_database::get_user_columns(u32 flags, bool add_table_name) {
 }
 
 void site_database::read_user_record(onis_kit::database::database_row& rec,
-                                     u32 flags, bool need_password,
+                                     std::uint32_t flags, bool need_password,
                                      std::string* site_seq, json& output) {
   onis::database::user::create(output, flags);
   output[BASE_SEQ_KEY] = rec.get_uuid("id", false, false);
@@ -120,7 +121,7 @@ void site_database::read_user_record(onis_kit::database::database_row& rec,
 void site_database::find_user_for_session(const std::string& site_seq,
                                           const std::string& login,
                                           const std::string& password,
-                                          u32 flags, json& output) {
+                                          std::uint32_t flags, json& output) {
   // always refuse empty password!
   if (password.empty()) {
     throw std::runtime_error("Password is empty");

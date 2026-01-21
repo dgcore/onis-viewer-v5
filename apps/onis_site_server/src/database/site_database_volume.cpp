@@ -16,7 +16,8 @@ using onis::database::lock_mode;
 // Utilities
 //------------------------------------------------------------------------------
 
-std::string site_database::get_volume_columns(u32 flags, bool add_table_name) {
+std::string site_database::get_volume_columns(std::uint32_t flags,
+                                              bool add_table_name) {
   std::string prefix = add_table_name ? "pacs_volumes." : "";
   if (flags == onis::database::info_all) {
     return prefix + "id, " + prefix + "site_id, " + prefix + "name, " + prefix +
@@ -33,8 +34,8 @@ std::string site_database::get_volume_columns(u32 flags, bool add_table_name) {
 }
 
 void site_database::read_volume_record(onis_kit::database::database_row& rec,
-                                       u32 flags, std::string* site_seq,
-                                       json& output) {
+                                       std::uint32_t flags,
+                                       std::string* site_seq, json& output) {
   onis::database::volume::create(output, flags);
   output[BASE_SEQ_KEY] = rec.get_string("id", false, false);
   if (site_seq) {
@@ -52,9 +53,9 @@ void site_database::read_volume_record(onis_kit::database::database_row& rec,
 // Find volumes
 //------------------------------------------------------------------------------
 
-void site_database::find_volume_by_seq(const std::string& seq, u32 flags,
-                                       lock_mode lock, std::string* site_seq,
-                                       json& output) {
+void site_database::find_volume_by_seq(const std::string& seq,
+                                       std::uint32_t flags, lock_mode lock,
+                                       std::string* site_seq, json& output) {
   // Create and prepare query:
   std::string columns = get_volume_columns(flags, false);
   std::string where = "id = ?";
@@ -83,8 +84,9 @@ void site_database::find_volume_by_seq(const std::string& seq, u32 flags,
 }
 
 void site_database::find_volume_by_seq(const std::string& site_seq,
-                                       const std::string& seq, u32 flags,
-                                       lock_mode lock, json& output) {
+                                       const std::string& seq,
+                                       std::uint32_t flags, lock_mode lock,
+                                       json& output) {
   // Create and prepare query:
   std::string columns = get_volume_columns(flags, false);
   std::string where = "id = ? AND site_id = ?";
@@ -114,7 +116,7 @@ void site_database::find_volume_by_seq(const std::string& site_seq,
 }
 
 void site_database::find_volumes_for_site(const std::string& site_seq,
-                                          u32 flags, lock_mode lock,
+                                          std::uint32_t flags, lock_mode lock,
                                           json& output) {
   // Create and prepare query:
   std::string columns = get_volume_columns(flags, false);
@@ -144,10 +146,10 @@ void site_database::find_volumes_for_site(const std::string& site_seq,
 
 void site_database::create_volume(const std::string& site_seq,
                                   const json& input, json& output,
-                                  u32 out_flags) {
+                                  std::uint32_t out_flags) {
   // construct the sql command:
-  u32 in_flags = input[BASE_FLAGS_KEY].asUInt();
-  std::string seq = dgc::util::uuid::generate_random_uuid();
+  std::uint32_t in_flags = input[BASE_FLAGS_KEY].asUInt();
+  std::string seq = onis::util::uuid::generate_random_uuid();
   std::string sql = "INSERT INTO PACS_VOLUMES (ID, SITE_ID";
   if (in_flags & onis::database::info_volume_name)
     sql += ", NAME";
@@ -185,7 +187,7 @@ void site_database::create_volume(const std::string& site_seq,
 void site_database::modify_volume(const json& volume) {
   std::string sql =
       "UPDATE pacs_volumes SET";  // name = ?, path = ? WHERE id = ?";
-  u32 flags = volume[BASE_FLAGS_KEY].asUInt();
+  std::uint32_t flags = volume[BASE_FLAGS_KEY].asUInt();
   std::string values = "";
   if (flags & onis::database::info_volume_name)
     values += ", name=?";
@@ -199,7 +201,7 @@ void site_database::modify_volume(const json& volume) {
     auto query = prepare_query(sql, "modify_volume");
 
     // Bind the seq parameter
-    s32 index = 1;
+    std::int32_t index = 1;
     if (flags & onis::database::info_volume_name) {
       bind_parameter(query, index, volume[VO_NAME_KEY].asString(), "name");
     }
@@ -224,7 +226,7 @@ void site_database::modify_volume(const json& volume) {
 
     // insert the media one by one:
     for (size_t i = 0; i < volume[VO_MEDIA_KEY].size(); i++) {
-      std::string seq = dgc::util::uuid::generate_random_uuid();
+      std::string seq = onis::util::uuid::generate_random_uuid();
       std::string sql =
           "INSERT INTO PACS_MEDIA (ID, VOLUME_ID, TYPE, NUM, PATH, MAXFILL, "
           "STATUS) VALUES (?, ?, ?, ?, ?, ?, ?)";

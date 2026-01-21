@@ -11,7 +11,7 @@ using onis::database::lock_mode;
 // Permission operations
 ////////////////////////////////////////////////////////////////////////////////
 
-void site_database::find_permissions_items(json& output, u32 flags) {
+void site_database::find_permissions_items(json& output, std::uint32_t flags) {
   std::string where = "";
   auto query = create_and_prepare_query("id, name, type", "pacs_role_items", "",
                                         onis::database::lock_mode::NONE);

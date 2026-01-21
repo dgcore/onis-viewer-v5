@@ -1,6 +1,6 @@
 #include "../../include/core/thread.hpp"
 #include <iostream>
-namespace dgc {
+namespace onis {
 
 //----------------------------------------------------------------------------
 // Contructor and destructor
@@ -139,13 +139,15 @@ void thread::exit_instance() {}
 // Messaging
 //----------------------------------------------------------------------------
 
-void thread::process_message(u32 message_id, u64 wParam, u64 lParam) {}
+void thread::process_message(std::uint32_t message_id, std::uint64_t wParam,
+                             std::uint64_t lParam) {}
 
 bool thread::on_idle() {
   return false;
 }
 
-bool thread::post_message_tothread_(u32 id, u64 wParam, u64 lParam) {
+bool thread::post_message_tothread_(std::uint32_t id, std::uint64_t wParam,
+                                    std::uint64_t lParam) {
   std::lock_guard<std::recursive_mutex> lock(_message_mutex);
   if (thread_ == nullptr || will_quit_)
     return false;
@@ -165,7 +167,7 @@ bool thread::post_message_tothread_(u32 id, u64 wParam, u64 lParam) {
   return true;
 }
 
-u64 thread::get_pending_message_count() {
+std::uint64_t thread::get_pending_message_count() {
   std::lock_guard<std::recursive_mutex> lock(_message_mutex);
   return messages_.size();
 }
@@ -174,7 +176,7 @@ u64 thread::get_pending_message_count() {
 // Timers
 //----------------------------------------------------------------------------
 
-bool thread::set_timer(u8 id, u32 millisec) {
+bool thread::set_timer(u8 id, std::uint32_t millisec) {
   std::lock_guard<std::recursive_mutex> lock(_message_mutex);
 
   // Prevent duplicates
@@ -201,7 +203,7 @@ bool thread::set_timer(u8 id, u32 millisec) {
       // Timeout occurred and not quitting
       if (!timer->should_quit) {
         this->post_message_tothread_(DGMSG_TIMER, timer->id,
-                                     reinterpret_cast<u64>(timer));
+                                     reinterpret_cast<std::uint64_t>(timer));
       }
     }
   });
@@ -238,4 +240,4 @@ bool thread::kill_timer(u8 id) {
 
 void thread::on_timer(u8 timer_id) {}
 
-}  // namespace dgc
+}  // namespace onis

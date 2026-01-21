@@ -7,7 +7,7 @@
 #include "./drogon_http_controller.hpp"
 #include "onis_kit/include/core/thread.hpp"
 
-using namespace dgc;
+using namespace onis;
 
 ////////////////////////////////////////////////////////////////////////////////
 // drogon_http_server
@@ -17,7 +17,7 @@ class drogon_http_server;
 typedef std::shared_ptr<drogon_http_server> drogon_http_server_ptr;
 typedef std::weak_ptr<drogon_http_server> drogon_http_server_wptr;
 
-class drogon_http_server : public dgc::thread {
+class drogon_http_server : public onis::thread {
 public:
   static drogon_http_server_ptr create(const request_service_ptr& srv,
                                        const config_service_ptr& config);

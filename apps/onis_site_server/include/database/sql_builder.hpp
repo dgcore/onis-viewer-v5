@@ -30,7 +30,7 @@ public:
                                  const std::string& table,
                                  const std::string& where_clause = "",
                                  const std::string& order_by = "",
-                                 dgc::s32 limit = 0,
+                                 std::int32_t limit = 0,
                                  lock_mode lock = lock_mode::NONE) const;
 
   /// Build INSERT query
@@ -74,10 +74,10 @@ private:
   std::string add_mssql_lock(const std::string& table, lock_mode lock) const;
 
   /// Add LIMIT clause based on database engine
-  std::string add_limit_clause(dgc::s32 limit) const;
+  std::string add_limit_clause(std::int32_t limit) const;
 
   /// Add TOP clause for MSSQL
-  std::string add_top_clause(dgc::s32 limit) const;
+  std::string add_top_clause(std::int32_t limit) const;
 
   /// Convert WHERE clause placeholders based on database engine
   std::string convert_where_placeholders(const std::string& where_clause) const;

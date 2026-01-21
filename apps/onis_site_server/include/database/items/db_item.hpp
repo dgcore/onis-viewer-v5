@@ -18,9 +18,9 @@
 namespace onis::database {
 
 using json = Json::Value;
-using namespace dgc;
+using namespace onis;
 
-const u32 info_all = 0xFFFFFFFF;
+const std::uint32_t info_all = 0xFFFFFFFF;
 
 // Helper function to convert Json::Value to string (replaces .dump())
 inline std::string json_to_string(const Json::Value& value) {
@@ -103,7 +103,7 @@ public:
         throw std::invalid_argument("Empty string not allowed for key: " +
                                     std::string(key));
       }
-      dgc::util::regex::match(value, regex_value, false);
+      onis::util::regex::match(value, regex_value, false);
     }
   }
 
@@ -136,13 +136,13 @@ public:
 
   static inline void verify_integer_value(
       const json& input, const char* key, bool allow_null,
-      s32 min_value = std::numeric_limits<s32>::min(),
-      s32 max_value = std::numeric_limits<s32>::max()) {
+      std::int32_t min_value = std::numeric_limits<std::int32_t>::min(),
+      std::int32_t max_value = std::numeric_limits<std::int32_t>::max()) {
     if (pre_verify(input, key, Json::intValue, allow_null))
       return;
     const json& input_ref = key == nullptr ? input : input[key];
     if (!input_ref.isNull()) {
-      s32 value = input_ref.asInt();
+      std::int32_t value = input_ref.asInt();
       if (value < min_value || value > max_value) {
         throw std::invalid_argument(
             "Integer value out of range for key: " + std::string(key) +
@@ -182,13 +182,14 @@ public:
   }
 
   static inline void verify_unsigned_integer_value(
-      const json& input, const char* key, bool allow_null, u32 min_value = 0,
-      u32 max_value = std::numeric_limits<u32>::max()) {
+      const json& input, const char* key, bool allow_null,
+      std::uint32_t min_value = 0,
+      std::uint32_t max_value = std::numeric_limits<std::uint32_t>::max()) {
     if (pre_verify(input, key, Json::uintValue, allow_null))
       return;
     const json& input_ref = key == nullptr ? input : input[key];
     if (!input_ref.isNull()) {
-      u32 value = input_ref.asUInt();
+      std::uint32_t value = input_ref.asUInt();
       if (value < min_value || value > max_value) {
         throw std::invalid_argument(
             "Unsigned integer value out of range for key: " + std::string(key) +
@@ -228,7 +229,8 @@ public:
     }
   }
 
-  static inline void check_must_flags(u32 flags, u32 must_flags) {
+  static inline void check_must_flags(std::uint32_t flags,
+                                      std::uint32_t must_flags) {
     if (must_flags)
       if ((flags & must_flags) != must_flags) {
         throw std::invalid_argument("Missing required flags");

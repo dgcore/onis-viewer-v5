@@ -14,22 +14,22 @@ using json = Json::Value;
 
 namespace onis::database {
 
-const s32 media_for_any = 0;
-const s32 media_for_images = 1;
-const s32 media_for_reports = 2;
-const s32 media_for_temp = 4;
-const s32 media_for_logs = 8;
+const std::int32_t media_for_any = 0;
+const std::int32_t media_for_images = 1;
+const std::int32_t media_for_reports = 2;
+const std::int32_t media_for_temp = 4;
+const std::int32_t media_for_logs = 8;
 
-const s32 media_full = 0;
-const s32 media_available = 1;
-const s32 media_not_found = 2;
-const s32 media_unknown = 3;
+const std::int32_t media_full = 0;
+const std::int32_t media_available = 1;
+const std::int32_t media_not_found = 2;
+const std::int32_t media_unknown = 3;
 
-const s32 info_media_data = 2;
-const s32 info_media_statistics = 4;
+const std::int32_t info_media_data = 2;
+const std::int32_t info_media_statistics = 4;
 
 struct media {
-  static void create(json& media, u32 flags) {
+  static void create(json& media, std::uint32_t flags) {
     if (!media.isObject()) {
       throw std::invalid_argument("media is not an object");
     }
@@ -52,7 +52,7 @@ struct media {
 
   static void verify(const json& input, bool with_seq) {
     onis::database::item::verify_seq_version_flags(input, with_seq);
-    u32 flags = input[BASE_FLAGS_KEY].asUInt();
+    std::uint32_t flags = input[BASE_FLAGS_KEY].asUInt();
     if (flags & info_media_data) {
       onis::database::item::verify_integer_value(input, ME_TYPE_KEY, false);
       onis::database::item::verify_integer_value(input, ME_NUM_KEY, false);
@@ -62,7 +62,7 @@ struct media {
                                                          false, 0.0, 100.0);
       onis::database::item::verify_integer_value(input, ME_STATUS_KEY, false);
 
-      s32 value = input[ME_TYPE_KEY].asInt();
+      std::int32_t value = input[ME_TYPE_KEY].asInt();
       if (value != media_for_any && value != media_for_images &&
           value != media_for_reports && value != media_for_temp &&
           value != media_for_logs) {

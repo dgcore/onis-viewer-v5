@@ -20,18 +20,18 @@ using json = Json::Value;
 
 namespace onis::database {
 
-const s32 info_report_status = 2;
-const s32 info_report_reading_doctor = 4;
-const s32 info_report_verify_doctor = 8;
-const s32 info_report_study = 16;
-const s32 info_report_media = 32;
-const s32 info_report_template = 64;
-const s32 info_report_date = 128;
-const s32 info_report_creation = 256;
-const s32 info_report_update = 512;
+const std::int32_t info_report_status = 2;
+const std::int32_t info_report_reading_doctor = 4;
+const std::int32_t info_report_verify_doctor = 8;
+const std::int32_t info_report_study = 16;
+const std::int32_t info_report_media = 32;
+const std::int32_t info_report_template = 64;
+const std::int32_t info_report_date = 128;
+const std::int32_t info_report_creation = 256;
+const std::int32_t info_report_update = 512;
 
 struct report {
-  static void create(json& item, u32 flags) {
+  static void create(json& item, std::uint32_t flags) {
     if (!item.isObject()) {
       throw std::invalid_argument("report is not an object");
     }
@@ -67,9 +67,9 @@ struct report {
   }
 };
 
-static void verify(const json& input, bool with_seq, u32 must_flags) {
+static void verify(const json& input, bool with_seq, std::uint32_t must_flags) {
   onis::database::item::verify_seq_version_flags(input, with_seq);
-  u32 flags = input[BASE_FLAGS_KEY].asUInt();
+  std::uint32_t flags = input[BASE_FLAGS_KEY].asUInt();
   onis::server::item::check_must_flags(flags, must_flags, res);
 
   if (flags & info_report_status)

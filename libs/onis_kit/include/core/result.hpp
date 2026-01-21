@@ -5,7 +5,7 @@
 
 #include "./types.hpp"
 
-namespace dgc {
+namespace onis {
 
 #define EOS_NONE 0
 #define EOS_PARAM 1
@@ -185,12 +185,13 @@ struct result {
   bool good() const;
 
   // Operations:
-  void set(s32 status, s32 reason, const std::string& info, bool force);
+  void set(std::int32_t status, std::int32_t reason, const std::string& info,
+           bool force);
 
   // Members:
-  s32 status;
-  s32 reason;
+  std::int32_t status;
+  std::int32_t reason;
   std::string info;
 };
 
-}  // namespace dgc
+}  // namespace onis

@@ -41,14 +41,53 @@ using json = Json::Value;
 
 namespace onis::database {
 
-const s32 info_partition_name = 2;
-const s32 info_partition_description = 4;
-const s32 info_partition_status = 8;
-const s32 info_partition_parameters = 16;
-const s32 info_partition_volume = 32;
-const s32 info_partition_conflict = 64;
-const s32 info_partition_albums = 128;
-const s32 info_partition_smart_albums = 256;
+const std::int32_t info_partition_name = 2;
+const std::int32_t info_partition_description = 4;
+const std::int32_t info_partition_status = 8;
+const std::int32_t info_partition_parameters = 16;
+const std::int32_t info_partition_volume = 32;
+const std::int32_t info_partition_conflict = 64;
+const std::int32_t info_partition_albums = 128;
+const std::int32_t info_partition_smart_albums = 256;
+
+///////////////////////////////////////////////////////////////////////
+// partition_access_mode
+///////////////////////////////////////////////////////////////////////
+
+enum class partition_access_mode : std::uint32_t {
+  NONE = 0,
+  ALL_PARTITIONS = 1 << 0,
+  ALL_ALBUMS = 1 << 1,
+  ALL_SMART_ALBUMS = 1 << 2,
+  LIMITED_ACCESS = 1 << 8
+};
+
+constexpr std::int32_t partition_access_mode_mask =
+    static_cast<std::int32_t>(partition_access_mode::ALL_PARTITIONS) |
+    static_cast<std::int32_t>(partition_access_mode::ALL_ALBUMS) |
+    static_cast<std::int32_t>(partition_access_mode::ALL_SMART_ALBUMS) |
+    static_cast<std::int32_t>(partition_access_mode::LIMITED_ACCESS);
+
+inline partition_access_mode operator|(partition_access_mode a,
+                                       partition_access_mode b) {
+  return static_cast<partition_access_mode>(static_cast<std::uint32_t>(a) |
+                                            static_cast<std::uint32_t>(b));
+}
+
+inline partition_access_mode operator&(partition_access_mode a,
+                                       partition_access_mode b) {
+  return static_cast<partition_access_mode>(static_cast<std::uint32_t>(a) &
+                                            static_cast<std::uint32_t>(b));
+}
+
+inline partition_access_mode operator~(partition_access_mode a) {
+  return static_cast<partition_access_mode>((~static_cast<std::uint32_t>(a)) &
+                                            partition_access_mode_mask);
+}
+
+///////////////////////////////////////////////////////////////////////
+// album_access_item
+///////////////////////////////////////////////////////////////////////
 
 struct album_access_item {
   static void create(json& album) {
@@ -93,7 +132,7 @@ struct partition_access_item {
     onis::database::item::verify_array_value(input, PTAI_ALBUMS_KEY, false);
     for (const auto& album : input[PTAI_ALBUMS_KEY])
       album_access_item::verify(album);
-    s32 value = input[PTAI_MODE_KEY].asInt();
+    std::int32_t value = input[PTAI_MODE_KEY].asInt();
     if (value != 256) {
       value &= ~2;
       value &= ~4;
@@ -106,11 +145,6 @@ struct partition_access_item {
 };
 
 struct partition_access {
-  static const s32 all_partitions = 1;
-  static const s32 all_albums = 2;
-  static const s32 all_smart_albums = 4;
-  static const s32 limited_access = 256;
-
   static void create(json& access) {
     if (!access.isObject()) {
       throw std::invalid_argument("partition_access is not an object");
@@ -131,12 +165,15 @@ struct partition_access {
     onis::database::item::verify_array_value(input, PTA_PARTITIONS_KEY, false);
     for (const auto& partition : input[PTA_PARTITIONS_KEY])
       partition_access_item::verify(partition);
-    s32 value = input[PTA_MODE_KEY].asInt();
+    std::int32_t value = input[PTA_MODE_KEY].asInt();
     if (value != 256) {
-      value &= ~partition_access::all_partitions;
-      value &= ~partition_access::all_albums;
-      value &= ~partition_access::all_smart_albums;
-      value &= ~partition_access::limited_access;
+      value &=
+          ~static_cast<std::uint32_t>(partition_access_mode::ALL_PARTITIONS);
+      value &= ~static_cast<std::uint32_t>(partition_access_mode::ALL_ALBUMS);
+      value &=
+          ~static_cast<std::uint32_t>(partition_access_mode::ALL_SMART_ALBUMS);
+      value &=
+          ~static_cast<std::uint32_t>(partition_access_mode::LIMITED_ACCESS);
       if (value != 0) {
         throw std::invalid_argument("Invalid mode value");
       }
@@ -145,20 +182,20 @@ struct partition_access {
 };
 
 struct partition {
-  static const s32 no_overwrite_failure = 1;
-  static const s32 no_overwrite_success = 2;
+  static const std::int32_t no_overwrite_failure = 1;
+  static const std::int32_t no_overwrite_success = 2;
 
-  static const s32 reject_if_conflict = 1;
-  static const s32 send_to_conflict_list = 2;
+  static const std::int32_t reject_if_conflict = 1;
+  static const std::int32_t send_to_conflict_list = 2;
 
-  static const s32 conflict_patient_name = 2;
-  static const s32 conflict_patient_birthdate = 4;
-  static const s32 conflict_patient_sex = 8;
-  static const s32 conflict_accession_number = 16;
-  static const s32 conflict_study_id = 32;
-  static const s32 conflict_study_desc = 64;
+  static const std::int32_t conflict_patient_name = 2;
+  static const std::int32_t conflict_patient_birthdate = 4;
+  static const std::int32_t conflict_patient_sex = 8;
+  static const std::int32_t conflict_accession_number = 16;
+  static const std::int32_t conflict_study_id = 32;
+  static const std::int32_t conflict_study_desc = 64;
 
-  static void create(json& partition, u32 flags) {
+  static void create(json& partition, std::uint32_t flags) {
     if (!partition.isObject()) {
       throw std::invalid_argument("partition is not an object");
     }
@@ -200,7 +237,7 @@ struct partition {
 
   static void verify(const json& input, bool with_seq) {
     onis::database::item::verify_seq_version_flags(input, with_seq);
-    u32 flags = input[BASE_FLAGS_KEY].asUInt();
+    std::uint32_t flags = input[BASE_FLAGS_KEY].asUInt();
     if (flags & info_partition_name)
       onis::database::item::verify_string_value(input, PT_NAME_KEY, false,
                                                 false, 64);
@@ -225,7 +262,7 @@ struct partition {
       }
       onis::database::item::verify_integer_value(param, PT_OVERWRITE_MODE_KEY,
                                                  false, 0, 1);
-      s32 value = param[PT_OVERWRITE_MODE_KEY].asInt();
+      std::int32_t value = param[PT_OVERWRITE_MODE_KEY].asInt();
       if (value != no_overwrite_failure && value != no_overwrite_success) {
         throw std::invalid_argument("Invalid overwrite mode for partition.");
       }

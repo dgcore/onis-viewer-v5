@@ -21,8 +21,8 @@
 #define OS_REGEX_EMAIL "^.{0,255}$"
 #define OS_REGEX_LOGIN "^[a-zA-Z0-9]{4,}$"
 
-namespace dgc::util::regex {
+namespace onis::util::regex {
 
 void match(const std::string value, const std::string& exp, bool allow_empty);
 
-}  // namespace dgc::util::regex
+}  // namespace onis::util::regex

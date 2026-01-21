@@ -13,7 +13,7 @@ std::string sql_builder::build_select_query(const std::string& columns,
                                             const std::string& table,
                                             const std::string& where_clause,
                                             const std::string& order_by,
-                                            dgc::s32 limit,
+                                            std::int32_t limit,
                                             lock_mode lock) const {
   std::ostringstream sql;
 
@@ -251,7 +251,7 @@ std::string sql_builder::add_mssql_lock(const std::string& table,
   }
 }
 
-std::string sql_builder::add_limit_clause(dgc::s32 limit) const {
+std::string sql_builder::add_limit_clause(std::int32_t limit) const {
   if (limit <= 0) {
     return "";
   }
@@ -261,7 +261,7 @@ std::string sql_builder::add_limit_clause(dgc::s32 limit) const {
   return clause.str();
 }
 
-std::string sql_builder::add_top_clause(dgc::s32 limit) const {
+std::string sql_builder::add_top_clause(std::int32_t limit) const {
   if (limit <= 0) {
     return "";
   }

@@ -10,7 +10,8 @@ using onis::database::lock_mode;
 // Media operations
 ////////////////////////////////////////////////////////////////////////////////
 
-std::string site_database::get_media_columns(u32 flags, b32 add_table_name) {
+std::string site_database::get_media_columns(std::uint32_t flags,
+                                             b32 add_table_name) {
   std::string prefix = add_table_name ? "pacs_media." : "";
   std::string columns =
       prefix + "id, " + prefix + "site_id, " + prefix + "volume_id";
@@ -23,7 +24,8 @@ std::string site_database::get_media_columns(u32 flags, b32 add_table_name) {
 }
 
 void site_database::read_media_record(onis_kit::database::database_row& rec,
-                                      u32 flags, std::string* site_seq,
+                                      std::uint32_t flags,
+                                      std::string* site_seq,
                                       std::string* volume_seq, json& output) {
   onis::database::media::create(output, flags);
   output[BASE_SEQ_KEY] = rec.get_string("id");
@@ -84,7 +86,7 @@ void site_database::read_media_record(onis_kit::database::database_row& rec,
 }
 
 void site_database::get_volume_media_list(const std::string& volume_seq,
-                                          u32 flags, lock_mode lock,
+                                          std::uint32_t flags, lock_mode lock,
                                           json& output) {
   // Create and prepare query:
   std::string columns = get_media_columns(flags, false);

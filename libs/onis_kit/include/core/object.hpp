@@ -4,7 +4,7 @@
 #include <memory>
 #include "./types.hpp"
 
-namespace dgc {
+namespace onis {
 
 ///////////////////////////////////////////////////////////////////////////////
 // object class
@@ -20,4 +20,4 @@ typedef std::shared_ptr<object> object_ptr;
 typedef std::weak_ptr<object> object_wptr;
 typedef std::list<object_ptr> object_list;
 
-}  // namespace dgc
+}  // namespace onis

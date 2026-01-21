@@ -10,12 +10,12 @@ using json = Json::Value;
 
 namespace onis::database {
 
-const s32 info_volume_name = 2;
-const s32 info_volume_description = 4;
-const s32 info_volume_media = 8;
+const std::int32_t info_volume_name = 2;
+const std::int32_t info_volume_description = 4;
+const std::int32_t info_volume_media = 8;
 
 struct volume {
-  static void create(json& volume, u32 flags) {
+  static void create(json& volume, std::uint32_t flags) {
     if (!volume.isObject()) {
       throw std::invalid_argument("volume is not an object");
     }
@@ -32,9 +32,9 @@ struct volume {
   }
 
   static void verify(const json& input, bool with_seq, bool with_media_seq,
-                     u32 must_flags) {
+                     std::uint32_t must_flags) {
     onis::database::item::verify_seq_version_flags(input, with_seq);
-    u32 flags = input[BASE_FLAGS_KEY].asUInt();
+    std::uint32_t flags = input[BASE_FLAGS_KEY].asUInt();
     onis::database::item::check_must_flags(flags, must_flags);
     if (flags & info_volume_name)
       onis::database::item::verify_string_value(input, VO_NAME_KEY, false,

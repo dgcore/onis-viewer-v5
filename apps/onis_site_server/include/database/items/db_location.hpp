@@ -15,16 +15,16 @@ using json = Json::Value;
 
 namespace onis::database {
 
-const s32 info_location_name = 2;
-const s32 info_location_type = 4;
-const s32 info_location_org_name = 16;
-const s32 info_location_site_name = 32;
-const s32 info_location_url = 64;
-const s32 info_location_login = 256;
-const s32 info_location_password = 512;
+const std::int32_t info_location_name = 2;
+const std::int32_t info_location_type = 4;
+const std::int32_t info_location_org_name = 16;
+const std::int32_t info_location_site_name = 32;
+const std::int32_t info_location_url = 64;
+const std::int32_t info_location_login = 256;
+const std::int32_t info_location_password = 512;
 
 struct location {
-  static void create(json& item, u32 flags) {
+  static void create(json& item, std::uint32_t flags) {
     if (!item.isObject()) {
       throw std::invalid_argument("location is not an object");
     }
@@ -52,8 +52,8 @@ struct location {
 
   static void verify(const json& input, bool with_seq) {
     onis::database::item::verify_seq_version_flags(input, with_seq);
-    u32 flags = input[BASE_FLAGS_KEY].asUInt();
-    s32 type = -1;
+    std::uint32_t flags = input[BASE_FLAGS_KEY].asUInt();
+    std::int32_t type = -1;
     if (flags & info_location_type) {
       onis::database::item::verify_integer_value(input, LC_TYPE_KEY, false, 0,
                                                  1);

@@ -15,7 +15,8 @@ using onis::database::lock_mode;
 // Utilities
 //------------------------------------------------------------------------------
 
-std::string site_database::get_group_columns(u32 flags, bool add_table_name) {
+std::string site_database::get_group_columns(std::uint32_t flags,
+                                             bool add_table_name) {
   std::string prefix = add_table_name ? "pacs_roles." : "";
   if (flags == onis::database::info_all) {
     return prefix + "id, " + prefix + "site_id, " + prefix + "name, " + prefix +
@@ -42,8 +43,8 @@ std::string site_database::get_group_columns(u32 flags, bool add_table_name) {
 }
 
 void site_database::read_group_record(onis_kit::database::database_row& rec,
-                                      u32 flags, std::string* site_seq,
-                                      json& output) {
+                                      std::uint32_t flags,
+                                      std::string* site_seq, json& output) {
   onis::database::group::create(output, flags);
   output[BASE_SEQ_KEY] = rec.get_uuid("id", false, false);
   if (site_seq) {

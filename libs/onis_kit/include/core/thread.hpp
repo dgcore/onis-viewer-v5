@@ -15,16 +15,16 @@
 #define DGMSG_IDLE 254
 #define DGMSG_QUIT 255
 
-namespace dgc {
+namespace onis {
 
 //-----------------------------------------------------------------------------
 // message
 //-----------------------------------------------------------------------------
 
 struct message {
-  u32 id;
-  u64 wParam;
-  u64 lParam;
+  std::uint32_t id;
+  std::uint64_t wParam;
+  std::uint64_t lParam;
 };
 
 //-----------------------------------------------------------------------------
@@ -57,13 +57,15 @@ public:
   virtual void init_instance();
   virtual void exit_instance();
   bool is_running();
-  virtual void process_message(u32 id, u64 wParam, u64 lParam);
-  virtual bool post_message_tothread_(u32 id, u64 wParam, u64 lParam);
+  virtual void process_message(std::uint32_t id, std::uint64_t wParam,
+                               std::uint64_t lParam);
+  virtual bool post_message_tothread_(std::uint32_t id, std::uint64_t wParam,
+                                      std::uint64_t lParam);
   virtual bool on_idle();
-  virtual bool set_timer(u8 timer_id, u32 milliSec);
+  virtual bool set_timer(u8 timer_id, std::uint32_t milliSec);
   virtual bool kill_timer(u8 timer_id);
   virtual void on_timer(u8 timer_id);
-  u64 get_pending_message_count();
+  std::uint64_t get_pending_message_count();
 
 private:
   std::queue<message*> messages_;
@@ -75,4 +77,4 @@ private:
   static void event_loop(thread* thiz);
 };
 
-}  // namespace dgc
+}  // namespace onis

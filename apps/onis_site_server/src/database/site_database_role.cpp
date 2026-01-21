@@ -15,7 +15,8 @@ using onis::database::lock_mode;
 // Utilities
 //------------------------------------------------------------------------------
 
-std::string site_database::get_role_columns(u32 flags, bool add_table_name) {
+std::string site_database::get_role_columns(std::uint32_t flags,
+                                            bool add_table_name) {
   std::string prefix = add_table_name ? "pacs_roles." : "";
   if (flags == onis::database::info_all) {
     return prefix + "id, " + prefix + "site_id, " + prefix + "name, " + prefix +
@@ -42,7 +43,7 @@ std::string site_database::get_role_columns(u32 flags, bool add_table_name) {
 }
 
 void site_database::read_role_record(onis_kit::database::database_row& rec,
-                                     u32 flags, std::string* site_seq,
+                                     std::uint32_t flags, std::string* site_seq,
                                      json& output) {
   onis::database::role::create(output, flags);
   output[BASE_SEQ_KEY] = rec.get_uuid("id", false, false);
@@ -71,9 +72,9 @@ void site_database::read_role_record(onis_kit::database::database_row& rec,
 // Find roles
 //------------------------------------------------------------------------------
 
-void site_database::find_role_by_seq(const std::string& seq, u32 flags,
-                                     lock_mode lock, std::string* site_seq,
-                                     json& output) {
+void site_database::find_role_by_seq(const std::string& seq,
+                                     std::uint32_t flags, lock_mode lock,
+                                     std::string* site_seq, json& output) {
   // Create and prepare query:
   std::string columns = get_role_columns(flags, false);
   std::string where = "id = ?";
@@ -115,8 +116,9 @@ void site_database::find_role_by_seq(const std::string& seq, u32 flags,
 }
 
 void site_database::find_role_by_seq(const std::string& site_seq,
-                                     const std::string& seq, u32 flags,
-                                     lock_mode lock, json& output) {
+                                     const std::string& seq,
+                                     std::uint32_t flags, lock_mode lock,
+                                     json& output) {
   std::string site_seq_from_seq;
   find_role_by_seq(seq, flags, lock, &site_seq_from_seq, output);
   if (site_seq_from_seq != site_seq) {
@@ -125,8 +127,9 @@ void site_database::find_role_by_seq(const std::string& site_seq,
   }
 }
 
-void site_database::find_roles_for_site(const std::string& site_seq, u32 flags,
-                                        lock_mode lock, json& output) {
+void site_database::find_roles_for_site(const std::string& site_seq,
+                                        std::uint32_t flags, lock_mode lock,
+                                        json& output) {
   // Create and prepare query:
   std::string columns = get_role_columns(flags, false);
   std::string where = "site_id = ?";
@@ -171,9 +174,9 @@ void site_database::find_roles_for_site(const std::string& site_seq, u32 flags,
 //------------------------------------------------------------------------------
 
 void site_database::create_role(const std::string& site_seq, const json& input,
-                                json& output, u32 out_flags) {
-  u32 in_flags = input[BASE_FLAGS_KEY].asUInt();
-  std::string seq = dgc::util::uuid::generate_random_uuid();
+                                json& output, std::uint32_t out_flags) {
+  std::uint32_t in_flags = input[BASE_FLAGS_KEY].asUInt();
+  std::string seq = onis::util::uuid::generate_random_uuid();
   std::string sql = "INSERT INTO pacs_roles (id, site_id";
   if (in_flags & onis::database::info_role_name)
     sql += ", name";
@@ -238,7 +241,7 @@ void site_database::modify_role(const json& role) {
   // construct the sql command:
   std::string sql = "UPDATE pacs_roles SET ";
   std::string values;
-  u32 flags = role[BASE_FLAGS_KEY].asUInt();
+  std::uint32_t flags = role[BASE_FLAGS_KEY].asUInt();
   if (flags & onis::database::info_role_name)
     values += ", name=?";
   if (flags & onis::database::info_role_description)
@@ -256,7 +259,7 @@ void site_database::modify_role(const json& role) {
     // Create and prepare query:
     auto query = prepare_query(sql, "modify_role");
 
-    s32 index = 1;
+    std::int32_t index = 1;
     if (flags & onis::database::info_role_name) {
       bind_parameter(query, index, role[RO_NAME_KEY].asString(), "name");
     }
@@ -287,7 +290,7 @@ void site_database::modify_role(const json& role) {
     for (Json::ArrayIndex i = 0; i < permissions.size(); ++i) {
       const auto& permission = permissions[i];
       std::string name = permission["id"].asString();
-      s32 value = permission["value"].asInt();
+      std::int32_t value = permission["value"].asInt();
       std::string perm_seq = find_role_permission_seq(name);
       modify_role_permission_value(role[BASE_SEQ_KEY].asString(), perm_seq,
                                    value, true);
@@ -310,7 +313,7 @@ void site_database::modify_role(const json& role) {
       check_circular_membership(parent_id, child_id);
 
       // insert the membership:
-      std::string seq = dgc::util::uuid::generate_random_uuid();
+      std::string seq = onis::util::uuid::generate_random_uuid();
       std::string sql =
           "INSERT INTO pacs_role_membership (id, role_id, parent_id) VALUES "
           "(?, ?, ?)";
@@ -406,12 +409,13 @@ std::string site_database::find_role_permission_seq(const std::string& name) {
 }
 
 void site_database::create_role_permission_value(
-    const std::string& role_seq, const std::string& permission_id, s32 value) {
+    const std::string& role_seq, const std::string& permission_id,
+    std::int32_t value) {
   // search the permission seq:
   std::string perm_seq = find_role_permission_seq(permission_id);
 
   // prepare the sql command:
-  std::string seq = dgc::util::uuid::generate_random_uuid();
+  std::string seq = onis::util::uuid::generate_random_uuid();
   std::string sql =
       "INSERT INTO pacs_role_has_role_items (id, role_id, item_id, value) "
       "VALUES (?, ?, ?, ?)";
@@ -426,8 +430,8 @@ void site_database::create_role_permission_value(
 }
 
 void site_database::modify_role_permission_value(
-    const std::string& role_seq, const std::string& permission_seq, s32 value,
-    bool create) {
+    const std::string& role_seq, const std::string& permission_seq,
+    std::int32_t value, bool create) {
   // create sql command:
   std::string sql =
       "UPDATE pacs_role_has_role_items SET value=? WHERE role_id=? AND "
@@ -441,7 +445,7 @@ void site_database::modify_role_permission_value(
   auto result = execute_query(query);
   if (result->get_affected_rows() == 0 && create) {
     /*if (!exist_permission(OSTRUE, role_seq, permission_seq, res)) {
-      std::string seq = dgc::util::uuid::generate_random_uuid();
+      std::string seq = onis::util::uuid::generate_random_uuid();
       sql =
           "INSERT INTO PACS_ROLE_HAS_ROLE_ITEMS (ID, ROLE_ID, ITEM_ID, "
           "VALUE) VALUES (?, ?, ?, ?)";

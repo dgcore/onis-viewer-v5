@@ -1,6 +1,6 @@
 #include "../../include/core/result.hpp"
 
-namespace dgc {
+namespace onis {
 
 //-----------------------------------------------------------------------------
 // Constructor
@@ -29,7 +29,8 @@ bool result::good() const {
 // Operations
 //-----------------------------------------------------------------------------
 
-void result::set(s32 status, s32 reason, const std::string& info, bool force) {
+void result::set(std::int32_t status, std::int32_t reason,
+                 const std::string& info, bool force) {
   if (!force && this->status != OSRSP_SUCCESS) {
     return;
   }
@@ -38,4 +39,4 @@ void result::set(s32 status, s32 reason, const std::string& info, bool force) {
   this->info = info;
 }
 
-}  // namespace dgc
+}  // namespace onis

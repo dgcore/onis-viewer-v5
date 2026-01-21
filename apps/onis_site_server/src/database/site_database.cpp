@@ -50,7 +50,7 @@ std::unique_ptr<onis_kit::database::database_query>
 site_database::create_and_prepare_query(const std::string& columns,
                                         const std::string& from,
                                         const std::string& where,
-                                        lock_mode lock) {
+                                        lock_mode lock) const {
   std::string sql =
       sql_builder_->build_select_query(columns, from, where, "", 0, lock);
   auto query = connection_->create_query();
@@ -62,7 +62,7 @@ site_database::create_and_prepare_query(const std::string& columns,
 
 std::unique_ptr<onis_kit::database::database_query>
 site_database::prepare_query(const std::string& sql,
-                             const std::string& context) {
+                             const std::string& context) const {
   auto query = connection_->create_query();
   if (!query->prepare(sql)) {
     std::string error_msg = "Failed to prepare query";
@@ -77,7 +77,7 @@ site_database::prepare_query(const std::string& sql,
 
 std::unique_ptr<onis_kit::database::database_result>
 site_database::execute_query(
-    std::unique_ptr<onis_kit::database::database_query>& query) {
+    std::unique_ptr<onis_kit::database::database_query>& query) const {
   if (!query) {
     throw std::runtime_error("Query is null");
   }
@@ -86,7 +86,7 @@ site_database::execute_query(
 
 void site_database::execute_and_check_affected(
     std::unique_ptr<onis_kit::database::database_query>& query,
-    const std::string& message) {
+    const std::string& message) const {
   auto result = execute_query(query);
 
   // Check if any rows were affected

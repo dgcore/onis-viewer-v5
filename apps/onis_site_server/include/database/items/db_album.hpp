@@ -10,12 +10,12 @@ using json = Json::Value;
 
 namespace onis::database {
 
-const s32 info_album_name = 2;
-const s32 info_album_description = 4;
-const s32 info_album_status = 8;
+const std::int32_t info_album_name = 2;
+const std::int32_t info_album_description = 4;
+const std::int32_t info_album_status = 8;
 
 struct album {
-  static void create(json& album, u32 flags) {
+  static void create(json& album, std::uint32_t flags) {
     if (!album.isObject()) {
       throw std::invalid_argument("album is not an object");
     }
@@ -33,9 +33,10 @@ struct album {
     }
   }
 
-  static void verify(const json& input, bool with_seq, u32 must_flags) {
+  static void verify(const json& input, bool with_seq,
+                     std::uint32_t must_flags) {
     onis::database::item::verify_seq_version_flags(input, with_seq);
-    u32 flags = input[BASE_FLAGS_KEY].asUInt();
+    std::uint32_t flags = input[BASE_FLAGS_KEY].asUInt();
     onis::database::item::check_must_flags(flags, must_flags);
 
     if (flags & onis::database::info_album_name) {

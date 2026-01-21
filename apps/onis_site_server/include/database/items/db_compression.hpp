@@ -13,13 +13,13 @@ using json = Json::Value;
 
 namespace onis::database {
 
-const s32 info_compression_enable = 2;
-const s32 info_compression_mode = 4;
-const s32 info_compression_transfer = 8;
-const s32 info_compression_update = 16;
+const std::int32_t info_compression_enable = 2;
+const std::int32_t info_compression_mode = 4;
+const std::int32_t info_compression_transfer = 8;
+const std::int32_t info_compression_update = 16;
 
 struct compression {
-  static void create(json& compression, u32 flags) {
+  static void create(json& compression, std::uint32_t flags) {
     if (!compression.isObject()) {
       throw std::invalid_argument("compression is not an object");
     }
@@ -42,7 +42,7 @@ struct compression {
 
   static void verify(const json& input, bool with_seq) {
     onis::database::item::verify_seq_version_flags(input, with_seq);
-    u32 flags = input[BASE_FLAGS_KEY].asUInt();
+    std::uint32_t flags = input[BASE_FLAGS_KEY].asUInt();
     if (flags & info_compression_enable)
       onis::database::item::verify_integer_value(input, CP_ENABLE_KEY, false, 0,
                                                  1);
