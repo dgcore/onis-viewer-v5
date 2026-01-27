@@ -45,6 +45,7 @@ dependencies:
 
   # HTTP client for making network requests
   http: ^1.2.0
+  uuid_v4: ^1.0.2
 
 dev_dependencies:
   flutter_test:

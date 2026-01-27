@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:core';
 
 import 'package:flutter/widgets.dart';
+import 'package:onis_viewer/core/error_codes.dart';
+import 'package:onis_viewer/core/onis_exception.dart';
 
 import '../api/request/async_request.dart';
 
@@ -40,6 +42,11 @@ class DatabaseSourceLoginState extends ChangeNotifier {
 /// Represents a database source with hierarchical structure
 /// Each source can have sub-sources and maintains a weak reference to its parent
 abstract class DatabaseSource extends ChangeNotifier {
+  /// Finalizer to detect when the source is garbage collected
+  static final Finalizer<String> _finalizer = Finalizer((uid) {
+    debugPrint('🗑️ DatabaseSource DESTRUCTED: uid=$uid');
+  });
+
   /// Unique identifier for this source
   final String uid;
 
@@ -157,6 +164,9 @@ abstract class DatabaseSource extends ChangeNotifier {
     if (metadata != null) {
       _metadata.addAll(metadata);
     }
+    // Attach finalizer to detect when this source is garbage collected
+    _finalizer.attach(this, uid);
+    debugPrint('✅ DatabaseSource CREATED: uid=$uid, name=$name');
   }
 
   /// Get the name of this source
@@ -169,6 +179,8 @@ abstract class DatabaseSource extends ChangeNotifier {
       notifyListeners();
     }
   }
+
+  DatabaseSource? get defaultSource => this;
 
   void addRequest(AsyncRequest request) {
     debugPrint('---------- Adding request: ${request.requestType}');
@@ -189,6 +201,15 @@ abstract class DatabaseSource extends ChangeNotifier {
 
   /// Get the source manager (weak reference)
   DatabaseSourceManager? get manager => _managerRef?.target;
+
+  /// Check if this source is actually registered with its manager
+  /// This is more reliable than checking the weak reference, as the source
+  /// might still be alive due to other references (streams, listeners, etc.)
+  bool get isRegistered {
+    final mgr = manager;
+    if (mgr == null) return false;
+    return mgr.findSourceByUid(uid) != null;
+  }
 
   /// Get the list of sub-sources (read-only)
   List<DatabaseSource> get subSources => List.unmodifiable(_subSources);
@@ -298,6 +319,13 @@ abstract class DatabaseSource extends ChangeNotifier {
   }
 
   Future<void> disconnect() async {
+    if (loginState.status == ConnectionStatus.disconnected ||
+        loginState.status == ConnectionStatus.disconnecting) {
+      return;
+    }
+    if (loginState.status != ConnectionStatus.loggedIn) {
+      throw OnisException(OnisErrorCodes.logicError, 'Source is not logged in');
+    }
     loginState.setStatus(ConnectionStatus.disconnecting);
     await waitForPendingRequests();
     loginState.setStatus(ConnectionStatus.disconnected);
@@ -309,6 +337,35 @@ abstract class DatabaseSource extends ChangeNotifier {
       _requests.forEach((type, list) {});
       await Future.delayed(pollInterval);
     }
+  }
+
+  /// Track if this source has been disposed
+  bool _isDisposed = false;
+
+  /// Check if this source has been disposed
+  bool get isDisposed => _isDisposed;
+
+  @override
+  void dispose() {
+    if (_isDisposed) {
+      debugPrint(
+          '⚠️ DatabaseSource DISPOSE called again (already disposed): uid=$uid');
+      return;
+    }
+    _isDisposed = true;
+    final subSourceCount = _subSources.length;
+    final requestCount =
+        _requests.values.fold<int>(0, (sum, list) => sum + list.length);
+    final hasParent = _parentRef?.target != null;
+    final hasManager = _managerRef?.target != null;
+    debugPrint(
+        '🔌 DatabaseSource DISPOSED: uid=$uid, name=$name, hasListeners=$hasListeners, subSources=$subSourceCount, requests=$requestCount, hasParent=$hasParent, hasManager=$hasManager');
+    // Clear internal references to help GC
+    _subSources.clear();
+    _requests.clear();
+    _parentRef = null;
+    _managerRef = null;
+    super.dispose();
   }
 }
 
@@ -326,11 +383,21 @@ class DatabaseSourceManager extends ChangeNotifier {
   final StreamController<DatabaseSource> _sourceUnregisteredController =
       StreamController<DatabaseSource>.broadcast();
 
+  /// Streams for connection/disconnection events
+  final StreamController<DatabaseSource> _sourceConnectionController =
+      StreamController<DatabaseSource>.broadcast();
+  final StreamController<DatabaseSource> _sourceDisconnectionController =
+      StreamController<DatabaseSource>.broadcast();
+
   /// Stream getters
   Stream<DatabaseSource> get onSourceRegistered =>
       _sourceRegisteredController.stream;
   Stream<DatabaseSource> get onSourceUnregistered =>
       _sourceUnregisteredController.stream;
+  Stream<DatabaseSource> get onSourceConnection =>
+      _sourceConnectionController.stream;
+  Stream<DatabaseSource> get onSourceDisconnection =>
+      _sourceDisconnectionController.stream;
 
   /// Get all root sources
   List<DatabaseSource> get rootSources => List.unmodifiable(_rootSources);
@@ -338,6 +405,14 @@ class DatabaseSourceManager extends ChangeNotifier {
   /// Get all sources
   List<DatabaseSource> get allSources =>
       List.unmodifiable(_sourcesByUid.values);
+
+  void onSourceConnected(DatabaseSource source) {
+    _sourceConnectionController.add(source);
+  }
+
+  void onSourceDisconnected(DatabaseSource source) {
+    _sourceDisconnectionController.add(source);
+  }
 
   /// Register an existing source with the manager
   /// This is the preferred way to add sources to the manager
@@ -355,6 +430,39 @@ class DatabaseSourceManager extends ChangeNotifier {
       _setParent(source, parent);
     }
     _registerSource(source);
+  }
+
+  void removeSource(DatabaseSource source) {
+    if (_sourcesByUid.remove(source.uid) == null) return;
+    debugPrint(
+        '❌ DatabaseSource REMOVED from manager: uid=${source.uid}, name=${source.name}, hasListeners=${source.hasListeners}, subSources=${source.subSources.length}');
+    for (final subSource in source.subSources) {
+      removeSource(subSource);
+    }
+    // Detach the source:
+    if (source.parent == null) {
+      _rootSources.remove(source);
+    } else {
+      source.parent!._removeSubSourceInternal(source);
+    }
+    // Clear parent and manager of the removed source
+    source._setParentInternal(null);
+    source._setManagerInternal(null);
+    // Only add to stream if controller is not closed
+    if (!_sourceUnregisteredController.isClosed) {
+      _sourceUnregisteredController.add(source);
+    }
+    // Dispose the source to clean up resources
+    // Note: This is safe even if the source is still referenced elsewhere,
+    // as dispose() is idempotent and ChangeNotifier.dispose() handles cleanup
+    source.dispose();
+    notifyListeners();
+
+    // Note: There's no way to force GC in Dart - it's non-deterministic.
+    // The finalizer will run when GC actually collects the object, which may be delayed.
+    // If hasListeners=false in the dispose() log, nothing should be keeping it alive.
+    debugPrint(
+        '💡 Hint: Source ${source.uid} should be GC\'d when all references are gone. Finalizer will run when GC occurs.');
   }
 
   /// Internal method to register a source
@@ -386,149 +494,37 @@ class DatabaseSourceManager extends ChangeNotifier {
     parent._addSubSourceInternal(source);
   }
 
-  Future<void> removeSource(DatabaseSource source) async {
-    if (_sourcesByUid.remove(source.uid) != null) {
-      while (source.subSources.isNotEmpty) {
-        final subSource = source.subSources.removeAt(0);
-        await removeSource(subSource);
-      }
-      await source.disconnect();
-      if (source.parent == null) {
-        _rootSources.remove(source);
-      } else {
-        // Use internal method to maintain relationship integrity
-        source.parent!._removeSubSourceInternal(source);
-      }
-      // Clear parent and manager of the removed source
-      source._setParentInternal(null);
-      source._setManagerInternal(null);
-      // Only add to stream if controller is not closed
-      if (!_sourceUnregisteredController.isClosed) {
-        _sourceUnregisteredController.add(source);
-      }
-      notifyListeners();
-    }
-  }
-
-  /// Remove a source from the manager
-  /*void removeSource(DatabaseSource source) {
-    if (_sourcesByUid.remove(source.uid) != null) {
-      if (source.parent == null) {
-        _rootSources.remove(source);
-      } else {
-        // Use internal method to maintain relationship integrity
-        source.parent!._removeSubSourceInternal(source);
-      }
-
-      // Remove all descendants as well
-      for (final descendant in source.allDescendants) {
-        _sourcesByUid.remove(descendant.uid);
-        descendant._setParentInternal(null);
-        descendant._setManagerInternal(null);
-      }
-
-      // Clear parent and manager of the removed source
-      source._setParentInternal(null);
-      source._setManagerInternal(null);
-
-      _sourceUnregisteredController.add(source);
-      notifyListeners();
-    }
-  }*/
-
-  /// Remove a source from the manager, disconnecting it first if needed
-  /// Returns a Future that completes when the source is fully removed
-  /*Future<void> removeSourceWithDisconnect(DatabaseSource source) async {
-    // Check if source needs disconnection
-    if (source.isActive) {
-      try {
-        // Use dynamic casting to avoid circular dependency
-        final dynamic dynamicSource = source;
-        if (dynamicSource.disconnect != null) {
-          await dynamicSource.disconnect();
-        } else {
-          debugPrint(
-              'Disconnect not implemented for source type ${source.runtimeType}');
-        }
-      } catch (e) {
-        // Log error but continue with removal
-        debugPrint('Failed to disconnect source ${source.uid}: $e');
-      }
-    }
-
-    // Now remove the source
-    removeSource(source);
-  }*/
-
-  /// Remove a source by UID, disconnecting it first if needed
-  /// Returns a Future that completes when the source is fully removed
-  /*Future<void> removeSourceByUidWithDisconnect(String uid) async {
-    final source = _sourcesByUid[uid];
-    if (source != null) {
-      await removeSourceWithDisconnect(source);
-    }
-  }*/
-
   /// Find a source by UID
   DatabaseSource? findSourceByUid(String uid) {
     return _sourcesByUid[uid];
   }
 
-  Future<void> clear() async {
+  void clear() {
     while (_rootSources.isNotEmpty) {
-      await removeSource(_rootSources.removeAt(0));
+      removeSource(_rootSources.removeAt(0));
     }
   }
-
-  /// Clear all sources
-  /*void clear() {
-    // Clear manager references from all sources before clearing
-    for (final source in _sourcesByUid.values) {
-      source._setManagerInternal(null);
-    }
-    _rootSources.clear();
-    _sourcesByUid.clear();
-    notifyListeners();
-  }*/
-
-  /// Clean exit: disconnect all active sources before clearing
-  /// Returns a Future that completes when all sources are properly disconnected
-  /*Future<void> removeAllSources() async {
-    while (_rootSources.isNotEmpty) {
-      final source = _rootSources.removeAt(0);
-      //removeSource(source);
-    }*/
-  /*final activeSources =
-        _sourcesByUid.values.where((so  urce) => source.isActive).toList();
-
-    // Disconnect all active sources concurrently
-    final disconnectFutures = activeSources.map((source) async {
-      try {
-        // Use dynamic casting to avoid circular dependency
-        final dynamic dynamicSource = source;
-        if (dynamicSource.disconnect != null) {
-          await dynamicSource.disconnect();
-        } else {
-          debugPrint(
-              'Disconnect not implemented for source type ${source.runtimeType}');
-        }
-      } catch (e) {
-        debugPrint(
-            'Failed to disconnect source ${source.uid} during clean exit: $e');
-      }
-    });
-
-    // Wait for all disconnections to complete
-    await Future.wait(disconnectFutures);
-
-    // Now clear all sources
-    clear();*/
-  //}
 
   @override
   void dispose() {
     _sourceRegisteredController.close();
     _sourceUnregisteredController.close();
     super.dispose();
+  }
+
+  Future<void> disconnectAll() async {
+    while (true) {
+      // Find the first connected source in the _sourcesByUid map
+      DatabaseSource? firstConnectedSource;
+      try {
+        firstConnectedSource = _sourcesByUid.values.firstWhere(
+          (source) => source.loginState.status == ConnectionStatus.loggedIn,
+        );
+        await firstConnectedSource.disconnect();
+      } catch (e) {
+        // No connected source found
+        return;
+      }
+    }
   }
 }

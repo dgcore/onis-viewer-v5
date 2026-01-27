@@ -1,6 +1,8 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:onis_viewer/core/models/study.dart';
+import 'package:onis_viewer/plugins/database/ui/study_list_view.dart';
 
 import '../../../api/core/ov_api_core.dart';
 import '../../../core/constants.dart';
@@ -89,6 +91,11 @@ class _DatabasePageState extends BasePageState<DatabasePage> {
       builder: (context, child) {
         // Get the selected source to determine capabilities
         final selected = sourceController!.selectedSource;
+        final canOpen = sourceController.canOpen(selected?.uid ?? '');
+        final canImport = sourceController.canImport(selected?.uid ?? '');
+        final canExport = sourceController.canExport(selected?.uid ?? '');
+        final canTransfer = sourceController.canTransfer(selected?.uid ?? '');
+        final canSearch = sourceController.canSearch(selected?.uid ?? '');
 
         return DatabaseToolbar(
           onPreferences: () => {},
@@ -103,13 +110,11 @@ class _DatabasePageState extends BasePageState<DatabasePage> {
               _controller.onSearch(selected.uid);
             }*/
           },
-          canOpen: selected != null ? true : false,
-          canImport: selected != null ? true : false,
-          canExport: selected != null ? true : false,
-          canTransfer: selected != null ? true : false,
-          canSearch: selected != null
-              ? /*_controller.canSearch(selected.uid)*/ true
-              : false,
+          canOpen: canOpen,
+          canImport: canImport,
+          canExport: canExport,
+          canTransfer: canTransfer,
+          canSearch: canSearch,
         );
       },
     );
@@ -124,20 +129,6 @@ class _DatabasePageState extends BasePageState<DatabasePage> {
       if (selected.loginState.status != ConnectionStatus.loggedIn) {
         loginPanel = selected.buildLoginPanel(context, true);
       }
-      /*DatabaseSourceLoginState? loginState =
-          sourceController!.getLoginState(selected.uid);
-      if (loginState != null &&
-          loginState.status != ConnectionStatus.loggedIn) {
-        loginPanel = selected.buildLoginPanel(
-          context,
-          loginState,
-          (AsyncRequest? request) {
-            if (request != null) {
-              //sourceController?.addPendingRequest(request);
-            }
-          },
-        );
-      }*/
     }
     final rightPanel = selected == null
         ? _buildNoSelectionPlaceholder()
@@ -206,47 +197,48 @@ class _DatabasePageState extends BasePageState<DatabasePage> {
         : <Study>[];
     final selectedStudies = selected != null
         ? _controller.getSelectedStudiesForSource(selected.uid)
-        : <Study>[];
+        : <Study>[];*/
+
+    final sourceController = _dbApi?.sourceController;
+    final selectedSource = sourceController?.selectedSource;
+
+    final studies = <Study>[];
+    final selectedStudies = <Study>[];
+    final username = 'madric';
+    final isDisconnecting = false;
 
     return StudyListView(
       studies: studies,
       selectedStudies: selectedStudies,
       onStudySelected: (study) {
-        if (selected != null) {
+        /*if (selected != null) {
           _controller.selectStudy(selected.uid, study);
-        }
+        }*/
       },
       onStudiesSelected: (studies) {
-        if (selected != null) {
+        /*if (selected != null) {
           _controller.selectStudies(selected.uid, studies);
-        }
+        }*/
       },
       username: username,
       isDisconnecting: isDisconnecting,
       onDisconnect: () {
-        debugPrint('Disconnect button clicked');
-        if (selected != null) {
-          debugPrint(
-              'Calling disconnect on selected source: ${selected.runtimeType}');
-          selected.disconnect().catchError((error) {
-            debugPrint('Disconnect failed: $error');
-          });
-        } else {
-          debugPrint('No source selected for disconnect');
+        if (selectedSource != null) {
+          selectedSource.disconnect();
         }
       },
-      initialScrollPosition: selected != null
+      initialScrollPosition: /*selected != null
           ? _controller.getScrollPositionForSource(selected.uid)
-          : 0.0,
+          :*/
+          0.0,
       onScrollPositionChanged: (position) {
-        debugPrint(
+        /*debugPrint(
             'Database page received scroll position: $position for source: ${selected?.uid}');
         if (selected != null) {
           _controller.saveScrollPositionForSource(selected.uid, position);
-        }
+        }*/
       },
-    );*/
-    return Container();
+    );
   }
 
   @override

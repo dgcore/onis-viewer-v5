@@ -38,6 +38,12 @@ class SiteServerPlugin implements OnisViewerPlugin {
     final dbApi =
         OVApi().plugins.getPublicApi<DatabaseApi>('onis_database_plugin');
     if (dbApi != null) {
+      SiteSource(
+        uid: 'site_server_1',
+        name: 'Site Server 1',
+        metadata: {'type': 'site_server', 'url': 'http://localhost:8080'},
+      );
+
       dbApi.sourceController.sources.registerSource(SiteSource(
         uid: 'site_server_1',
         name: 'Site Server 1',
