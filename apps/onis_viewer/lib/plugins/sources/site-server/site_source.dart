@@ -1,8 +1,11 @@
 import 'dart:core';
 
 import 'package:flutter/material.dart';
+import 'package:onis_viewer/core/error_codes.dart';
+import 'package:onis_viewer/core/onis_exception.dart';
 import 'package:onis_viewer/plugins/sources/site-server/credentials/credential_store.dart';
 import 'package:onis_viewer/plugins/sources/site-server/ui/site_server_login_panel.dart';
+import 'package:uuid_v4/uuid_v4.dart';
 
 import '../../../api/request/async_request.dart';
 import '../../../core/database_source.dart';
@@ -18,6 +21,7 @@ class SiteSourceLoginState extends DatabaseSourceLoginState {
 enum SiteChildSourceType {
   partition,
   album,
+  smartAlbum,
   dicomPacs,
   dicomFolder,
   partitionFolder
@@ -27,6 +31,41 @@ enum SiteChildSourceType {
 class SiteChildSource extends DatabaseSource {
   final SiteChildSourceType type;
   WeakReference<SiteSource>? _parentSiteRef;
+  final DatabaseSourceLoginState _loginState = SiteSourceLoginState();
+
+  static SiteChildSource createFromJson(Map<String, dynamic> data) {
+    SiteChildSourceType type;
+    switch (data['type'] as int) {
+      case 1:
+        type = SiteChildSourceType.partitionFolder;
+        break;
+      case 2:
+        type = SiteChildSourceType.partition;
+        break;
+      case 3:
+        type = SiteChildSourceType.dicomFolder;
+        break;
+      case 4:
+        type = SiteChildSourceType.dicomPacs;
+        break;
+      case 5:
+        type = SiteChildSourceType.album;
+        break;
+      case 6:
+        type = SiteChildSourceType.smartAlbum;
+        break;
+      default:
+        throw OnisException(OnisErrorCodes.invalidResponse,
+            "Invalid site child source type: ${data["type"] as int}");
+    }
+
+    SiteChildSource source = SiteChildSource(
+      uid: UUIDv4().toString(),
+      name: data["name"] as String,
+      type: type,
+    );
+    return source;
+  }
 
   SiteChildSource({
     required super.uid,
@@ -48,8 +87,7 @@ class SiteChildSource extends DatabaseSource {
 
   /// Get the login state from the parent site source
   @override
-  DatabaseSourceLoginState get loginState =>
-      parentSite?.loginState ?? DatabaseSourceLoginState();
+  DatabaseSourceLoginState get loginState => _loginState;
 
   /// Get the type as a display string
   String get typeDisplayName {
@@ -58,6 +96,8 @@ class SiteChildSource extends DatabaseSource {
         return 'Partition';
       case SiteChildSourceType.album:
         return 'Album';
+      case SiteChildSourceType.smartAlbum:
+        return 'Smart Album';
       case SiteChildSourceType.dicomPacs:
         return 'DICOM PACS';
       case SiteChildSourceType.dicomFolder:
@@ -73,6 +113,8 @@ class SiteChildSource extends DatabaseSource {
       case SiteChildSourceType.partition:
         return Icons.folder;
       case SiteChildSourceType.album:
+        return Icons.photo_library;
+      case SiteChildSourceType.smartAlbum:
         return Icons.photo_library;
       case SiteChildSourceType.dicomPacs:
         return Icons.medical_services;
@@ -119,9 +161,11 @@ class SiteChildSource extends DatabaseSource {
   @override
   Future<void> disconnect() async {
     final parentSite = this.parentSite;
-    if (parentSite != null) {
-      return parentSite.disconnect();
-    }
+    return parentSite?.disconnect();
+  }
+
+  Future<void> _disconnectBase() async {
+    return super.disconnect();
   }
 }
 
@@ -138,6 +182,17 @@ class SiteSource extends DatabaseSource {
 
   @override
   DatabaseSourceLoginState get loginState => _loginState;
+
+  @override
+  DatabaseSource? get defaultSource {
+    if (subSources.isNotEmpty) {
+      if (subSources.first.subSources.isNotEmpty) {
+        return subSources.first.subSources.first;
+      }
+      return subSources.first;
+    }
+    return this;
+  }
 
   /// Get whether the source is currently disconnecting
   //@override
@@ -183,55 +238,40 @@ class SiteSource extends DatabaseSource {
 
   /// Disconnect from the source
   @override
-  @override
   Future<void> disconnect() async {
-    await super.disconnect();
-
-    //if (_isDisconnecting) return;
-    //_isDisconnecting = true;
-    //notifyListeners();
-
-    // Emit disconnection event and wait for subscribers to complete
-    //await emitDisconnecting();
-
-    // Simulate slow server response for disconnect
-    //await Future.delayed(const Duration(seconds: 10));
-
-    // Remove all child sources that were created during login
-    /*final api = OVApi();
-    final manager = api.sources;
-
-    // Get all child sources of this site source using weak references
-    final childSources = manager.allSources
-        .where((source) =>
-            source is SiteChildSource && (source).parentSite == this)
-        .toList();
-
-    // Remove each child source
-    for (final childSource in childSources) {
-      manager.removeSource(childSource);
+    if (loginState.status == ConnectionStatus.disconnecting ||
+        loginState.status == ConnectionStatus.disconnected) {
+      return;
+    }
+    if (loginState.status == ConnectionStatus.loggingIn) {
+      // We must wait for the login to complete
+      await waitForPendingRequests();
     }
 
-    // Mark source as disconnected
-    isActive = false;
-    lastUsername = null;
-    lastPassword = null;
-    lastRemember = false;
-    isLoggingIn = false;
-    lastErrorMessage = null;
-    _isDisconnecting = false;
-
-    debugPrint(
-        'Disconnected from site: $name (removed ${childSources.length} child sources)');
-
-    notifyListeners();
-
-    // Check and fix selection after disconnect completes
-    // Use the current site UID for selection logic
-    final dbApi = api.plugins.getPublicApi('onis_database_plugin');
-    if (dbApi != null) {
-      dbApi.checkAndFixSelection(uid);
-    }*/
+    // Send a logout request to the server if logged in
+    if (loginState.status == ConnectionStatus.loggedIn) {
+      // Send a logout request to the server:
+      AsyncRequest? request;
+      try {
+        request = createRequest(RequestType.logout, {});
+        if (request != null) {
+          addRequest(request);
+          await request.send();
+        }
+      } catch (e) {
+        //print('Error sending logout request: $e');
+      } finally {
+        if (request != null) removeRequest(request);
+      }
+    }
+    //loginState.setStatus(ConnectionStatus.disconnecting);
+    // Disconnect all child sources and remove them from the manager
+    for (final subSource in subSources) {
+      await (subSource as SiteChildSource)._disconnectBase();
+      manager?.removeSource(subSource);
+    }
+    await super.disconnect();
+    manager?.onSourceDisconnected(this);
   }
 
   /// Update credentials (called when user types in login fields)
@@ -264,7 +304,8 @@ class SiteSource extends DatabaseSource {
     AsyncRequest? request;
     try {
       if (siteLoginState.status != ConnectionStatus.disconnected) {
-        throw Exception('The source is not disconnected.');
+        throw OnisException(
+            OnisErrorCodes.logicError, "The source is not disconnected.");
       }
       // Create authentication request
       request = createRequest(RequestType.login, {
@@ -284,17 +325,18 @@ class SiteSource extends DatabaseSource {
       final response = await request.send();
 
       if (!response.isSuccess) {
-        throw Exception('Authentication failed: ${response.errorMessage}');
+        throw OnisException(
+            OnisErrorCodes.invalidResponse, "${response.errorMessage}");
       }
 
       // Check if authentication was successful
       final data = response.data;
-      if (data == null || data['success'] != true) {
-        throw Exception('Authentication failed: Invalid response from server');
+      if (data == null) {
+        throw OnisException(
+            OnisErrorCodes.invalidResponse, "Missing response from server");
       }
 
       loginState.setStatus(ConnectionStatus.loggedIn, errorMessage: null);
-      removeRequest(request);
 
       // Store or clear credentials based on remember flag
       if (useKeyChain && credentials.remember) {
@@ -307,19 +349,16 @@ class SiteSource extends DatabaseSource {
       } else {
         await SiteServerCredentialStore.clear(uid);
       }
-
-      // Create child sources after successful authentication
-      createChildSources();
-
-      // Auto-expand the site source node in the source tree
-      /*final api = OVApi();
-      final dbApi = api.plugins.getPublicApi('onis_database_plugin');
-      if (dbApi != null) {
-        dbApi.expandSourceNode(uid, expand: true, expandChildren: true);
-      }*/
+      // Create child sources from the server response
+      createChildSources(data['config']['sources']);
+      manager?.onSourceConnected(this);
+    } on OnisException catch (e) {
+      loginState.setStatus(ConnectionStatus.disconnected,
+          errorMessage: e.message);
     } catch (e) {
       loginState.setStatus(ConnectionStatus.disconnected,
           errorMessage: e.toString());
+    } finally {
       if (request != null) removeRequest(request);
     }
   }
@@ -434,51 +473,28 @@ class SiteSource extends DatabaseSource {
       ));*/
   //}
 
-  void createChildSources() {
-    // Create partition source as a child of this site source
+  void createAndRegisterChildSource(
+      Map<String, dynamic> childData, DatabaseSource parent) {
+    final childSource = SiteChildSource.createFromJson(childData);
+    childSource.setParentSite(this);
+    (childSource.loginState as SiteSourceLoginState).credentials =
+        (loginState as SiteSourceLoginState).credentials;
+    manager?.registerSource(childSource, parentUid: parent.uid);
+    childSource.loginState.setStatus(ConnectionStatus.loggedIn);
+    for (final nestedChild in childData['children']) {
+      if (nestedChild is Map<String, dynamic>) {
+        createAndRegisterChildSource(nestedChild, childSource);
+      }
+    }
+  }
 
-    /*final partitionsFolder = SiteChildSource(
-      uid: '${uid}_partitions',
-      name: 'Partitions',
-      type: SiteChildSourceType.partitionFolder,
-      metadata: {
-        'type': 'partition_list',
-        'parent_site': uid,
-      },
-    );
-    partitionsFolder.setParentSite(this);
-    OVApi().sources.registerSource(partitionsFolder, parentUid: uid);
-
-    final partition1 = SiteChildSource(
-      uid: '${uid}_partition1',
-      name: 'Partition 1',
-      type: SiteChildSourceType.partition,
-      metadata: {
-        'type': 'partition',
-        'parent_site': uid,
-        'description': 'Main clinical data partition',
-        'size': '2.5 TB',
-      },
-    );
-    partition1.setParentSite(this);
-    OVApi().sources.registerSource(partition1, parentUid: partitionsFolder.uid);
-
-    final partition2 = SiteChildSource(
-      uid: '${uid}_partition2',
-      name: 'Partition 2',
-      type: SiteChildSourceType.partition,
-      metadata: {
-        'type': 'partition',
-        'parent_site': uid,
-        'description': 'Research and development data',
-        'size': '1.8 TB',
-      },
-    );
-    partition2.setParentSite(this);
-    OVApi().sources.registerSource(partition2, parentUid: partitionsFolder.uid);
-
-    debugPrint('Created child sources for site: $name');
-    debugPrint('- Partitions folder: ${partitionsFolder.name}');
-    debugPrint('- Partitions: ${partition1.name}, ${partition2.name}');*/
+  void createChildSources(List<dynamic> sources) {
+    for (final source in sources) {
+      if (source['type'] == 0) {
+        for (final child in source['children']) {
+          createAndRegisterChildSource(child, this);
+        }
+      }
+    }
   }
 }

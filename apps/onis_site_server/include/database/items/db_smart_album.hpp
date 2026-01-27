@@ -11,26 +11,26 @@ using json = Json::Value;
 
 namespace onis::database {
 
-const s32 info_smart_album_name = 2;
-const s32 info_smart_album_description = 4;
-const s32 info_smart_album_status = 8;
-const s32 info_smart_album_criteria = 16;
+const std::int32_t info_smart_album_name = 2;
+const std::int32_t info_smart_album_description = 4;
+const std::int32_t info_smart_album_status = 8;
+const std::int32_t info_smart_album_criteria = 16;
 
 struct smart_album {
-  const s32 criteria_modality = 0;
-  const s32 criteria_patient_id = 1;
-  const s32 criteria_study_date = 2;
+  const std::int32_t criteria_modality = 0;
+  const std::int32_t criteria_patient_id = 1;
+  const std::int32_t criteria_study_date = 2;
 
-  const s32 cp_equal = 0;
-  const s32 cp_start = 1;
-  const s32 cp_end = 2;
-  const s32 cp_contain = 3;
-  const s32 cp_greater = 4;
-  const s32 cp_less = 5;
-  const s32 cp_greater_or_equal = 6;
-  const s32 cp_less_or_equal = 7;
+  const std::int32_t cp_equal = 0;
+  const std::int32_t cp_start = 1;
+  const std::int32_t cp_end = 2;
+  const std::int32_t cp_contain = 3;
+  const std::int32_t cp_greater = 4;
+  const std::int32_t cp_less = 5;
+  const std::int32_t cp_greater_or_equal = 6;
+  const std::int32_t cp_less_or_equal = 7;
 
-  static void create(json& album, u32 flags) {
+  static void create(json& album, std::uint32_t flags) {
     if (!album.isObject()) {
       throw std::invalid_argument("smart_album is not an object");
     }
@@ -80,9 +80,10 @@ struct smart_album {
     onis::database::item::verify_string_value(input, "val", false, false, 64);
   }
 
-  static void verify(const json& input, bool with_seq, u32 must_flags) {
+  static void verify(const json& input, bool with_seq,
+                     std::uint32_t must_flags) {
     onis::database::item::verify_seq_version_flags(input, with_seq);
-    u32 flags = input[BASE_FLAGS_KEY].asUInt();
+    std::uint32_t flags = input[BASE_FLAGS_KEY].asUInt();
     onis::database::item::check_must_flags(flags, must_flags);
     if (flags & info_smart_album_name)
       onis::database::item::verify_string_value(input, SA_NAME_KEY, false,

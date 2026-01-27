@@ -33,23 +33,23 @@ using json = Json::Value;
 
 namespace onis::database {
 
-const s32 info_user_login = 2;
-const s32 info_user_password = 4;
-const s32 info_user_active = 8;
-const s32 info_user_identity = 32;
-const s32 info_user_organization = 64;
-const s32 info_user_address = 128;
-const s32 info_user_contact = 256;
-const s32 info_user_superuser = 512;
-const s32 info_user_inherit = 1024;
-const s32 info_user_permissions = 2048;
-const s32 info_user_membership = 4096;
-const s32 info_user_partition_access = 8192;
-const s32 info_user_dicom_access = 16384;
-const s32 info_user_pref_set = 32768;
+const std::int32_t info_user_login = 2;
+const std::int32_t info_user_password = 4;
+const std::int32_t info_user_active = 8;
+const std::int32_t info_user_identity = 32;
+const std::int32_t info_user_organization = 64;
+const std::int32_t info_user_address = 128;
+const std::int32_t info_user_contact = 256;
+const std::int32_t info_user_superuser = 512;
+const std::int32_t info_user_inherit = 1024;
+const std::int32_t info_user_permissions = 2048;
+const std::int32_t info_user_membership = 4096;
+const std::int32_t info_user_partition_access = 8192;
+const std::int32_t info_user_dicom_access = 16384;
+const std::int32_t info_user_pref_set = 32768;
 
 struct user {
-  static void create(json& item, u32 flags) {
+  static void create(json& item, std::uint32_t flags) {
     if (!item.isObject()) {
       throw std::invalid_argument("user is not an object");
     }
@@ -107,9 +107,10 @@ struct user {
     }
   }
 
-  static void verify(const json& input, bool with_seq, u32 must_flags) {
+  static void verify(const json& input, bool with_seq,
+                     std::uint32_t must_flags) {
     onis::database::item::verify_seq_version_flags(input, with_seq);
-    u32 flags = input[BASE_FLAGS_KEY].asUInt();
+    std::uint32_t flags = input[BASE_FLAGS_KEY].asUInt();
     onis::database::item::check_must_flags(flags, must_flags);
 
     if (flags & info_user_login)

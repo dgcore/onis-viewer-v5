@@ -12,8 +12,8 @@ using json = Json::Value;
 namespace onis::database {
 
 struct dicom_access {
-  static const s32 all_clients = 1;
-  static const s32 limited_access = 256;
+  static const std::int32_t all_clients = 1;
+  static const std::int32_t limited_access = 256;
 
   static void create(json& access) {
     if (!access.isObject()) {
@@ -33,7 +33,7 @@ struct dicom_access {
                                                1);
     onis::database::item::verify_integer_value(input, DA_MODE_KEY, false, 0,
                                                256);
-    u32 mode = input[DA_MODE_KEY].asUInt();
+    std::uint32_t mode = input[DA_MODE_KEY].asUInt();
     if (mode != 256) {
       mode &= ~all_clients;
       mode &= ~limited_access;

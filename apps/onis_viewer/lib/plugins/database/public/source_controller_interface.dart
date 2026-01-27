@@ -5,8 +5,15 @@ import 'package:onis_viewer/core/database_source.dart';
 abstract class ISourceController extends ChangeNotifier {
   DatabaseSourceManager get sources;
   DatabaseSource? get selectedSource;
-  //DatabaseSourceLoginState? getLoginState(String sourceUid);
+
   int get totalStudyCount;
 
-  void selectSourceByUid(String uid);
+  void selectSourceByUid(String sourceUid);
+  void expandSourceNode(String sourceUid,
+      {bool expand = true, bool expandChildren = false});
+  bool canSearch(String sourceUid);
+  bool canImport(String sourceUid);
+  bool canExport(String sourceUid);
+  bool canOpen(String sourceUid);
+  bool canTransfer(String sourceUid);
 }

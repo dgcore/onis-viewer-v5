@@ -143,7 +143,8 @@ class _DatabaseApiImpl implements DatabaseApi {
     debugPrint('---------- _DatabaseApiImpl.dispose() called');
     debugPrint(
         '---------- Calling sources.clear(), rootSources count: ${_sourceController.sources.rootSources.length}');
-    await _sourceController.sources.clear();
+    await _sourceController.sources.disconnectAll();
+    _sourceController.sources.clear();
     debugPrint('---------- sources.clear() completed');
     _sourceController.dispose();
     debugPrint('---------- _DatabaseApiImpl.dispose() completed');

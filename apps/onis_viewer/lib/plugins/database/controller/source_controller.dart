@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:onis_viewer/core/database_source.dart';
 import 'package:onis_viewer/core/models/study.dart';
 import 'package:onis_viewer/plugins/database/public/source_controller_interface.dart';
+import 'package:onis_viewer/plugins/database/ui/database_source_bar.dart';
 
 class SourceState {
   SourceState(DatabaseSource source) {
@@ -24,6 +25,8 @@ class SourceController extends ISourceController {
   /// Stream subscriptions for source registration events
   StreamSubscription<DatabaseSource>? _sourceRegisteredSubscription;
   StreamSubscription<DatabaseSource>? _sourceUnregisteredSubscription;
+  StreamSubscription<DatabaseSource>? _sourceConnectionSubscription;
+  StreamSubscription<DatabaseSource>? _sourceDisconnectionSubscription;
 
   /// Constructor
   SourceController();
@@ -41,6 +44,13 @@ class SourceController extends ISourceController {
     _sourceUnregisteredSubscription = _databaseSourceManager
         .onSourceUnregistered
         .listen(_onSourceUnregistered);
+
+    _sourceConnectionSubscription =
+        _databaseSourceManager.onSourceConnection.listen(_onSourceConnection);
+    _sourceDisconnectionSubscription = _databaseSourceManager
+        .onSourceDisconnection
+        .listen(_onSourceDisconnection);
+
     // Register the existing sources:
     final sources = _databaseSourceManager.allSources;
     for (final source in sources) {
@@ -78,6 +88,18 @@ class SourceController extends ISourceController {
 
   void _onSourceUnregistered(DatabaseSource source) {
     _sourceStates.remove(source.uid);
+    if (_selectedSource == source) {
+      _selectedSource = null;
+    }
+  }
+
+  void _onSourceConnection(DatabaseSource source) {
+    _selectedSource = source.defaultSource;
+    expandSourceNode(source.uid, expand: true, expandChildren: true);
+  }
+
+  void _onSourceDisconnection(DatabaseSource source) {
+    _selectedSource ??= source;
   }
 
   @override
@@ -100,9 +122,24 @@ class SourceController extends ISourceController {
   }
 
   @override
-  void selectSourceByUid(String uid) {
-    _selectedSource = _databaseSourceManager.findSourceByUid(uid);
+  void selectSourceByUid(String sourceUid) {
+    final source = _databaseSourceManager.findSourceByUid(sourceUid);
+    if (source == null) {
+      _selectedSource = null;
+    } else {
+      _selectedSource = source;
+    }
     notifyListeners();
+  }
+
+  @override
+  void expandSourceNode(String sourceUid,
+      {bool expand = true, bool expandChildren = false}) {
+    if (expand) {
+      DatabaseSourceBar.expandNode(sourceUid, expandChildren: expandChildren);
+    } else {
+      DatabaseSourceBar.collapseNode(sourceUid);
+    }
   }
 
   /*void executeRequest(String uid, AsyncRequest request) {
@@ -117,4 +154,44 @@ class SourceController extends ISourceController {
       request.send();
     }
   }*/
+
+  /// Check if search is available for the given source
+  /// Returns true if the source is connected
+  @override
+  bool canSearch(String sourceUid) {
+    final source = _databaseSourceManager.findSourceByUid(sourceUid);
+    return source?.loginState.status == ConnectionStatus.loggedIn;
+  }
+
+  /// Check if import is available for the given source
+  /// Returns true if the source is connected
+  @override
+  bool canImport(String sourceUid) {
+    return canSearch(sourceUid);
+  }
+
+  /// Check if export is available for the given source
+  /// Returns true if the source is connected and at least one study is selected
+  @override
+  bool canExport(String sourceUid) {
+    /*final api = OVApi();
+    final source = api.sources.findSourceByUid(sourceUid);
+    if (source == null) return false;
+    return source.isActive && hasSelectedStudies(sourceUid);*/
+    return false;
+  }
+
+  /// Check if open is available for the given source
+  /// Returns true if the source is connected and at least one study is selected
+  @override
+  bool canOpen(String sourceUid) {
+    return canExport(sourceUid);
+  }
+
+  /// Check if transfer is available for the given source
+  /// Returns true if the source is connected and at least one study is selected
+  @override
+  bool canTransfer(String sourceUid) {
+    return canExport(sourceUid);
+  }
 }

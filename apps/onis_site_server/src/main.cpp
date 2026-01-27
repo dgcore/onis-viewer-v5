@@ -10,7 +10,7 @@
 // main_thread class
 ////////////////////////////////////////////////////////////////////////////////
 
-class main_thread : public dgc::thread {
+class main_thread : public onis::thread {
 public:
   main_thread() : thread() {
     std::cout << "Main thread constructor" << std::endl;
@@ -19,7 +19,7 @@ public:
   ~main_thread() {}
 
   void init_instance() {
-    dgc::thread::init_instance();
+    onis::thread::init_instance();
 
     // Initialize the site API with config file
     std::string config_file_path =
@@ -47,7 +47,7 @@ public:
   void exit_instance() {
     // Shutdown the site API
     api().shutdown();
-    dgc::thread::exit_instance();
+    onis::thread::exit_instance();
   }
 
 private:

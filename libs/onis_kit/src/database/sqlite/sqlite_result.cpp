@@ -16,7 +16,7 @@ sqlite_row::~sqlite_row() {}
 std::string sqlite_row::get_uuid(int& column_index, bool allow_null,
                                  bool allow_empty) const {
   std::string value = get_string(column_index, allow_null, allow_empty);
-  if (!value.empty() && !dgc::util::uuid::is_valid(value)) {
+  if (!value.empty() && !onis::util::uuid::is_valid(value)) {
     throw std::invalid_argument("Invalid UUID format");
   }
   return value;

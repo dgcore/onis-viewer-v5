@@ -58,8 +58,11 @@ void http_drogon_controller::treat_post_request(
     // Direct assignment - both use JsonCPP (Json::Value)
     data->input_json = *json_obj;
     rqsrv_->process_request(data);
-    resp = drogon::HttpResponse::newHttpResponse();
-    resp->setStatusCode(drogon::HttpStatusCode::k400BadRequest);
+    // INSERT_YOUR_CODE
+    data->read_output([&](const Json::Value& output) {
+      resp = drogon::HttpResponse::newHttpJsonResponse(output);
+    });
+    resp->setStatusCode(drogon::HttpStatusCode::k200OK);
   } else {
     resp = drogon::HttpResponse::newHttpResponse();
     resp->setStatusCode(drogon::HttpStatusCode::k400BadRequest);

@@ -8,13 +8,13 @@ using json = Json::Value;
 
 namespace onis::database {
 
-using dgc::s32;
-using dgc::u32;
+using std::int32_t;
+using std::uint32_t;
 
-const s32 info_organization_name = 1;
+const std::int32_t info_organization_name = 1;
 
 struct organization {
-  static void create(json& organization, u32 flags) {
+  static void create(json& organization, std::uint32_t flags) {
     if (!organization.isObject()) {
       throw std::invalid_argument("organization is not an object");
     }
@@ -28,7 +28,7 @@ struct organization {
 
   static void verify(const json& input, bool with_seq) {
     onis::database::item::verify_seq_version_flags(input, with_seq);
-    u32 flags = input[BASE_FLAGS_KEY].asUInt();
+    std::uint32_t flags = input[BASE_FLAGS_KEY].asUInt();
     if (flags & info_organization_name)
       onis::database::item::verify_string_value(input, OR_NAME_KEY, false,
                                                 false, 64);

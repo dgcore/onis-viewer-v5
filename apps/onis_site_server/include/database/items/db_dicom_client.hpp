@@ -19,29 +19,29 @@ using json = Json::Value;
 
 namespace onis::database {
 
-const s32 dcfind = 1;
-const s32 dcstore = 2;
-const s32 dcmove = 4;
+const std::int32_t dcfind = 1;
+const std::int32_t dcstore = 2;
+const std::int32_t dcmove = 4;
 
-const s32 type_undefined = 0;
-const s32 type_server = 1;
-const s32 type_client = 2;
-const s32 type_client_and_server = 3;
-const s32 type_modality = 4;
+const std::int32_t type_undefined = 0;
+const std::int32_t type_server = 1;
+const std::int32_t type_client = 2;
+const std::int32_t type_client_and_server = 3;
+const std::int32_t type_modality = 4;
 
-const s32 info_dicom_client_ae = 2;
-const s32 info_dicom_client_name = 4;
-const s32 info_dicom_client_ip = 8;
-const s32 info_dicom_client_port = 16;
-const s32 info_dicom_client_permissions = 32;
-const s32 info_dicom_client_type = 64;
-const s32 info_dicom_client_comment = 128;
-const s32 info_dicom_client_target = 256;
-const s32 info_dicom_client_conversion = 512;
-const s32 info_dicom_client_status = 1024;
+const std::int32_t info_dicom_client_ae = 2;
+const std::int32_t info_dicom_client_name = 4;
+const std::int32_t info_dicom_client_ip = 8;
+const std::int32_t info_dicom_client_port = 16;
+const std::int32_t info_dicom_client_permissions = 32;
+const std::int32_t info_dicom_client_type = 64;
+const std::int32_t info_dicom_client_comment = 128;
+const std::int32_t info_dicom_client_target = 256;
+const std::int32_t info_dicom_client_conversion = 512;
+const std::int32_t info_dicom_client_status = 1024;
 
 struct dicom_client {
-  static void create(json& client, u32 flags) {
+  static void create(json& client, std::uint32_t flags) {
     if (!client.isObject()) {
       throw std::invalid_argument("dicom_client is not an object");
     }
@@ -76,9 +76,10 @@ struct dicom_client {
       client[DCMCLT_CONV_KEY] = "";
   }
 
-  static void verify(const json& input, bool with_seq, u32 must_flags) {
+  static void verify(const json& input, bool with_seq,
+                     std::uint32_t must_flags) {
     onis::database::item::verify_seq_version_flags(input, with_seq);
-    u32 flags = input[BASE_FLAGS_KEY].asUInt();
+    std::uint32_t flags = input[BASE_FLAGS_KEY].asUInt();
     onis::database::item::check_must_flags(flags, must_flags);
 
     if (flags & info_dicom_client_status)

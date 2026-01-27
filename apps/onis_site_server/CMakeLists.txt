@@ -55,6 +55,8 @@ set(SERVER_SOURCES
     src/services/requests/request_service.cpp
     src/services/requests/request_service_authenticate.cpp
     src/services/requests/sessions/request_session.cpp
+    src/services/requests/request_database.cpp
+    src/services/requests/sessions/request_session_access_cache.cpp
     src/services/config/config_service.cpp
     src/database/site_database.cpp
     src/database/site_database_organization.cpp
@@ -64,6 +66,9 @@ set(SERVER_SOURCES
     src/database/site_database_role.cpp
     src/database/site_database_group.cpp
     src/database/site_database_user.cpp
+    src/database/site_database_partition.cpp
+    src/database/site_database_album.cpp
+    src/database/site_database_smart_album.cpp
     src/database/sql_builder.cpp
     src/database/site_database_pool.cpp
 )

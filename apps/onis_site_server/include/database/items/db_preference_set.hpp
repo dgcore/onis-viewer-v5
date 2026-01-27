@@ -11,13 +11,13 @@ using json = Json::Value;
 
 namespace onis::database {
 
-const s32 info_pref_set_name = 2;
-const s32 info_pref_set_description = 4;
-const s32 info_pref_set_active = 8;
-const s32 info_pref_set_items = 16;
+const std::int32_t info_pref_set_name = 2;
+const std::int32_t info_pref_set_description = 4;
+const std::int32_t info_pref_set_active = 8;
+const std::int32_t info_pref_set_items = 16;
 
 struct preference_set {
-  static void create(json& item, u32 flags) {
+  static void create(json& item, std::uint32_t flags) {
     if (!item.isObject()) {
       throw std::invalid_argument("preference_set is not an object");
     }
@@ -36,9 +36,9 @@ struct preference_set {
   }
 };
 
-static void verify(const json& input, bool with_seq, u32 must_flags) {
+static void verify(const json& input, bool with_seq, std::uint32_t must_flags) {
   onis::database::item::verify_seq_version_flags(input, with_seq);
-  u32 flags = input[BASE_FLAGS_KEY].asUInt();
+  std::uint32_t flags = input[BASE_FLAGS_KEY].asUInt();
   onis::database::item::check_must_flags(flags, must_flags, res);
   if (flags & info_pref_set_name)
     onis::database::item::verify_string_value(input, PFS_NAME_KEY, false, false,

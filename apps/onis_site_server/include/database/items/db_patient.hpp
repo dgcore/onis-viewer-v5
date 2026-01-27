@@ -27,16 +27,16 @@ using json = Json::Value;
 
 namespace onis::database {
 
-const s32 info_patient_charset = 1;
-const s32 info_patient_name = 2;
-const s32 info_patient_birthdate = 4;
-const s32 info_patient_sex = 8;
-const s32 info_patient_statistics = 16;
-const s32 info_patient_status = 32;
-const s32 info_patient_creation = 64;
+const std::int32_t info_patient_charset = 1;
+const std::int32_t info_patient_name = 2;
+const std::int32_t info_patient_birthdate = 4;
+const std::int32_t info_patient_sex = 8;
+const std::int32_t info_patient_statistics = 16;
+const std::int32_t info_patient_status = 32;
+const std::int32_t info_patient_creation = 64;
 
 struct patient {
-  static void create(json& patient, u32 flags, bool for_client) {
+  static void create(json& patient, std::uint32_t flags, bool for_client) {
     if (!patient.isObject()) {
       throw std::invalid_argument("patient is not an object");
     }
@@ -80,7 +80,7 @@ struct patient {
 
   static void verify(const json& input, bool with_seq, bool for_client) {
     onis::database::item::verify_seq_version_flags(input, with_seq);
-    u32 flags = input[BASE_FLAGS_KEY].asUInt();
+    std::uint32_t flags = input[BASE_FLAGS_KEY].asUInt();
     if (flags & info_patient_charset)
       onis::database::item::verify_string_value(input, PA_CHARSET_KEY, true,
                                                 true, 255);
@@ -128,10 +128,10 @@ struct patient {
 }
 
 static void
-copy(const json& input, u32 flags, bool for_client, json& output) {
+copy(const json& input, std::uint32_t flags, bool for_client, json& output) {
   create(output, flags, for_client);
   output[BASE_UID_KEY] = input[BASE_UID_KEY].asString();
-  u32 input_flags = input[BASE_FLAGS_KEY].asUInt();
+  std::uint32_t input_flags = input[BASE_FLAGS_KEY].asUInt();
 
   if (flags & info_patient_charset) {
     if ((input_flags & info_patient_charset) == 0)

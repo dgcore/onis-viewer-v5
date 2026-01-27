@@ -6,7 +6,7 @@
 
 #include "./types.hpp"
 
-namespace dgc {
+namespace onis {
 
 //////////////////////////////////////////////////////////////////////////////////////////////
 // event class
@@ -25,7 +25,7 @@ public:
 
   void reset();
   void signal();
-  bool wait(u32 millisec = 0);
+  bool wait(std::uint32_t millisec = 0);
   bool is_signaled();
 
 private:
@@ -34,4 +34,4 @@ private:
   std::condition_variable _condition;
 };
 
-}  // namespace dgc
+}  // namespace onis

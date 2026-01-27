@@ -15,7 +15,7 @@ using onis::database::lock_mode;
 // Utilities
 //------------------------------------------------------------------------------
 
-std::string site_database::get_organization_columns(u32 flags,
+std::string site_database::get_organization_columns(std::uint32_t flags,
                                                     bool add_table_name) {
   std::string prefix = add_table_name ? "pacs_organizations." : "";
   if (flags == onis::database::info_all) {
@@ -28,7 +28,7 @@ std::string site_database::get_organization_columns(u32 flags,
 }
 
 void site_database::read_organization_record(
-    onis_kit::database::database_row& rec, u32 flags, json& output) {
+    onis_kit::database::database_row& rec, std::uint32_t flags, json& output) {
   onis::database::organization::create(output, flags);
   output[BASE_SEQ_KEY] = rec.get_string("id", false, false);
   if (flags & onis::database::info_organization_name) {
@@ -40,7 +40,8 @@ void site_database::read_organization_record(
 // Find organizations
 //------------------------------------------------------------------------------
 
-void site_database::find_organization_by_seq(const std::string& seq, u32 flags,
+void site_database::find_organization_by_seq(const std::string& seq,
+                                             std::uint32_t flags,
                                              lock_mode lock, json& output) {
   // Query and prepare query:
   std::string columns = get_organization_columns(flags, false);

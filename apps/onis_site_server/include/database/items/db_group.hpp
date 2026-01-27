@@ -14,14 +14,14 @@ using json = Json::Value;
 
 namespace onis::database {
 
-const u32 info_user_group_name = 2;
-const u32 info_user_group_description = 4;
-const u32 info_user_group_active = 8;
-const s32 info_user_group_role = 32;
-const s32 info_user_group_partition = 128;
+const std::uint32_t info_user_group_name = 2;
+const std::uint32_t info_user_group_description = 4;
+const std::uint32_t info_user_group_active = 8;
+const std::int32_t info_user_group_role = 32;
+const std::int32_t info_user_group_partition = 128;
 
 struct group {
-  static void create(json& item, u32 flags) {
+  static void create(json& item, std::uint32_t flags) {
     if (!item.isObject()) {
       throw std::invalid_argument("group is not an object");
     }
@@ -47,7 +47,7 @@ struct group {
 
   static void verify(const json& input, bool with_seq) {
     onis::database::item::verify_seq_version_flags(input, with_seq);
-    u32 flags = input[BASE_FLAGS_KEY].asUInt();
+    std::uint32_t flags = input[BASE_FLAGS_KEY].asUInt();
     if (flags & info_user_group_name)
       onis::database::item::verify_string_value(input, GR_NAME_KEY, false,
                                                 false, 64);

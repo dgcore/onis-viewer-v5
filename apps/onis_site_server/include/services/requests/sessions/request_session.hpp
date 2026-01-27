@@ -1,8 +1,11 @@
 #pragma once
 
 #include <chrono>
+#include <cstdint>
 #include <memory>
 #include <string>
+#include <unordered_map>
+#include "../../../../include/database/items/db_partition.hpp"
 
 ///////////////////////////////////////////////////////////////////////
 // request_session
@@ -34,4 +37,18 @@ public:
   std::string pref_set_id;
   std::string shared_pref_set_id;
   bool superuser;
+
+  // partition access:
+  onis::database::partition_access_mode partition_mode;
+  std::unordered_map<
+      std::string,
+      std::pair<onis::database::partition_access_mode, std::uint32_t>>
+      partition_access;
+  // Individual access for each partition, album, and smart album (if
+  // partition_mode is LIMITED_ACCESS):
+  // key: partition_id, value: permission
+
+  // std::unordered_map<std::string, std::uint32_t> partition_access;
+  // std::unordered_map<std::string, std::uint32_t> album_access;
+  // std::unordered_map<std::string, std::uint32_t> smart_album_access;
 };

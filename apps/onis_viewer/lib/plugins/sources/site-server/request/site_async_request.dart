@@ -52,14 +52,14 @@ class SiteAsyncRequest implements AsyncRequest {
     debugPrint(
         'SiteAsyncRequest.send() started for request type: $requestType');
 
+    // Cancel any existing request
+    await cancel();
+
     // Create completer to track completion
     _sendCompleter = Completer<void>();
 
     // Reset cancellation flag
     _isCancelled = false;
-
-    // Cancel any existing request
-    await cancel();
 
     // Create cancellation controller for this request
     /*_cancellationController = StreamController<bool>();

@@ -14,7 +14,8 @@ using onis::database::lock_mode;
 // Utilities
 //------------------------------------------------------------------------------
 
-std::string site_database::get_site_columns(u32 flags, bool add_table_name) {
+std::string site_database::get_site_columns(std::uint32_t flags,
+                                            bool add_table_name) {
   std::string prefix = add_table_name ? "pacs_sites." : "";
   if (flags == onis::database::info_all) {
     return prefix + "id, " + prefix + "organization_id, " + prefix + "name";
@@ -26,7 +27,7 @@ std::string site_database::get_site_columns(u32 flags, bool add_table_name) {
 }
 
 void site_database::read_site_record(onis_kit::database::database_row& rec,
-                                     u32 flags, std::string* org_seq,
+                                     std::uint32_t flags, std::string* org_seq,
                                      json& output) {
   onis::database::site::create(output, flags);
   output[BASE_SEQ_KEY] = rec.get_string("id", false, false);
@@ -66,9 +67,9 @@ void site_database::lock_site(const std::string& seq, lock_mode lock) {
 // Find sites
 //------------------------------------------------------------------------------
 
-void site_database::find_site_by_seq(const std::string& seq, u32 flags,
-                                     lock_mode lock, std::string* org_seq,
-                                     json& output) {
+void site_database::find_site_by_seq(const std::string& seq,
+                                     std::uint32_t flags, lock_mode lock,
+                                     std::string* org_seq, json& output) {
   // Create and prepare query:
   std::string columns = get_site_columns(flags, false);
   std::string where = "id = ?";
@@ -93,7 +94,7 @@ void site_database::find_site_by_seq(const std::string& seq, u32 flags,
   throw std::runtime_error("Site not found");
 }
 
-void site_database::find_single_site(u32 flags, lock_mode lock,
+void site_database::find_single_site(std::uint32_t flags, lock_mode lock,
                                      std::string* org_seq, json& output) {
   // Create and prepare query:
   std::string columns = get_site_columns(flags, false);
@@ -116,5 +117,5 @@ void site_database::find_single_site(u32 flags, lock_mode lock,
   throw std::runtime_error("Site not found");
 }
 
-/*void find_all_sites(const std::string& seq, u32 flags, lock_mode lock,
-std::vector<std::string>& org_seqs, json& output);*/
+/*void find_all_sites(const std::string& seq, std::uint32_t flags, lock_mode
+lock, std::vector<std::string>& org_seqs, json& output);*/

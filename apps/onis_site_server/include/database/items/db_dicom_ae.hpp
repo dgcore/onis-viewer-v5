@@ -13,16 +13,16 @@ using json = Json::Value;
 
 namespace onis::database {
 
-const s32 info_dicom_ae_name = 2;
-const s32 info_dicom_ae_status = 4;
-const s32 info_dicom_ae_type = 8;
-const s32 info_dicom_ae_comment = 16;
-const s32 info_dicom_ae_clients = 32;
+const std::int32_t info_dicom_ae_name = 2;
+const std::int32_t info_dicom_ae_status = 4;
+const std::int32_t info_dicom_ae_type = 8;
+const std::int32_t info_dicom_ae_comment = 16;
+const std::int32_t info_dicom_ae_clients = 32;
 
-const s32 ae_type_local = 0;
+const std::int32_t ae_type_local = 0;
 
 struct dicom_ae {
-  static void create(json& ae, u32 flags) {
+  static void create(json& ae, std::uint32_t flags) {
     if (!ae.isObject()) {
       throw std::invalid_argument("dicom_ae is not an object");
     }
@@ -43,7 +43,8 @@ struct dicom_ae {
       ae[DCMAE_CLIENTS_KEY] = Json::Value(Json::arrayValue);
   }
 
-  static void verify(const json& input, bool with_seq, u32 must_flags) {
+  static void verify(const json& input, bool with_seq,
+                     std::uint32_t must_flags) {
     onis::database::item::verify_seq_version_flags(input, with_seq);
     onis::database::item::check_must_flags(flags, must_flags);
     if (flags & info_dicom_ae_name) {

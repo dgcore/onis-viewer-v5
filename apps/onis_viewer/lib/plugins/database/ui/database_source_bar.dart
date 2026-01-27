@@ -38,22 +38,16 @@ class _DatabaseSourceBarState extends State<DatabaseSourceBar> {
   DatabaseApi? _dbApi;
   //late final DatabaseSourceManager _manager;
   final Set<String> _expanded = <String>{};
-  //DatabaseSource? _selected;
 
   // Static reference to the current instance for direct access
-  //static _DatabaseSourceBarState? _currentInstance;
+  static _DatabaseSourceBarState? _currentInstance;
 
   @override
   void initState() {
     super.initState();
     _dbApi = OVApi().plugins.getPublicApi<DatabaseApi>('onis_database_plugin');
-
-    //_manager = _api.sources;
-    //_selected = widget.selectedSource;
-    //_manager.addListener(_onManagerChanged);
-
     // Register this instance as the current one
-    //_currentInstance = this;
+    _currentInstance = this;
   }
 
   @override
@@ -71,38 +65,38 @@ class _DatabaseSourceBarState extends State<DatabaseSourceBar> {
 
   @override
   void dispose() {
-    //_manager.removeListener(_onManagerChanged);
     // Clear the static reference if this is the current instance
-    /*if (_currentInstance == this) {
+    if (_currentInstance == this) {
       _currentInstance = null;
-    }*/
+    }
     super.dispose();
   }
 
   /// Static method to expand a node by UID
   static void expandNode(String uid, {bool expandChildren = false}) {
-    /*_currentInstance?.setState(() {
+    _currentInstance?.setState(() {
       _currentInstance!._expanded.add(uid);
-
       if (expandChildren) {
         // Expand immediate children
-        final source = _currentInstance!._manager.allSources
+        final sourceController = _currentInstance!._dbApi?.sourceController;
+        if (sourceController == null) return;
+        final source = sourceController.sources.allSources
             .where((s) => s.uid == uid)
             .firstOrNull;
         if (source != null) {
           for (final child in source.subSources) {
-            _currentInstance!._expanded.add(child.uid);
+            expandNode(child.uid, expandChildren: true);
           }
         }
       }
-    });*/
+    });
   }
 
   /// Static method to collapse a node by UID
   static void collapseNode(String uid) {
-    /*_currentInstance?.setState(() {
+    _currentInstance?.setState(() {
       _currentInstance!._expanded.remove(uid);
-    });*/
+    });
   }
 
   @override
