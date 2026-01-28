@@ -50,9 +50,10 @@ std::unique_ptr<onis_kit::database::database_query>
 site_database::create_and_prepare_query(const std::string& columns,
                                         const std::string& from,
                                         const std::string& where,
-                                        lock_mode lock) const {
+                                        lock_mode lock,
+                                        std::int32_t limit) const {
   std::string sql =
-      sql_builder_->build_select_query(columns, from, where, "", 0, lock);
+      sql_builder_->build_select_query(columns, from, where, "", limit, lock);
   auto query = connection_->create_query();
   if (!query->prepare(sql)) {
     return nullptr;
