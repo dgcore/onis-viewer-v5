@@ -69,6 +69,8 @@ set(SERVER_SOURCES
     src/database/site_database_partition.cpp
     src/database/site_database_album.cpp
     src/database/site_database_smart_album.cpp
+    src/database/site_database_patient.cpp
+    src/database/site_database_study.cpp
     src/database/sql_builder.cpp
     src/database/site_database_pool.cpp
 )
