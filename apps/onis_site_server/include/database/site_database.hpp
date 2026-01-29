@@ -250,8 +250,8 @@ public:
       const onis::dicom_base_ptr& dataset, std::string* charset,
       std::string* name, std::string* ideo, std::string* phono,
       std::string* birthdate, std::string* birthtime, std::string* sex,
-      onis::dicom_charset_info_list* used_charsets = NULL);
-  void create_patient(
+      onis::dicom_charset_info_list* used_charsets = NULL);*/
+  /*void create_patient(
       const std::string& partition_seq, const onis::core::date_time& dt,
       const onis::astring& charset, const onis::astring& pid,
       const onis::astring& name, const onis::astring& ideogram,
@@ -323,36 +323,39 @@ public:
   // update_patient_link(const partition_patient_link_ptr &link, oresult
   // &result); partition_patient_link_ptr add_patient_link(s64 sub_database_seq,
   // s64 patient_seq, b32 all_studies, s32 study_count, s32 series_count, s32
-  // image_count, s32 report_count, onis::oresult &result);
+  // image_count, s32 report_count, onis::oresult &result);*/
 
   // studies:
-  onis::astring get_study_columns(u32 flags, b32 add_table_name);
-  void find_studies(const onis::astring& clause, u32 flags, b32 for_client,
-                    s32 lock_mode, Json::Value& list,
-                    onis::astring* patient_seq, onis::aresult& res);
-  b32 find_study(const onis::astring& clause, u32 flags, b32 for_client,
-                 s32 lock_mode, Json::Value& output, onis::astring* patient_seq,
-                 onis::aresult& res);
-  void find_studies(const onis::astring& partition_seq,
-                    b32 reject_empty_request, s32 limit,
+  std::string get_study_columns(std::uint32_t flags, bool add_table_name);
+  void create_study_item(onis_kit::database::database_row& rec,
+                         std::uint32_t flags, bool for_client,
+                         std::string* patient_seq, Json::Value& study,
+                         std::int32_t* start_index);
+  void create_patient_and_study_item(onis_kit::database::database_row& rec,
+                                     std::uint32_t patient_flags,
+                                     std::uint32_t study_flags, bool for_client,
+                                     bool for_album, Json::Value& patient,
+                                     Json::Value& study);
+
+  /*void find_studies(const std::string& partition_seq,
+                    bool reject_empty_request, std::int32_t limit,
                     const onis::dicom_file_ptr& dataset,
                     const onis::astring& code_page, b32 patient_root,
                     u32 patient_flags, u32 study_flags, b32 for_client,
-                    s32 lock_mode, Json::Value& output, onis::aresult& res);
-  void find_studies(const onis::astring& partition_seq,
-                    b32 reject_empty_request, s32 limit,
-                    const Json::Value& filters, u32 patient_flags,
-                    u32 study_flags, b32 for_client, s32 lock_mode,
-                    Json::Value& output, onis::aresult& res);
-  void find_studies(const onis::astring& patient_seq, u32 flags, b32 for_client,
-                    s32 lock_mode, Json::Value& output, onis::aresult& res);
-  b32 decode_find_study_filters_from_dataset(
-      const onis::dicom_file_ptr& dataset, const onis::astring code_page,
-      b32 patient_root, Json::Value& filters);
-  void find_online_studies(const onis::astring& patient_seq, u32 flags,
-                           b32 for_client, s32 lock_mode, Json::Value& output,
-                           onis::aresult& res);
-  void find_studies_from_album(const onis::astring& album_seq,
+                    s32 lock_mode, Json::Value& output, onis::aresult& res);*/
+  void find_studies(const std::string& partition_seq, bool reject_empty_request,
+                    std::int32_t limit, const Json::Value& filters,
+                    std::uint32_t patient_flags, std::uint32_t study_flags,
+                    bool for_client, lock_mode lock, Json::Value& output);
+  void find_studies(const std::string& patient_seq, std::uint32_t flags,
+                    bool for_client, lock_mode lock, Json::Value& output);
+  /*bool decode_find_study_filters_from_dataset(
+      const onis::dicom_file_ptr& dataset, const std::string& code_page,
+      bool patient_root, Json::Value& filters);*/
+  void find_online_studies(const std::string& patient_seq, std::uint32_t flags,
+                           bool for_client, lock_mode lock,
+                           Json::Value& output);
+  /*void find_studies_from_album(const onis::astring& album_seq,
                                b32 reject_empty_request, s32 limit,
                                const onis::dicom_file_ptr& dataset,
                                const onis::astring& code_page, b32 patient_root,
@@ -363,18 +366,19 @@ public:
                                b32 reject_empty_request, s32 limit,
                                const Json::Value& filters, u32 patient_flags,
                                u32 study_flags, b32 for_client, s32 lock_mode,
-                               Json::Value& output, onis::aresult& res);
-  void find_study_by_seq(const onis::astring& partition_seq,
-                         const onis::astring& study_seq, u32 patient_flags,
-                         u32 study_flags, b32 for_client, s32 lock_mode,
-                         Json::Value& output, onis::aresult& res);
-  void find_study_by_seq(const onis::astring& seq, u32 flags, b32 for_client,
-                         s32 lock_mode, Json::Value& output,
-                         onis::astring* patient_seq, onis::aresult& res);
-  b32 find_study_patient(const onis::astring& study_seq, u32 patient_flags,
-                         b32 for_client, s32 lock_mode, Json::Value& output,
-                         onis::astring* partition_seq, onis::aresult& res);
-  void create_study_item_from_album(onis::odb_record& rec, u32 flags,
+                               Json::Value& output, onis::aresult& res);*/
+  void find_study_by_seq(const std::string& partition_seq,
+                         const std::string& study_seq,
+                         std::uint32_t patient_flags, std::uint32_t study_flags,
+                         bool for_client, lock_mode lock, Json::Value& output);
+  void find_study_by_seq(const std::string& seq, std::uint32_t flags,
+                         bool for_client, lock_mode lock, Json::Value& output,
+                         std::string* patient_seq);
+  bool find_study_patient(const std::string& study_seq,
+                          std::uint32_t patient_flags, bool for_client,
+                          lock_mode lock, Json::Value& output,
+                          std::string* partition_seq);
+  /*void create_study_item_from_album(onis::odb_record& rec, u32 flags,
                                     b32 for_client, Json::Value& study,
                                     s32* start_index, onis::aresult& res);
   void create_study_item(onis::odb_record& rec, u32 flags, b32 for_client,

@@ -61,43 +61,49 @@ void site_database::create_patient_item(onis_kit::database::database_row& rec,
                                         Json::Value& patient,
                                         std::int32_t* start_index) {
   onis::database::patient::create(patient, flags, for_client);
-  patient[BASE_SEQ_KEY] = rec.get_uuid("id", false, false);
+  std::int32_t index = 0;
+  std::int32_t* target_index = start_index ? start_index : &index;
+  patient[BASE_SEQ_KEY] = rec.get_uuid(*target_index, false, false);
+  if (partition_seq) {
+    *partition_seq = rec.get_uuid(*target_index, false, false);
+  } else {
+    (*target_index)++;
+  }
   if (partition_seq) {
     *partition_seq = rec.get_uuid("partition_id", false, false);
   }
   if (flags & onis::database::info_patient_name) {
-    patient[PA_NAME_KEY] = rec.get_string(PA_NAME_KEY, true, true);
-    patient[PA_IDEOGRAM_KEY] = rec.get_string(PA_IDEOGRAM_KEY, true, true);
-    patient[PA_PHONETIC_KEY] = rec.get_string(PA_PHONETIC_KEY, true, true);
+    patient[PA_NAME_KEY] = rec.get_string(*target_index, true, true);
+    patient[PA_IDEOGRAM_KEY] = rec.get_string(*target_index, true, true);
+    patient[PA_PHONETIC_KEY] = rec.get_string(*target_index, true, true);
   }
   if (flags & onis::database::info_patient_charset) {
-    patient[PA_CHARSET_KEY] = rec.get_string(PA_CHARSET_KEY, true, true);
+    patient[PA_CHARSET_KEY] = rec.get_string(*target_index, true, true);
   }
   if (flags & onis::database::info_patient_birthdate) {
-    patient[PA_BDATE_KEY] = rec.get_string(PA_BDATE_KEY, true, true);
-    patient[PA_BTIME_KEY] = rec.get_string(PA_BTIME_KEY, true, true);
+    patient[PA_BDATE_KEY] = rec.get_string(*target_index, true, true);
+    patient[PA_BTIME_KEY] = rec.get_string(*target_index, true, true);
   }
   if (flags & onis::database::info_patient_sex) {
-    patient[PA_SEX_KEY] = rec.get_string(PA_SEX_KEY, true, true);
+    patient[PA_SEX_KEY] = rec.get_string(*target_index, true, true);
   }
   if (flags & onis::database::info_patient_statistics) {
-    patient[PA_STCNT_KEY] = rec.get_int(PA_STCNT_KEY, false);
-    patient[PA_SRCNT_KEY] = rec.get_int(PA_SRCNT_KEY, false);
-    patient[PA_IMCNT_KEY] = rec.get_int(PA_IMCNT_KEY, false);
+    patient[PA_STCNT_KEY] = rec.get_int(*target_index, false);
+    patient[PA_SRCNT_KEY] = rec.get_int(*target_index, false);
+    patient[PA_IMCNT_KEY] = rec.get_int(*target_index, false);
   }
   if (flags & onis::database::info_patient_status) {
-    std::string status = rec.get_uuid(PA_STATUS_KEY, false, false);
+    auto status = rec.get_uuid(*target_index, false, false);
     if (for_client)
       patient[PA_STATUS_KEY] = status == ONLINE_STATUS ? 0 : 1;
     else
       patient[PA_STATUS_KEY] = status;
   }
   if (flags & onis::database::info_patient_creation) {
-    patient[PA_CRDATE_KEY] = rec.get_string(PA_CRDATE_KEY, true, true);
-    patient[PA_ORIGIN_ID_KEY] = rec.get_string(PA_ORIGIN_ID_KEY, true, true);
-    patient[PA_ORIGIN_NAME_KEY] =
-        rec.get_string(PA_ORIGIN_NAME_KEY, true, true);
-    patient[PA_ORIGIN_IP_KEY] = rec.get_string(PA_ORIGIN_IP_KEY, true, true);
+    patient[PA_CRDATE_KEY] = rec.get_string(*target_index, false, false);
+    patient[PA_ORIGIN_ID_KEY] = rec.get_string(*target_index, true, true);
+    patient[PA_ORIGIN_NAME_KEY] = rec.get_string(*target_index, true, true);
+    patient[PA_ORIGIN_IP_KEY] = rec.get_string(*target_index, true, true);
   }
 }
 
@@ -193,12 +199,13 @@ void site_database::find_patient_by_seq(const std::string& seq,
   throw std::runtime_error("Patient not found");
 }
 
-/*static void get_patient_info_to_insert(
-const onis::dicom_base_ptr& dataset, std::string* charset,
-std::string* name, std::string* ideo, std::string* phono,
-std::string* birthdate, std::string* birthtime, std::string* sex,
-onis::dicom_charset_info_list* used_charsets = NULL);
-void create_patient(
+/*void site_database::get_patient_info_to_insert(
+    const onis::dicom_base_ptr& dataset, std::string* charset,
+    std::string* name, std::string* ideo, std::string* phono,
+    std::string* birthdate, std::string* birthtime, std::string* sex,
+    onis::dicom_charset_info_list* used_charsets = NULL) {}*/
+
+/*void create_patient(
 const std::string& partition_seq, const onis::core::date_time& dt,
 const onis::astring& charset, const onis::astring& pid,
 const onis::astring& name, const onis::astring& ideogram,
