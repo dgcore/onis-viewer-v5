@@ -27,6 +27,8 @@ public:
                 drogon::Post);
   ADD_METHOD_TO(http_drogon_controller::logout, "/accounts/logout",
                 drogon::Post);
+  ADD_METHOD_TO(http_drogon_controller::find_studies, "/studies/find",
+                drogon::Post);
   METHOD_LIST_END
 
   // Accounts
@@ -34,6 +36,11 @@ public:
       const drogon::HttpRequestPtr& req,
       std::function<void(const drogon::HttpResponsePtr&)>&& callback) const;
   void logout(
+      const drogon::HttpRequestPtr& req,
+      std::function<void(const drogon::HttpResponsePtr&)>&& callback) const;
+
+  // Find Studies
+  void find_studies(
       const drogon::HttpRequestPtr& req,
       std::function<void(const drogon::HttpResponsePtr&)>&& callback) const;
 
