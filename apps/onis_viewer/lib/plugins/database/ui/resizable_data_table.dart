@@ -65,7 +65,8 @@ class _ResizableDataTableState extends State<ResizableDataTable>
   late List<TextEditingController> _filterControllers;
 
   // Selection state
-  //Study? _lastSelectedStudy; // Track last selected study for range selection
+  Study? _lastSelectedStudy; // Track last selected study for range selection
+  final Set<String> _selectedStudyIds = {}; // Track selected study IDs
   late ScrollController _scrollController;
   late ScrollController _verticalScrollController;
 
@@ -727,10 +728,24 @@ class _ResizableDataTableState extends State<ResizableDataTable>
     );
   }
 
+  /// Convert database.Study to Study model for selection
+  Study _convertToStudy(database.Patient patient, database.Study dbStudy) {
+    return Study(
+      id: dbStudy.id.isNotEmpty ? dbStudy.id : dbStudy.uid,
+      name: patient.name.isNotEmpty ? patient.name : 'Unknown',
+      sex: patient.sex.isNotEmpty ? patient.sex : '',
+      birthDate: patient.birthDate ?? DateTime.now(),
+      patientId: patient.pid.isNotEmpty ? patient.pid : patient.id,
+      studyDate: dbStudy.studyDate,
+      modality: dbStudy.modalities.isNotEmpty ? dbStudy.modalities : null,
+      status: dbStudy.status.toString(),
+    );
+  }
+
   /// Build a data row
   Widget _buildDataRow(database.Patient patient, database.Study study) {
-    final isSelected = false;
-    //widget.selectedStudies.any((s) => s.id == study.id);
+    final studyId = study.id.isNotEmpty ? study.id : study.uid;
+    final isSelected = _selectedStudyIds.contains(studyId);
 
     return GestureDetector(
       onTapDown: (details) {
@@ -882,75 +897,76 @@ class _ResizableDataTableState extends State<ResizableDataTable>
   }
 
   /// Handle row selection with keyboard modifiers
-  void _handleRowSelection(database.Patient patient, database.Study study) {
-    /*debugPrint('Row selection triggered for study: ${study.name}');
-    print("Shift pressed: $isShiftPressed");
-    print("Ctrl/Cmd pressed: $isCtrlOrCmdPressed");
-
-    final currentSelection = List<Study>.from(widget.selectedStudies);
-    final isCurrentlySelected = currentSelection.any((s) => s.id == study.id);
-
-    debugPrint('Current selection count: ${currentSelection.length}');
-    debugPrint('Is currently selected: $isCurrentlySelected');
-    debugPrint(
-        'Ctrl pressed: $isCtrlOrCmdPressed, Shift pressed: $isShiftPressed');
+  void _handleRowSelection(database.Patient patient, database.Study dbStudy) {
+    final study = _convertToStudy(patient, dbStudy);
+    final studyId = dbStudy.id.isNotEmpty ? dbStudy.id : dbStudy.uid;
+    final isCurrentlySelected = _selectedStudyIds.contains(studyId);
 
     if (isShiftPressed && _lastSelectedStudy != null) {
       // Range selection mode (Shift + click)
-      final lastIndex =
-          _filteredStudies.indexWhere((s) => s.id == _lastSelectedStudy!.id);
-      final currentIndex = _filteredStudies.indexWhere((s) => s.id == study.id);
+      final lastIndex = widget.studies.indexWhere((s) {
+        final id = s.study.id.isNotEmpty ? s.study.id : s.study.uid;
+        return id == (_lastSelectedStudy!.id);
+      });
+      final currentIndex = widget.studies.indexWhere((s) {
+        final id = s.study.id.isNotEmpty ? s.study.id : s.study.uid;
+        return id == studyId;
+      });
 
       if (lastIndex != -1 && currentIndex != -1) {
         final startIndex = lastIndex < currentIndex ? lastIndex : currentIndex;
         final endIndex = lastIndex < currentIndex ? currentIndex : lastIndex;
 
         // Clear current selection and add range
-        currentSelection.clear();
+        _selectedStudyIds.clear();
         for (int i = startIndex; i <= endIndex; i++) {
-          currentSelection.add(_filteredStudies[i]);
+          final id = widget.studies[i].study.id.isNotEmpty
+              ? widget.studies[i].study.id
+              : widget.studies[i].study.uid;
+          _selectedStudyIds.add(id);
         }
-        debugPrint(
-            'Range selection from index $startIndex to $endIndex (${currentSelection.length} studies)');
       }
     } else if (isCtrlOrCmdPressed) {
-      // Multi-selection mode (manual toggle or Ctrl/Cmd + click)
+      // Multi-selection mode (Ctrl/Cmd + click)
       if (isCurrentlySelected) {
         // Remove from selection
-        currentSelection.removeWhere((s) => s.id == study.id);
-        debugPrint('Removed from selection');
+        _selectedStudyIds.remove(studyId);
       } else {
         // Add to selection
-        currentSelection.add(study);
-        debugPrint('Added to selection');
+        _selectedStudyIds.add(studyId);
       }
     } else {
       // Single selection mode
-      if (isCurrentlySelected && currentSelection.length == 1) {
+      if (isCurrentlySelected && _selectedStudyIds.length == 1) {
         // If only this item is selected, deselect it
-        currentSelection.clear();
-        debugPrint('Deselected single item');
+        _selectedStudyIds.clear();
       } else {
         // Select only this item
-        currentSelection.clear();
-        currentSelection.add(study);
-        debugPrint('Selected single item');
+        _selectedStudyIds.clear();
+        _selectedStudyIds.add(studyId);
       }
     }
 
     // Update last selected study for range selection
     _lastSelectedStudy = study;
 
-    debugPrint('Final selection count: ${currentSelection.length}');
+    // Build list of selected Study objects for callbacks
+    final selectedStudies = widget.studies
+        .where((s) {
+          final id = s.study.id.isNotEmpty ? s.study.id : s.study.uid;
+          return _selectedStudyIds.contains(id);
+        })
+        .map((s) => _convertToStudy(s.patient, s.study))
+        .toList();
 
     // Call the appropriate callback
-    debugPrint(
-        'Calling onStudiesSelected with ${currentSelection.length} studies');
-    widget.onStudiesSelected?.call(currentSelection);
-    if (currentSelection.length == 1) {
-      debugPrint('Calling onStudySelected with single study');
-      widget.onStudySelected?.call(currentSelection.first);
-    }*/
+    widget.onStudiesSelected?.call(selectedStudies);
+    if (selectedStudies.length == 1) {
+      widget.onStudySelected?.call(selectedStudies.first);
+    }
+
+    // Update UI
+    setState(() {});
   }
 
   /// Format date for display
