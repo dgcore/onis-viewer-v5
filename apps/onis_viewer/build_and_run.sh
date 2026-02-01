@@ -27,4 +27,4 @@ echo "🔐 Step 4: Verifying code signing..."
 codesign --verify --verbose=4 build/macos/Build/Products/Debug/onis_viewer.app/Contents/MacOS/libonis_core.dylib
 
 echo "✅ Build complete! Starting the app..."
-flutter run -d macos 
+flutter run -d macos --scheme Runner 

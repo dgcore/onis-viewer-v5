@@ -19,12 +19,15 @@ class SiteSourceLoginState extends DatabaseSourceLoginState {
 
 /// Represents different types of child sources that can be created under a site source
 enum SiteChildSourceType {
-  partition,
-  album,
-  smartAlbum,
-  dicomPacs,
-  dicomFolder,
-  partitionFolder
+  partition(1),
+  album(2),
+  smartAlbum(3),
+  dicomPacs(4),
+  dicomFolder(5),
+  partitionFolder(6);
+
+  const SiteChildSourceType(this.value);
+  final int value;
 }
 
 /// A child source under a site source (partition, album, or DICOM PACS)
@@ -34,30 +37,14 @@ class SiteChildSource extends DatabaseSource {
   final DatabaseSourceLoginState _loginState = SiteSourceLoginState();
 
   static SiteChildSource createFromJson(Map<String, dynamic> data) {
-    SiteChildSourceType type;
-    switch (data['type'] as int) {
-      case 1:
-        type = SiteChildSourceType.partitionFolder;
-        break;
-      case 2:
-        type = SiteChildSourceType.partition;
-        break;
-      case 3:
-        type = SiteChildSourceType.dicomFolder;
-        break;
-      case 4:
-        type = SiteChildSourceType.dicomPacs;
-        break;
-      case 5:
-        type = SiteChildSourceType.album;
-        break;
-      case 6:
-        type = SiteChildSourceType.smartAlbum;
-        break;
-      default:
-        throw OnisException(OnisErrorCodes.invalidResponse,
-            "Invalid site child source type: ${data["type"] as int}");
-    }
+    final typeValue = data['type'] as int;
+    final type = SiteChildSourceType.values.firstWhere(
+      (e) => e.value == typeValue,
+      orElse: () => throw OnisException(
+        OnisErrorCodes.invalidResponse,
+        "Invalid site child source type: $typeValue",
+      ),
+    );
 
     SiteChildSource source = SiteChildSource(
       uid: UUIDv4().toString(),
@@ -149,7 +136,20 @@ class SiteChildSource extends DatabaseSource {
       [Map<String, dynamic>? data]) {
     // For now, we'll create a basic SiteAsyncRequest
     // In a real implementation, you would need to get the base URL from metadata or configuration
-    final baseUrl = metadata['baseUrl'] as String? ?? 'https://api.example.com';
+    //final baseUrl = metadata['baseUrl'] as String? ?? 'https://api.example.com';
+    final baseUrl = 'https://127.0.0.1:5555';
+
+    if (data != null) {
+      switch (requestType) {
+        case RequestType.findStudies:
+          data["source"] = uid;
+          data["type"] = type.value;
+          data["limit"] = 100;
+          break;
+        default:
+          break;
+      }
+    }
 
     return SiteAsyncRequest(
       baseUrl: baseUrl,
@@ -207,8 +207,8 @@ class SiteSource extends DatabaseSource {
   AsyncRequest? createRequest(RequestType requestType,
       [Map<String, dynamic>? data]) {
     // Get the base URL from metadata or use default localhost server
-    final baseUrl = metadata['baseUrl'] as String? ?? 'https://127.0.0.1:5555';
-
+    //final baseUrl = metadata['baseUrl'] as String? ?? 'https://127.0.0.1:5555';
+    final baseUrl = 'https://127.0.0.1:5555';
     return SiteAsyncRequest(
       baseUrl: baseUrl,
       requestType: requestType,

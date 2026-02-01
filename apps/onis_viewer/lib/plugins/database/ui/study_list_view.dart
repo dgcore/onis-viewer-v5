@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:onis_viewer/core/models/database/patient.dart' as database;
+import 'package:onis_viewer/core/models/database/study.dart' as database;
 import 'package:onis_viewer/plugins/database/ui/resizable_data_table.dart';
 
 import '../../../core/constants.dart';
@@ -6,8 +8,8 @@ import '../../../core/models/study.dart';
 
 /// Study list view using resizable data table
 class StudyListView extends StatefulWidget {
-  final List<Study> studies;
-  final List<Study> selectedStudies; // Changed from Study? to List<Study>
+  final List<({database.Patient patient, database.Study study})> studies;
+  //final List<Study> selectedStudies; // Changed from Study? to List<Study>
   final ValueChanged<Study>? onStudySelected;
   final ValueChanged<List<Study>>?
       onStudiesSelected; // New callback for multi-selection
@@ -20,7 +22,7 @@ class StudyListView extends StatefulWidget {
   const StudyListView({
     super.key,
     required this.studies,
-    required this.selectedStudies, // Changed from optional to required
+    //required this.selectedStudies, // Changed from optional to required
     this.onStudySelected,
     this.onStudiesSelected, // New callback
     this.username,
@@ -188,9 +190,11 @@ class _StudyListViewState extends State<StudyListView> {
 
   /// Build the study table
   Widget _buildStudyTable() {
-    final sortedStudies = List<Study>.from(widget.studies);
+    final sortedStudies =
+        List<({database.Patient patient, database.Study study})>.from(
+            widget.studies);
 
-    if (_sortColumnIndex != null) {
+    /*if (_sortColumnIndex != null) {
       sortedStudies.sort((a, b) {
         int comparison = 0;
         switch (_sortColumnIndex) {
@@ -209,12 +213,12 @@ class _StudyListViewState extends State<StudyListView> {
         }
         return _sortAscending ? comparison : -comparison;
       });
-    }
+    }*/
 
     return ResizableDataTable(
       key: ValueKey('default'), // Use source key to maintain widget identity
       studies: sortedStudies,
-      selectedStudies: widget.selectedStudies,
+      //selectedStudies: widget.selectedStudies,
       onStudySelected: widget.isDisconnecting ? null : widget.onStudySelected,
       onStudiesSelected:
           widget.isDisconnecting ? null : widget.onStudiesSelected,

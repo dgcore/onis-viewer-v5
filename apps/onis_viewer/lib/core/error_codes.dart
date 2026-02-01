@@ -164,4 +164,127 @@ class OnisErrorCodes {
   static const int usbDriveNotFound = 2600;
   static const int usbMultipleDrives = 2601;
   static const int usbUnmountFailed = 2602;
+
+  /// Check if an integer value is a valid error code
+  /// Returns true if the value matches any known error code constant
+  static bool isValid(int value) {
+    // Check against all known error codes
+    return value == none ||
+        value == param ||
+        value == canceled ||
+        value == memory ||
+        value == permission ||
+        value == notAvailable ||
+        value == networkReceive ||
+        value == networkClosed ||
+        value == networkConnection ||
+        value == networkSsl ||
+        value == networkSend ||
+        value == networkUnknownCmd ||
+        value == networkDatagram ||
+        value == urlResolve ||
+        value == targetNetworkConnection ||
+        value == dbConnection ||
+        value == dbQuery ||
+        value == dbNull ||
+        value == dbValue ||
+        value == dbValueLength ||
+        value == dbTransaction ||
+        value == dbTransactionCommit ||
+        value == dbConsistency ||
+        value == dbUpdate ||
+        value == unknown ||
+        value == internal ||
+        value == resource ||
+        value == noSupport ||
+        value == notFound ||
+        value == allFailed ||
+        value == someFailure ||
+        value == duplicate ||
+        value == busy ||
+        value == overflow ||
+        value == invalidResponse ||
+        value == logicError ||
+        value == timeout ||
+        value == invalidUser ||
+        value == invalidSession ||
+        value == targetPermission ||
+        value == sessionExceededLimit ||
+        value == invalidCsrf ||
+        value == media ||
+        value == noFile ||
+        value == fileWrite ||
+        value == fileRead ||
+        value == fileOpen ||
+        value == fileFormat ||
+        value == fileCreate ||
+        value == fileMissing ||
+        value == fileConversion ||
+        value == invalidStream ||
+        value == fileRename ||
+        value == fileCopy ||
+        value == fileMove ||
+        value == fileSize ||
+        value == endOfFile ||
+        value == fileDelete ||
+        value == inputCharset ||
+        value == dirCreate ||
+        value == dirDelete ||
+        value == dirRename ||
+        value == dirOpen ||
+        value == tagValueInvalidWithDefaultRepertoire ||
+        value == tagNameConflict ||
+        value == tagInsert ||
+        value == tagNoCompatibleRepertoire ||
+        value == tagUnsupportedRepertoire ||
+        value == anonymizeTag ||
+        value == invalidDcm ||
+        value == missingSopUid ||
+        value == missingSeriesUid ||
+        value == missingStudyUid ||
+        value == missingModality ||
+        value == missingPatientId ||
+        value == extractFrame ||
+        value == changeTransfer ||
+        value == sopclassNotSupported ||
+        value == failedToStore ||
+        value == conflict ||
+        value == addDicomDir ||
+        value == createDicomDir ||
+        value == writeDicomDir ||
+        value == createDicomFile ||
+        value == dcmCharset ||
+        value == aeRejection ||
+        value == destination ||
+        value == invalidPalette ||
+        value == invalidImage ||
+        value == failedToExtractImage ||
+        value == noImage ||
+        value == circular ||
+        value == zipCreate ||
+        value == zipAddFile ||
+        value == zipSourceFile ||
+        value == missingRecordingPlan ||
+        value == notCapturing ||
+        value == startPlaying ||
+        value == startStreaming ||
+        value == signalLost ||
+        value == examMissing ||
+        value == wrongExam ||
+        value == noExamSession ||
+        value == alreadyRecording ||
+        value == startRecording ||
+        value == rs232 ||
+        value == invalidRequest ||
+        value == notReady ||
+        value == mediaClosed ||
+        value == decoding ||
+        value == seek ||
+        value == capacityOver ||
+        value == frameRateConflict ||
+        value == encoding ||
+        value == usbDriveNotFound ||
+        value == usbMultipleDrives ||
+        value == usbUnmountFailed;
+  }
 }

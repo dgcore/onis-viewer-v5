@@ -193,7 +193,7 @@ class SiteAsyncRequest implements AsyncRequest {
   String _buildUrl(RequestType type) {
     switch (type) {
       case RequestType.findStudies:
-        return '$baseUrl/api/studies/find';
+        return '$baseUrl/studies/find';
       case RequestType.import:
         return '$baseUrl/api/import';
       case RequestType.export:

@@ -37,10 +37,10 @@ void request_service::process_find_studies_request(
   if (search_partitions || search_dicoms) {
   } else if (type == onis::database::source::type_partition) {
     find_source source;
-    source.seq = source_id;
+    source.seq = "ab827b22-a4b9-44a4-96d8-28c6d2a29884";  // source_id;
     source.type = type;
     source.have_conflict = false;
-    source.reject_empty_request = true;
+    source.reject_empty_request = false;
     source.limit = 500;
     source.name = "tralala";
     find_req->sources.emplace_back(source);
@@ -63,8 +63,8 @@ void request_service::process_find_studies_request(
           request_database db(this);
           Json::Value filters(Json::objectValue);
           Json::Value& studies = source_output["studies"];
-          db->find_studies(source_id, source.reject_empty_request, source.limit,
-                           filters, onis::database::info_all,
+          db->find_studies(source.seq, source.reject_empty_request,
+                           source.limit, filters, onis::database::info_all,
                            onis::database::info_all, true,
                            onis::database::lock_mode::NO_LOCK, studies);
           source_output["status"] = 0;

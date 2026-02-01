@@ -406,6 +406,10 @@ class DatabaseSourceManager extends ChangeNotifier {
   List<DatabaseSource> get allSources =>
       List.unmodifiable(_sourcesByUid.values);
 
+  DatabaseSource? findSourceByUid(String uid) {
+    return _sourcesByUid[uid];
+  }
+
   void onSourceConnected(DatabaseSource source) {
     _sourceConnectionController.add(source);
   }
@@ -492,11 +496,6 @@ class DatabaseSourceManager extends ChangeNotifier {
     // Add to new parent
     source._setParentInternal(parent);
     parent._addSubSourceInternal(source);
-  }
-
-  /// Find a source by UID
-  DatabaseSource? findSourceByUid(String uid) {
-    return _sourcesByUid[uid];
   }
 
   void clear() {
