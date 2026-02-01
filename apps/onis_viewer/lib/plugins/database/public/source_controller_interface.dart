@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:onis_viewer/core/database_source.dart';
+import 'package:onis_viewer/core/models/database/patient.dart' as database;
+import 'package:onis_viewer/core/models/database/study.dart' as database;
+import 'package:onis_viewer/core/responses/find_study_response.dart';
 
 /// Interface for SourceController functionality
 abstract class ISourceController extends ChangeNotifier {
@@ -16,4 +19,9 @@ abstract class ISourceController extends ChangeNotifier {
   bool canExport(String sourceUid);
   bool canOpen(String sourceUid);
   bool canTransfer(String sourceUid);
+  Future<FindPatientStudyResponse> findStudies(String sourceUid);
+  void setStudies(FindPatientStudyResponse response);
+  void clearStudies(String sourceUid);
+  List<({database.Patient patient, database.Study study})> getStudiesForSource(
+      String sourceUid);
 }

@@ -1,7 +1,8 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:onis_viewer/core/models/study.dart';
+import 'package:onis_viewer/core/error_codes.dart';
+import 'package:onis_viewer/plugins/database/public/source_controller_interface.dart';
 import 'package:onis_viewer/plugins/database/ui/study_list_view.dart';
 
 import '../../../api/core/ov_api_core.dart';
@@ -104,11 +105,13 @@ class _DatabasePageState extends BasePageState<DatabasePage> {
           onTransfer: () => {},
           onOpen: () => {},
           selectedLocation: 'Local computer',
-          onSearch: () {
-            /*final selected = _dbApi?.selectedSource;
+          onSearch: () async {
             if (selected != null) {
-              _controller.onSearch(selected.uid);
-            }*/
+              final response = await sourceController.findStudies(selected.uid);
+              if (response.status == OnisErrorCodes.none) {
+                sourceController.setStudies(response);
+              }
+            }
           },
           canOpen: canOpen,
           canImport: canImport,
@@ -132,7 +135,7 @@ class _DatabasePageState extends BasePageState<DatabasePage> {
     }
     final rightPanel = selected == null
         ? _buildNoSelectionPlaceholder()
-        : (loginPanel ?? _buildDatabaseDetails());
+        : (loginPanel ?? _buildDatabaseDetails(sourceController!, selected));
 
     return Row(
       children: [
@@ -185,7 +188,8 @@ class _DatabasePageState extends BasePageState<DatabasePage> {
   }
 
   /// Build the database details panel
-  Widget _buildDatabaseDetails() {
+  Widget _buildDatabaseDetails(
+      ISourceController sourceController, DatabaseSource selectedSource) {
     // Always show the study list, but with different header based on selection
     /*final selected = _dbApi?.selectedSource;
     final username = selected?.currentUsername;
@@ -199,17 +203,16 @@ class _DatabasePageState extends BasePageState<DatabasePage> {
         ? _controller.getSelectedStudiesForSource(selected.uid)
         : <Study>[];*/
 
-    final sourceController = _dbApi?.sourceController;
-    final selectedSource = sourceController?.selectedSource;
+    final patientStudies =
+        sourceController.getStudiesForSource(selectedSource.uid);
 
-    final studies = <Study>[];
-    final selectedStudies = <Study>[];
+    //final selectedStudies = <Study>[];
     final username = 'madric';
     final isDisconnecting = false;
 
     return StudyListView(
-      studies: studies,
-      selectedStudies: selectedStudies,
+      studies: patientStudies,
+      //selectedStudies: selectedStudies,
       onStudySelected: (study) {
         /*if (selected != null) {
           _controller.selectStudy(selected.uid, study);
@@ -223,9 +226,7 @@ class _DatabasePageState extends BasePageState<DatabasePage> {
       username: username,
       isDisconnecting: isDisconnecting,
       onDisconnect: () {
-        if (selectedSource != null) {
-          selectedSource.disconnect();
-        }
+        selectedSource.disconnect();
       },
       initialScrollPosition: /*selected != null
           ? _controller.getScrollPositionForSource(selected.uid)

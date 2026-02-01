@@ -1,14 +1,16 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:onis_viewer/core/models/database/patient.dart' as database;
+import 'package:onis_viewer/core/models/database/study.dart' as database;
 
 import '../../../core/constants.dart';
 import '../../../core/models/study.dart';
 
 /// A resizable data table that allows column width adjustment
 class ResizableDataTable extends StatefulWidget {
-  final List<Study> studies;
-  final List<Study> selectedStudies; // Changed from Study? to List<Study>
+  final List<({database.Patient patient, database.Study study})> studies;
+  //final List<Study> selectedStudies; // Changed from Study? to List<Study>
   final ValueChanged<Study>? onStudySelected;
   final ValueChanged<List<Study>>?
       onStudiesSelected; // New callback for multi-selection
@@ -21,7 +23,7 @@ class ResizableDataTable extends StatefulWidget {
   const ResizableDataTable({
     super.key,
     required this.studies,
-    required this.selectedStudies, // Changed from optional to required
+    //required this.selectedStudies, // Changed from optional to required
     this.onStudySelected,
     this.onStudiesSelected, // New callback
     this.sortColumnIndex,
@@ -77,7 +79,7 @@ class _ResizableDataTableState extends State<ResizableDataTable>
   ];
 
   // Selection state
-  Study? _lastSelectedStudy; // Track last selected study for range selection
+  //Study? _lastSelectedStudy; // Track last selected study for range selection
   late ScrollController _scrollController;
   late ScrollController _verticalScrollController;
 
@@ -146,7 +148,7 @@ class _ResizableDataTableState extends State<ResizableDataTable>
   }
 
   /// Get filtered studies based on current filter values
-  List<Study> get _filteredStudies {
+  /*List<Study> get _filteredStudies {
     return widget.studies.where((study) {
       // Check ID filter
       if (_filterControllers[0].text.isNotEmpty) {
@@ -185,7 +187,7 @@ class _ResizableDataTableState extends State<ResizableDataTable>
 
       return true;
     }).toList();
-  }
+  }*/
 
   @override
   Widget build(BuildContext context) {
@@ -221,8 +223,9 @@ class _ResizableDataTableState extends State<ResizableDataTable>
                       child: SingleChildScrollView(
                         controller: _verticalScrollController,
                         child: Column(
-                          children: _filteredStudies
-                              .map((study) => _buildDataRow(study))
+                          children: widget.studies
+                              .map((study) =>
+                                  _buildDataRow(study.patient, study.study))
                               .toList(),
                         ),
                       ),
@@ -626,13 +629,14 @@ class _ResizableDataTableState extends State<ResizableDataTable>
   }
 
   /// Build a data row
-  Widget _buildDataRow(Study study) {
-    final isSelected = widget.selectedStudies.any((s) => s.id == study.id);
+  Widget _buildDataRow(database.Patient patient, database.Study study) {
+    final isSelected = false;
+    //widget.selectedStudies.any((s) => s.id == study.id);
 
     return GestureDetector(
       onTapDown: (details) {
         // Check for modifier keys in the mouse event
-        _handleRowSelection(study);
+        _handleRowSelection(patient, study);
       },
       child: Container(
         decoration: BoxDecoration(
@@ -654,16 +658,17 @@ class _ResizableDataTableState extends State<ResizableDataTable>
             // Get the correct data based on column definition
             switch (columnDef['key']) {
               case 'patientId':
-                cellData = study.patientId ?? 'N/A';
+                cellData = patient.pid;
                 break;
               case 'name':
-                cellData = study.name;
+                cellData = patient.name;
                 break;
               case 'sex':
-                cellData = study.sex;
+                cellData = patient.sex;
                 break;
               case 'birthDate':
-                cellData = _formatDate(study.birthDate);
+                //cellData = _formatDate(patient.birthDate);
+                cellData = 'N/A';
                 break;
               default:
                 cellData = 'N/A';
@@ -672,7 +677,8 @@ class _ResizableDataTableState extends State<ResizableDataTable>
             return Row(
               children: [
                 // Data cell
-                _buildDataCell(cellData, columnIndex, isSelected, study),
+                _buildDataCell(
+                    cellData, columnIndex, isSelected, patient, study),
                 // Resize handle
                 _buildResizeHandle(columnIndex),
               ],
@@ -684,8 +690,8 @@ class _ResizableDataTableState extends State<ResizableDataTable>
   }
 
   /// Build a data cell
-  Widget _buildDataCell(
-      String text, int columnIndex, bool isSelected, Study study) {
+  Widget _buildDataCell(String text, int columnIndex, bool isSelected,
+      database.Patient patient, database.Study study) {
     return Container(
       width: _columnWidths[columnIndex],
       padding: const EdgeInsets.symmetric(
@@ -707,8 +713,8 @@ class _ResizableDataTableState extends State<ResizableDataTable>
   }
 
   /// Handle row selection with keyboard modifiers
-  void _handleRowSelection(Study study) {
-    debugPrint('Row selection triggered for study: ${study.name}');
+  void _handleRowSelection(database.Patient patient, database.Study study) {
+    /*debugPrint('Row selection triggered for study: ${study.name}');
     print("Shift pressed: $isShiftPressed");
     print("Ctrl/Cmd pressed: $isCtrlOrCmdPressed");
 
@@ -775,7 +781,7 @@ class _ResizableDataTableState extends State<ResizableDataTable>
     if (currentSelection.length == 1) {
       debugPrint('Calling onStudySelected with single study');
       widget.onStudySelected?.call(currentSelection.first);
-    }
+    }*/
   }
 
   /// Format date for display

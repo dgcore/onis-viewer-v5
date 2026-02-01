@@ -57,6 +57,7 @@ public:
   void process_request(const request_data_ptr& req);
 
   void process_authenticate_request(const request_data_ptr& req);
+  void process_find_studies_request(const request_data_ptr& req);
 
 private:
   // database pool

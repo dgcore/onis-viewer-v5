@@ -95,7 +95,7 @@ void site_database::create_study_item(onis_kit::database::database_row& rec,
   }
   study[BASE_UID_KEY] = rec.get_string(*target_index, false, false);
   if (flags & onis::database::info_study_character_set) {
-    study[ST_CHARSET_KEY] = rec.get_string(*target_index, false, false);
+    study[ST_CHARSET_KEY] = rec.get_string(*target_index, true, true);
   }
   if (flags & onis::database::info_study_date) {
     study[ST_DATE_KEY] = rec.get_string(*target_index, true, true);
@@ -135,7 +135,7 @@ void site_database::create_study_item(onis_kit::database::database_row& rec,
   }
   if (flags & onis::database::info_study_status) {
     auto status = rec.get_uuid(*target_index, false, false);
-    auto conflict = rec.get_uuid(*target_index, false, false);
+    auto conflict = rec.get_uuid(*target_index, true, true);
     if (for_client) {
       if (status == ONLINE_STATUS)
         study[ST_STATUS_KEY] = 0;

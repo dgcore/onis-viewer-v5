@@ -69,9 +69,7 @@ void site_database::create_patient_item(onis_kit::database::database_row& rec,
   } else {
     (*target_index)++;
   }
-  if (partition_seq) {
-    *partition_seq = rec.get_uuid("partition_id", false, false);
-  }
+  patient[BASE_UID_KEY] = rec.get_string(*target_index, false, false);
   if (flags & onis::database::info_patient_name) {
     patient[PA_NAME_KEY] = rec.get_string(*target_index, true, true);
     patient[PA_IDEOGRAM_KEY] = rec.get_string(*target_index, true, true);

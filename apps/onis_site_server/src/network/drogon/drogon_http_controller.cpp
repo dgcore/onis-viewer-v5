@@ -47,6 +47,20 @@ void http_drogon_controller::logout(
   return callback(resp);*/
 }
 
+//------------------------------------------------------------------------------
+// Find Studies
+//------------------------------------------------------------------------------
+
+void http_drogon_controller::find_studies(
+    const drogon::HttpRequestPtr& req,
+    std::function<void(const drogon::HttpResponsePtr&)>&& callback) const {
+  treat_post_request(req, callback, request_type::kFindStudies);
+}
+
+//------------------------------------------------------------------------------
+// Treat Post Request
+//------------------------------------------------------------------------------
+
 void http_drogon_controller::treat_post_request(
     const drogon::HttpRequestPtr& req,
     std::function<void(const drogon::HttpResponsePtr&)>& callback,

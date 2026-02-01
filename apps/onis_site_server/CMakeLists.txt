@@ -54,6 +54,7 @@ set(SERVER_SOURCES
     src/services/requests/request_data.cpp
     src/services/requests/request_service.cpp
     src/services/requests/request_service_authenticate.cpp
+    src/services/requests/request_find_studies.cpp
     src/services/requests/sessions/request_session.cpp
     src/services/requests/request_database.cpp
     src/services/requests/sessions/request_session_access_cache.cpp

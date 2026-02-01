@@ -1,20 +1,28 @@
 import 'dart:async';
 
+import 'package:onis_viewer/api/request/async_request.dart';
 import 'package:onis_viewer/core/database_source.dart';
-import 'package:onis_viewer/core/models/study.dart';
+import 'package:onis_viewer/core/error_codes.dart';
+import 'package:onis_viewer/core/models/database/patient.dart' as database;
+import 'package:onis_viewer/core/models/database/study.dart' as database;
+import 'package:onis_viewer/core/onis_exception.dart';
+import 'package:onis_viewer/core/responses/find_study_response.dart';
 import 'package:onis_viewer/plugins/database/public/source_controller_interface.dart';
 import 'package:onis_viewer/plugins/database/ui/database_source_bar.dart';
 
 class SourceState {
-  SourceState(DatabaseSource source) {
-    //loginState = source.createLoginState();
-  }
-  //DatabaseSourceLoginState? loginState;
-  bool isConnected = false;
-  List<Study> studies = [];
-  List<Study> selectedStudies = [];
+  SourceState();
+  List<({String sourceUid, int status})> sourceStatuses = [];
+  List<({database.Patient patient, database.Study study})> studies = [];
+  List<int> selectedStudyIndices = [];
   double scrollPosition = 0.0;
-  //Map<RequestType, List<AsyncRequest>> pendingRequests = {};
+
+  void reset() {
+    sourceStatuses.clear();
+    studies.clear();
+    selectedStudyIndices.clear();
+    scrollPosition = 0.0;
+  }
 }
 
 class SourceController extends ISourceController {
@@ -83,7 +91,7 @@ class SourceController extends ISourceController {
   }
 
   void _onSourceRegistered(DatabaseSource source) {
-    _sourceStates[source.uid] = SourceState(source);
+    _sourceStates[source.uid] = SourceState();
   }
 
   void _onSourceUnregistered(DatabaseSource source) {
@@ -194,4 +202,61 @@ class SourceController extends ISourceController {
   bool canTransfer(String sourceUid) {
     return canExport(sourceUid);
   }
+
+  @override
+  Future<FindPatientStudyResponse> findStudies(String sourceUid) async {
+    final source = _databaseSourceManager.findSourceByUid(sourceUid);
+    if (source == null) {
+      return FindPatientStudyResponse(
+          sourceUid: sourceUid, status: OnisErrorCodes.logicError, sources: []);
+    }
+    Map<String, dynamic> data = {};
+    AsyncRequest? request = source.createRequest(RequestType.findStudies, data);
+    try {
+      AsyncResponse? response = await request?.send();
+      if (response != null && response.data != null) {
+        return FindPatientStudyResponse.fromJson(source.uid, response.data!);
+      } else {
+        return FindPatientStudyResponse(
+            sourceUid: source.uid,
+            status: OnisErrorCodes.invalidResponse,
+            sources: []);
+      }
+    } on OnisException catch (e) {
+      return FindPatientStudyResponse(
+          sourceUid: sourceUid, status: e.code, sources: []);
+    } catch (e) {
+      return FindPatientStudyResponse(
+          sourceUid: sourceUid, status: OnisErrorCodes.unknown, sources: []);
+    }
+  }
+
+  @override
+  void clearStudies(String sourceUid) {
+    SourceState? sourceState = _sourceStates[sourceUid];
+    if (sourceState != null) {
+      sourceState.reset();
+    }
+  }
+
+  @override
+  void setStudies(FindPatientStudyResponse response) {
+    SourceState? sourceState = _sourceStates[response.sourceUid];
+    if (sourceState != null) {
+      sourceState.reset();
+      for (FindPatientStudySourceResponse sourceResponse in response.sources) {
+        sourceState.sourceStatuses.add((
+          sourceUid: sourceResponse.sourceUid,
+          status: sourceResponse.status,
+        ));
+        sourceState.studies.addAll(sourceResponse.studies);
+      }
+      notifyListeners();
+    }
+  }
+
+  @override
+  List<({database.Patient patient, database.Study study})> getStudiesForSource(
+          String sourceUid) =>
+      _sourceStates[sourceUid]?.studies ?? [];
 }

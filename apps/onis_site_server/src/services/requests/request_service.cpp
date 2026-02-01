@@ -142,6 +142,9 @@ void request_service::process_request(const request_data_ptr& req) {
       case request_type::kAuthenticate:
         process_authenticate_request(req);
         break;
+      case request_type::kFindStudies:
+        process_find_studies_request(req);
+        break;
       default:
         break;
     }
@@ -154,8 +157,14 @@ void request_service::process_request(const request_data_ptr& req) {
   } catch (const std::exception& e) {
     req->write_output([&](json& output) {
       output.clear();
-      output["status"] = 9999;
+      output["status"] = EOS_UNKNOWN;
       output["message"] = e.what();
+    });
+  } catch (...) {
+    req->write_output([&](json& output) {
+      output.clear();
+      output["status"] = EOS_UNKNOWN;
+      output["message"] = "Unknown error";
     });
   }
 }

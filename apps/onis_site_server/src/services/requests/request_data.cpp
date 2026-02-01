@@ -1,4 +1,4 @@
-#include "../../../include/services/requests/request_data.hpp"
+#include "../../../include/services/requests/find_request_data.hpp"
 
 ////////////////////////////////////////////////////////////////////////////////
 // request_data class
@@ -9,7 +9,12 @@
 //------------------------------------------------------------------------------
 
 request_data_ptr request_data::create(request_type type) {
-  return std::make_shared<request_data>(type);
+  switch (type) {
+    case request_type::kFindStudies:
+      return std::make_shared<find_request_data>();
+    default:
+      return std::make_shared<request_data>(type);
+  }
 }
 
 //------------------------------------------------------------------------------

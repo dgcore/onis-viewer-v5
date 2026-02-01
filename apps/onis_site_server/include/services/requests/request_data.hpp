@@ -14,6 +14,7 @@ using json = Json::Value;
 enum class request_type {
   kAuthenticate,
   kLogout,
+  kFindStudies,
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -32,7 +33,7 @@ public:
   request_data(request_type type);
 
   // destructor
-  ~request_data();
+  virtual ~request_data();
 
   // prevent copy and move
   request_data(const request_data&) = delete;
