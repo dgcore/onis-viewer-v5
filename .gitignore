@@ -1,6 +1,7 @@
 # ONIS5 Root .gitignore
 
 # Build artifacts
+# Root build directory (C++/CMake unified build)
 build/
 dist/
 *.dylib
@@ -8,6 +9,12 @@ dist/
 *.dll
 *.exe
 *.app
+
+# C++/CMake build directories in subdirectories (should not exist, but ignore just in case)
+apps/*/build/
+libs/*/build/
+apps/onis_site_server/build/
+libs/onis_kit/build/
 
 # IDE specific files
 .vscode/settings.json

@@ -107,7 +107,7 @@ build_onis_site_server() {
     echo ""
     echo -e "${BLUE}🖥️  Building ONIS Site Server (C++)...${NC}"
     
-    cd "$PROJECT_ROOT/apps/onis_site_server"
+    cd "$PROJECT_ROOT"
     
     if [ ! -d "build" ]; then
         mkdir build
@@ -115,11 +115,13 @@ build_onis_site_server() {
     
     cd build
     
-    # Configure with CMake
-    cmake .. -DCMAKE_BUILD_TYPE=Release
+    # Configure with CMake (if not already configured)
+    if [ ! -f "CMakeCache.txt" ]; then
+        cmake .. -DCMAKE_BUILD_TYPE=Release
+    fi
     
     # Build server
-    make -j$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)
+    make onis_site_server -j$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)
     
     print_status "ONIS Site Server built successfully"
 }
@@ -155,7 +157,7 @@ main() {
     echo "Build outputs:"
     echo "  - Shared libraries: $PROJECT_ROOT/build/lib/"
     echo "  - ONIS Viewer: $PROJECT_ROOT/apps/onis_viewer/build/"
-    echo "  - ONIS Site Server: $PROJECT_ROOT/apps/onis_site_server/build/"
+    echo "  - ONIS Site Server: $PROJECT_ROOT/build/bin/onis_site_server"
 }
 
 # Run main function
