@@ -14,13 +14,13 @@ class SourceState {
   SourceState();
   List<({String sourceUid, int status})> sourceStatuses = [];
   List<({database.Patient patient, database.Study study})> studies = [];
-  List<int> selectedStudyIndices = [];
+  List<({database.Patient patient, database.Study study})> selectedStudies = [];
   double scrollPosition = 0.0;
 
   void reset() {
     sourceStatuses.clear();
     studies.clear();
-    selectedStudyIndices.clear();
+    selectedStudies.clear();
     scrollPosition = 0.0;
   }
 }
@@ -88,6 +88,11 @@ class SourceController extends ISourceController {
     _sourceRegisteredSubscription?.cancel();
     _sourceUnregisteredSubscription?.cancel();
     super.dispose();
+  }
+
+  @override
+  void notifyUpdate() {
+    notifyListeners();
   }
 
   void _onSourceRegistered(DatabaseSource source) {
@@ -259,4 +264,9 @@ class SourceController extends ISourceController {
   List<({database.Patient patient, database.Study study})> getStudiesForSource(
           String sourceUid) =>
       _sourceStates[sourceUid]?.studies ?? [];
+
+  @override
+  List<({database.Patient patient, database.Study study})>
+      getSelectedStudiesForSource(String sourceUid) =>
+          _sourceStates[sourceUid]?.selectedStudies ?? [];
 }

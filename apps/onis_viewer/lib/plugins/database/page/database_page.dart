@@ -205,24 +205,25 @@ class _DatabasePageState extends BasePageState<DatabasePage> {
 
     final patientStudies =
         sourceController.getStudiesForSource(selectedSource.uid);
-
-    //final selectedStudies = <Study>[];
+    final selectedStudies =
+        sourceController.getSelectedStudiesForSource(selectedSource.uid);
     final username = 'madric';
     final isDisconnecting = false;
 
     return StudyListView(
       studies: patientStudies,
-      //selectedStudies: selectedStudies,
-      onStudySelected: (study) {
-        /*if (selected != null) {
+      selectedStudies: selectedStudies,
+      onStudySelectionChanged: () => sourceController.notifyUpdate(),
+      //onStudySelected: (study) {
+      /*if (selected != null) {
           _controller.selectStudy(selected.uid, study);
         }*/
-      },
-      onStudiesSelected: (studies) {
-        /*if (selected != null) {
+      //},
+      //onStudiesSelected: (studies) {
+      /*if (selected != null) {
           _controller.selectStudies(selected.uid, studies);
         }*/
-      },
+      //},
       username: username,
       isDisconnecting: isDisconnecting,
       onDisconnect: () {

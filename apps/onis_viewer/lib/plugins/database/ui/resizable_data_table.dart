@@ -5,17 +5,19 @@ import 'package:onis_viewer/core/models/database/patient.dart' as database;
 import 'package:onis_viewer/core/models/database/study.dart' as database;
 
 import '../../../core/constants.dart';
-import '../../../core/models/study.dart';
 import '../../../core/ui/column_configuration.dart';
 import 'database_table_column_config.dart';
 
 /// A resizable data table that allows column width adjustment
 class ResizableDataTable extends StatefulWidget {
   final List<({database.Patient patient, database.Study study})> studies;
-  //final List<Study> selectedStudies; // Changed from Study? to List<Study>
-  final ValueChanged<Study>? onStudySelected;
-  final ValueChanged<List<Study>>?
-      onStudiesSelected; // New callback for multi-selection
+  final List<({database.Patient patient, database.Study study})>
+      selectedStudies;
+  final VoidCallback? onStudySelectionChanged;
+  /*final ValueChanged<({database.Patient patient, database.Study study})>?
+      onStudySelected;
+  final ValueChanged<List<({database.Patient patient, database.Study study})>>?
+      onStudiesSelected;*/
   final int? sortColumnIndex;
   final bool sortAscending;
   final ValueChanged<int?>? onSort;
@@ -25,9 +27,10 @@ class ResizableDataTable extends StatefulWidget {
   const ResizableDataTable({
     super.key,
     required this.studies,
-    //required this.selectedStudies, // Changed from optional to required
-    this.onStudySelected,
-    this.onStudiesSelected, // New callback
+    required this.selectedStudies,
+    this.onStudySelectionChanged,
+    //this.onStudySelected,
+//    this.onStudiesSelected,
     this.sortColumnIndex,
     this.sortAscending = true,
     this.onSort,
@@ -65,8 +68,10 @@ class _ResizableDataTableState extends State<ResizableDataTable>
   late List<TextEditingController> _filterControllers;
 
   // Selection state
-  Study? _lastSelectedStudy; // Track last selected study for range selection
-  final Set<String> _selectedStudyIds = {}; // Track selected study IDs
+  ({
+    database.Patient patient,
+    database.Study study
+  })? _lastSelectedStudy; // Track last selected study for range selection
   late ScrollController _scrollController;
   late ScrollController _verticalScrollController;
 
@@ -253,8 +258,7 @@ class _ResizableDataTableState extends State<ResizableDataTable>
                           controller: _verticalScrollController,
                           child: Column(
                             children: widget.studies
-                                .map((study) =>
-                                    _buildDataRow(study.patient, study.study))
+                                .map((study) => _buildDataRow(study))
                                 .toList(),
                           ),
                         ),
@@ -728,29 +732,15 @@ class _ResizableDataTableState extends State<ResizableDataTable>
     );
   }
 
-  /// Convert database.Study to Study model for selection
-  Study _convertToStudy(database.Patient patient, database.Study dbStudy) {
-    return Study(
-      id: dbStudy.id.isNotEmpty ? dbStudy.id : dbStudy.uid,
-      name: patient.name.isNotEmpty ? patient.name : 'Unknown',
-      sex: patient.sex.isNotEmpty ? patient.sex : '',
-      birthDate: patient.birthDate ?? DateTime.now(),
-      patientId: patient.pid.isNotEmpty ? patient.pid : patient.id,
-      studyDate: dbStudy.studyDate,
-      modality: dbStudy.modalities.isNotEmpty ? dbStudy.modalities : null,
-      status: dbStudy.status.toString(),
-    );
-  }
-
   /// Build a data row
-  Widget _buildDataRow(database.Patient patient, database.Study study) {
-    final studyId = study.id.isNotEmpty ? study.id : study.uid;
-    final isSelected = _selectedStudyIds.contains(studyId);
+  Widget _buildDataRow(
+      ({database.Patient patient, database.Study study}) study) {
+    final isSelected = widget.selectedStudies.contains(study);
 
     return GestureDetector(
       onTapDown: (details) {
         // Check for modifier keys in the mouse event
-        _handleRowSelection(patient, study);
+        _handleRowSelection(study);
       },
       child: Container(
         decoration: BoxDecoration(
@@ -776,83 +766,99 @@ class _ResizableDataTableState extends State<ResizableDataTable>
             // Get the correct data based on column id
             switch (columnId) {
               case 'source':
-                cellData = patient.sourceUid.isNotEmpty
-                    ? patient.sourceUid
-                    : study.sourceUid.isNotEmpty
-                        ? study.sourceUid
+                cellData = study.patient.sourceUid.isNotEmpty
+                    ? study.patient.sourceUid
+                    : study.study.sourceUid.isNotEmpty
+                        ? study.study.sourceUid
                         : 'N/A';
                 break;
               case 'patientId':
-                cellData = patient.pid.isNotEmpty ? patient.pid : patient.id;
+                cellData = study.patient.pid.isNotEmpty
+                    ? study.patient.pid
+                    : study.patient.id;
                 break;
               case 'patientName':
                 // Concatenate name, ideogram, and phonetic
                 final parts = <String>[];
-                if (patient.name.isNotEmpty) parts.add(patient.name);
-                if (patient.ideogram.isNotEmpty) parts.add(patient.ideogram);
-                if (patient.phonetic.isNotEmpty)
-                  parts.add('(${patient.phonetic})');
+                if (study.patient.name.isNotEmpty)
+                  parts.add(study.patient.name);
+                if (study.patient.ideogram.isNotEmpty)
+                  parts.add(study.patient.ideogram);
+                if (study.patient.phonetic.isNotEmpty)
+                  parts.add('(${study.patient.phonetic})');
                 cellData = parts.join(' ');
                 break;
               case 'birthDate':
-                cellData = patient.birthDate != null
-                    ? _formatDate(patient.birthDate!)
+                cellData = study.patient.birthDate != null
+                    ? _formatDate(study.patient.birthDate!)
                     : 'N/A';
                 break;
               case 'sex':
-                cellData = patient.sex.isNotEmpty ? patient.sex : 'N/A';
+                cellData =
+                    study.patient.sex.isNotEmpty ? study.patient.sex : 'N/A';
                 break;
               case 'age':
-                cellData = study.age.isNotEmpty ? study.age : 'N/A';
+                cellData = study.study.age.isNotEmpty ? study.study.age : 'N/A';
                 break;
               case 'modalities':
-                cellData =
-                    study.modalities.isNotEmpty ? study.modalities : 'N/A';
+                cellData = study.study.modalities.isNotEmpty
+                    ? study.study.modalities
+                    : 'N/A';
                 break;
               case 'studyDate':
-                cellData =
-                    study.studyDate != null && study.studyDate!.isNotEmpty
-                        ? _formatStudyDate(study.studyDate!)
-                        : 'N/A';
+                cellData = study.study.studyDate != null &&
+                        study.study.studyDate!.isNotEmpty
+                    ? _formatStudyDate(study.study.studyDate!)
+                    : 'N/A';
                 break;
               case 'studyTime':
-                cellData =
-                    study.studyTime != null && study.studyTime!.isNotEmpty
-                        ? study.studyTime!
-                        : 'N/A';
+                cellData = study.study.studyTime != null &&
+                        study.study.studyTime!.isNotEmpty
+                    ? study.study.studyTime!
+                    : 'N/A';
                 break;
               case 'bodyParts':
-                cellData = study.bodyParts.isNotEmpty ? study.bodyParts : 'N/A';
+                cellData = study.study.bodyParts.isNotEmpty
+                    ? study.study.bodyParts
+                    : 'N/A';
                 break;
               case 'accnum':
-                cellData = study.accnum.isNotEmpty ? study.accnum : 'N/A';
+                cellData =
+                    study.study.accnum.isNotEmpty ? study.study.accnum : 'N/A';
                 break;
               case 'studyId':
-                cellData = study.studyId.isNotEmpty ? study.studyId : 'N/A';
+                cellData = study.study.studyId.isNotEmpty
+                    ? study.study.studyId
+                    : 'N/A';
                 break;
               case 'description':
-                cellData = study.desc.isNotEmpty ? study.desc : 'N/A';
+                cellData =
+                    study.study.desc.isNotEmpty ? study.study.desc : 'N/A';
                 break;
               case 'instanceNumber':
-                cellData = study.imcnt.toString();
+                cellData = study.study.imcnt.toString();
                 break;
               case 'comment':
-                cellData = study.comment.isNotEmpty ? study.comment : 'N/A';
+                cellData = study.study.comment.isNotEmpty
+                    ? study.study.comment
+                    : 'N/A';
                 break;
               case 'stations':
-                cellData = study.stations.isNotEmpty ? study.stations : 'N/A';
+                cellData = study.study.stations.isNotEmpty
+                    ? study.study.stations
+                    : 'N/A';
                 break;
               case 'seriesCount':
-                cellData = study.srcnt.toString();
+                cellData = study.study.srcnt.toString();
                 break;
               case 'imagesCount':
-                cellData = study.imcnt.toString();
+                cellData = study.study.imcnt.toString();
                 break;
               case 'reportsCount':
-                cellData = study.rptcnt.toString();
+                cellData = study.study.rptcnt.toString();
                 break;
               case 'status':
-                cellData = study.status.toString();
+                cellData = study.study.status.toString();
                 break;
               default:
                 cellData = 'N/A';
@@ -861,8 +867,8 @@ class _ResizableDataTableState extends State<ResizableDataTable>
             return Row(
               children: [
                 // Data cell
-                _buildDataCell(
-                    cellData, displayIndex, isSelected, patient, study),
+                _buildDataCell(cellData, displayIndex, isSelected,
+                    study.patient, study.study),
                 // Resize handle
                 _buildResizeHandle(displayIndex),
               ],
@@ -897,61 +903,54 @@ class _ResizableDataTableState extends State<ResizableDataTable>
   }
 
   /// Handle row selection with keyboard modifiers
-  void _handleRowSelection(database.Patient patient, database.Study dbStudy) {
-    final study = _convertToStudy(patient, dbStudy);
-    final studyId = dbStudy.id.isNotEmpty ? dbStudy.id : dbStudy.uid;
-    final isCurrentlySelected = _selectedStudyIds.contains(studyId);
+  void _handleRowSelection(
+      ({database.Patient patient, database.Study study}) study) {
+    final isCurrentlySelected = widget.selectedStudies.contains(study);
 
     if (isShiftPressed && _lastSelectedStudy != null) {
       // Range selection mode (Shift + click)
-      final lastIndex = widget.studies.indexWhere((s) {
-        final id = s.study.id.isNotEmpty ? s.study.id : s.study.uid;
-        return id == (_lastSelectedStudy!.id);
-      });
-      final currentIndex = widget.studies.indexWhere((s) {
-        final id = s.study.id.isNotEmpty ? s.study.id : s.study.uid;
-        return id == studyId;
-      });
+      final lastIndex =
+          widget.studies.indexWhere((s) => s == _lastSelectedStudy);
+      final currentIndex = widget.studies.indexWhere((s) => s == study);
 
       if (lastIndex != -1 && currentIndex != -1) {
         final startIndex = lastIndex < currentIndex ? lastIndex : currentIndex;
         final endIndex = lastIndex < currentIndex ? currentIndex : lastIndex;
-
         // Clear current selection and add range
-        _selectedStudyIds.clear();
+        widget.selectedStudies.clear();
         for (int i = startIndex; i <= endIndex; i++) {
-          final id = widget.studies[i].study.id.isNotEmpty
-              ? widget.studies[i].study.id
-              : widget.studies[i].study.uid;
-          _selectedStudyIds.add(id);
+          widget.selectedStudies.add(widget.studies[i]);
         }
+        widget.onStudySelectionChanged?.call();
       }
     } else if (isCtrlOrCmdPressed) {
       // Multi-selection mode (Ctrl/Cmd + click)
       if (isCurrentlySelected) {
         // Remove from selection
-        _selectedStudyIds.remove(studyId);
+        widget.selectedStudies.remove(study);
       } else {
         // Add to selection
-        _selectedStudyIds.add(studyId);
+        widget.selectedStudies.add(study);
       }
+      widget.onStudySelectionChanged?.call();
     } else {
       // Single selection mode
-      if (isCurrentlySelected && _selectedStudyIds.length == 1) {
+      if (isCurrentlySelected && widget.selectedStudies.length == 1) {
         // If only this item is selected, deselect it
-        _selectedStudyIds.clear();
+        widget.selectedStudies.clear();
       } else {
         // Select only this item
-        _selectedStudyIds.clear();
-        _selectedStudyIds.add(studyId);
+        widget.selectedStudies.clear();
+        widget.selectedStudies.add(study);
       }
+      widget.onStudySelectionChanged?.call();
     }
 
     // Update last selected study for range selection
     _lastSelectedStudy = study;
 
     // Build list of selected Study objects for callbacks
-    final selectedStudies = widget.studies
+    /*final selectedStudies = widget.studies
         .where((s) {
           final id = s.study.id.isNotEmpty ? s.study.id : s.study.uid;
           return _selectedStudyIds.contains(id);
@@ -966,7 +965,7 @@ class _ResizableDataTableState extends State<ResizableDataTable>
     }
 
     // Update UI
-    setState(() {});
+    setState(() {});*/
   }
 
   /// Format date for display

@@ -4,15 +4,18 @@ import 'package:onis_viewer/core/models/database/study.dart' as database;
 import 'package:onis_viewer/plugins/database/ui/resizable_data_table.dart';
 
 import '../../../core/constants.dart';
-import '../../../core/models/study.dart';
 
 /// Study list view using resizable data table
 class StudyListView extends StatefulWidget {
   final List<({database.Patient patient, database.Study study})> studies;
-  //final List<Study> selectedStudies; // Changed from Study? to List<Study>
-  final ValueChanged<Study>? onStudySelected;
-  final ValueChanged<List<Study>>?
-      onStudiesSelected; // New callback for multi-selection
+  final List<({database.Patient patient, database.Study study})>
+      selectedStudies;
+
+  final VoidCallback? onStudySelectionChanged;
+  //final ValueChanged<({database.Patient patient, database.Study study})>?
+  //  onStudySelected;
+  //final ValueChanged<List<({database.Patient patient, database.Study study})>>?
+  //  onStudiesSelected; // New callback for multi-selection
   final String? username; // Current logged-in username
   final VoidCallback? onDisconnect; // Disconnect callback
   final bool isDisconnecting; // Whether currently disconnecting
@@ -22,9 +25,8 @@ class StudyListView extends StatefulWidget {
   const StudyListView({
     super.key,
     required this.studies,
-    //required this.selectedStudies, // Changed from optional to required
-    this.onStudySelected,
-    this.onStudiesSelected, // New callback
+    required this.selectedStudies,
+    this.onStudySelectionChanged,
     this.username,
     this.onDisconnect,
     this.isDisconnecting = false,
@@ -218,10 +220,11 @@ class _StudyListViewState extends State<StudyListView> {
     return ResizableDataTable(
       key: ValueKey('default'), // Use source key to maintain widget identity
       studies: sortedStudies,
-      //selectedStudies: widget.selectedStudies,
-      onStudySelected: widget.isDisconnecting ? null : widget.onStudySelected,
-      onStudiesSelected:
-          widget.isDisconnecting ? null : widget.onStudiesSelected,
+      selectedStudies: widget.selectedStudies,
+      onStudySelectionChanged: widget.onStudySelectionChanged,
+      //onStudySelected: widget.isDisconnecting ? null : widget.onStudySelected,
+      //onStudiesSelected:
+      //  widget.isDisconnecting ? null : widget.onStudiesSelected,
       sortColumnIndex: _sortColumnIndex,
       sortAscending: _sortAscending,
       onSort: widget.isDisconnecting
