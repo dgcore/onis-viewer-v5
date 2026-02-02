@@ -692,6 +692,8 @@ class _ResizableDataTableState extends State<ResizableDataTable>
                   fontSize: 14,
                 ),
                 textAlign: isNumeric ? TextAlign.right : TextAlign.left,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
             ),
             if (widget.sortColumnIndex == displayIndex)
