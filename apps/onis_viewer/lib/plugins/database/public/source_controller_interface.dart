@@ -27,4 +27,8 @@ abstract class ISourceController extends ChangeNotifier {
       String sourceUid);
   List<({database.Patient patient, database.Study study})>
       getSelectedStudiesForSource(String sourceUid);
+  ({double horizontal, double vertical}) getScrollPositionsForSource(
+      String sourceUid);
+  void saveScrollPositionsForSource(
+      String sourceUid, double horizontalPosition, double verticalPosition);
 }

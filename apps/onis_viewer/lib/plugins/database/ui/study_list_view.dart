@@ -19,8 +19,9 @@ class StudyListView extends StatefulWidget {
   final String? username; // Current logged-in username
   final VoidCallback? onDisconnect; // Disconnect callback
   final bool isDisconnecting; // Whether currently disconnecting
-  final double initialScrollPosition;
-  final ValueChanged<double>? onScrollPositionChanged;
+  final ({double horizontal, double vertical}) initialScrollPositions;
+  final ValueChanged<({double horizontal, double vertical})>?
+      onScrollPositionChanged;
 
   const StudyListView({
     super.key,
@@ -30,7 +31,7 @@ class StudyListView extends StatefulWidget {
     this.username,
     this.onDisconnect,
     this.isDisconnecting = false,
-    this.initialScrollPosition = 0.0,
+    this.initialScrollPositions = const (horizontal: 0.0, vertical: 0.0),
     this.onScrollPositionChanged,
   });
 
@@ -239,7 +240,7 @@ class _StudyListViewState extends State<StudyListView> {
                 }
               });
             },
-      initialScrollPosition: widget.initialScrollPosition,
+      initialScrollPositions: widget.initialScrollPositions,
       onScrollPositionChanged: widget.onScrollPositionChanged,
     );
   }

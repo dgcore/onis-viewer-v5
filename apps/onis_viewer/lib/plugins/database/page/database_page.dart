@@ -229,16 +229,16 @@ class _DatabasePageState extends BasePageState<DatabasePage> {
       onDisconnect: () {
         selectedSource.disconnect();
       },
-      initialScrollPosition: /*selected != null
-          ? _controller.getScrollPositionForSource(selected.uid)
-          :*/
-          0.0,
+      initialScrollPositions:
+          sourceController.getScrollPositionsForSource(selectedSource.uid),
       onScrollPositionChanged: (position) {
-        /*debugPrint(
-            'Database page received scroll position: $position for source: ${selected?.uid}');
+        debugPrint(
+            'Database page received scroll position: horizontal=${position.horizontal}, vertical=${position.vertical} for source: ${selectedSource.uid}');
+        final selected = sourceController.selectedSource;
         if (selected != null) {
-          _controller.saveScrollPositionForSource(selected.uid, position);
-        }*/
+          sourceController.saveScrollPositionsForSource(
+              selected.uid, position.horizontal, position.vertical);
+        }
       },
     );
   }

@@ -15,13 +15,14 @@ class SourceState {
   List<({String sourceUid, int status})> sourceStatuses = [];
   List<({database.Patient patient, database.Study study})> studies = [];
   List<({database.Patient patient, database.Study study})> selectedStudies = [];
-  double scrollPosition = 0.0;
-
+  double horizontalScrollPosition = 0.0;
+  double verticalScrollPosition = 0.0;
   void reset() {
     sourceStatuses.clear();
     studies.clear();
     selectedStudies.clear();
-    scrollPosition = 0.0;
+    horizontalScrollPosition = 0.0;
+    verticalScrollPosition = 0.0;
   }
 }
 
@@ -269,4 +270,24 @@ class SourceController extends ISourceController {
   List<({database.Patient patient, database.Study study})>
       getSelectedStudiesForSource(String sourceUid) =>
           _sourceStates[sourceUid]?.selectedStudies ?? [];
+
+  @override
+  ({double horizontal, double vertical}) getScrollPositionsForSource(
+      String sourceUid) {
+    SourceState? sourceState = _sourceStates[sourceUid];
+    return (
+      horizontal: sourceState?.horizontalScrollPosition ?? 0.0,
+      vertical: sourceState?.verticalScrollPosition ?? 0.0
+    );
+  }
+
+  @override
+  void saveScrollPositionsForSource(
+      String sourceUid, double horizontalPosition, double verticalPosition) {
+    SourceState? sourceState = _sourceStates[sourceUid];
+    if (sourceState != null) {
+      sourceState.horizontalScrollPosition = horizontalPosition;
+      sourceState.verticalScrollPosition = verticalPosition;
+    }
+  }
 }

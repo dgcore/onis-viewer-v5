@@ -21,8 +21,9 @@ class ResizableDataTable extends StatefulWidget {
   final int? sortColumnIndex;
   final bool sortAscending;
   final ValueChanged<int?>? onSort;
-  final double initialScrollPosition;
-  final ValueChanged<double>? onScrollPositionChanged;
+  final ({double horizontal, double vertical}) initialScrollPositions;
+  final ValueChanged<({double horizontal, double vertical})>?
+      onScrollPositionChanged;
 
   const ResizableDataTable({
     super.key,
@@ -34,7 +35,7 @@ class ResizableDataTable extends StatefulWidget {
     this.sortColumnIndex,
     this.sortAscending = true,
     this.onSort,
-    this.initialScrollPosition = 0.0,
+    this.initialScrollPositions = const (horizontal: 0.0, vertical: 0.0),
     this.onScrollPositionChanged,
   });
 
@@ -88,10 +89,13 @@ class _ResizableDataTableState extends State<ResizableDataTable>
       (index) => TextEditingController(),
     );
 
-    _scrollController =
-        ScrollController(initialScrollOffset: widget.initialScrollPosition);
+    _scrollController = ScrollController(
+        initialScrollOffset: widget.initialScrollPositions.horizontal);
     _scrollController.addListener(_onScrollChanged);
-    _verticalScrollController = ScrollController();
+
+    _verticalScrollController = ScrollController(
+        initialScrollOffset: widget.initialScrollPositions.vertical);
+    _verticalScrollController.addListener(_onScrollChanged);
 
     // Add listeners to filter controllers
     for (final controller in _filterControllers) {
@@ -106,6 +110,7 @@ class _ResizableDataTableState extends State<ResizableDataTable>
     // Dispose filter controllers
     _scrollController.removeListener(_onScrollChanged);
     _scrollController.dispose();
+    _verticalScrollController.removeListener(_onScrollChanged);
     _verticalScrollController.dispose();
     for (final controller in _filterControllers) {
       controller.dispose();
@@ -119,11 +124,18 @@ class _ResizableDataTableState extends State<ResizableDataTable>
   void didUpdateWidget(ResizableDataTable oldWidget) {
     super.didUpdateWidget(oldWidget);
 
-    // If the initial scroll position changed, update the scroll controller
-    if (oldWidget.initialScrollPosition != widget.initialScrollPosition) {
+    // If the initial scroll positions changed, update the scroll controllers
+    if (oldWidget.initialScrollPositions.horizontal !=
+        widget.initialScrollPositions.horizontal) {
       debugPrint(
-          'Restoring scroll position to: ${widget.initialScrollPosition}');
-      _scrollController.jumpTo(widget.initialScrollPosition);
+          'Restoring horizontal scroll position to: ${widget.initialScrollPositions.horizontal}');
+      _scrollController.jumpTo(widget.initialScrollPositions.horizontal);
+    }
+    if (oldWidget.initialScrollPositions.vertical !=
+        widget.initialScrollPositions.vertical) {
+      debugPrint(
+          'Restoring vertical scroll position to: ${widget.initialScrollPositions.vertical}');
+      _verticalScrollController.jumpTo(widget.initialScrollPositions.vertical);
     }
   }
 
@@ -145,8 +157,12 @@ class _ResizableDataTableState extends State<ResizableDataTable>
   }
 
   void _onScrollChanged() {
-    debugPrint('Scroll position changed: ${_scrollController.offset}');
-    widget.onScrollPositionChanged?.call(_scrollController.offset);
+    final horizontal = _scrollController.offset;
+    final vertical = _verticalScrollController.offset;
+    debugPrint(
+        'Scroll position changed: horizontal=$horizontal, vertical=$vertical');
+    widget.onScrollPositionChanged
+        ?.call((horizontal: horizontal, vertical: vertical));
   }
 
   /// Get filtered studies based on current filter values
