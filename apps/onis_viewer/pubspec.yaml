@@ -46,6 +46,9 @@ dependencies:
   # HTTP client for making network requests
   http: ^1.2.0
   uuid_v4: ^1.0.2
+  
+  # File picker for selecting files and directories
+  file_picker: ^8.1.4
 
 dev_dependencies:
   flutter_test:

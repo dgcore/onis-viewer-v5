@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../app/onis_viewer_app.dart';
 import '../../core/constants.dart';
 import '../../core/page_type.dart';
 
@@ -97,21 +98,24 @@ abstract class BasePageState<T extends BasePage> extends State<T>
 
   /// Build the main page content
   Widget _buildPageContent() {
-    return Container(
-      color: OnisViewerConstants.backgroundColor,
-      child: Column(
-        children: [
-          // Page header/toolbar
-          _buildPageHeader(),
+    return Scaffold(
+      backgroundColor: OnisViewerConstants.backgroundColor,
+      body: Container(
+        color: OnisViewerConstants.backgroundColor,
+        child: Column(
+          children: [
+            // Page header/toolbar
+            _buildPageHeader(),
 
-          // Main content area
-          Expanded(
-            child: _buildPageBody(),
-          ),
+            // Main content area
+            Expanded(
+              child: _buildPageBody(),
+            ),
 
-          // Page footer/status
-          _buildPageFooter(),
-        ],
+            // Page footer/status
+            _buildPageFooter(),
+          ],
+        ),
       ),
     );
   }
@@ -297,14 +301,34 @@ abstract class BasePageState<T extends BasePage> extends State<T>
   void showMessage(String message, {bool isError = false}) {
     if (!mounted) return;
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor:
-            isError ? Colors.red : OnisViewerConstants.primaryColor,
-        duration: const Duration(seconds: 3),
-      ),
-    );
+    // Try to get ScaffoldMessenger from context first
+    final scaffoldMessenger = ScaffoldMessenger.maybeOf(context);
+    if (scaffoldMessenger != null) {
+      scaffoldMessenger.showSnackBar(
+        SnackBar(
+          content: Text(message),
+          backgroundColor:
+              isError ? Colors.red : OnisViewerConstants.primaryColor,
+          duration: const Duration(seconds: 3),
+        ),
+      );
+    } else {
+      // Fallback: use navigatorKey if available
+      final navigatorContext = navigatorKey.currentContext;
+      if (navigatorContext != null) {
+        ScaffoldMessenger.of(navigatorContext).showSnackBar(
+          SnackBar(
+            content: Text(message),
+            backgroundColor:
+                isError ? Colors.red : OnisViewerConstants.primaryColor,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      } else {
+        // Last resort: just print to console
+        debugPrint('Message: $message');
+      }
+    }
   }
 
   /// Show a confirmation dialog
