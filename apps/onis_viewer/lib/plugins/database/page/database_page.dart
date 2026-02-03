@@ -108,9 +108,7 @@ class _DatabasePageState extends BasePageState<DatabasePage> {
           onSearch: () async {
             if (selected != null) {
               final response = await sourceController.findStudies(selected.uid);
-              if (response.status == OnisErrorCodes.none) {
-                sourceController.setStudies(response);
-              }
+              sourceController.setStudies(response);
             }
           },
           canOpen: canOpen,
@@ -205,39 +203,40 @@ class _DatabasePageState extends BasePageState<DatabasePage> {
 
     final patientStudies =
         sourceController.getStudiesForSource(selectedSource.uid);
-
-    //final selectedStudies = <Study>[];
+    final selectedStudies =
+        sourceController.getSelectedStudiesForSource(selectedSource.uid);
     final username = 'madric';
     final isDisconnecting = false;
 
     return StudyListView(
       studies: patientStudies,
-      //selectedStudies: selectedStudies,
-      onStudySelected: (study) {
-        /*if (selected != null) {
+      selectedStudies: selectedStudies,
+      onStudySelectionChanged: () => sourceController.notifyUpdate(),
+      //onStudySelected: (study) {
+      /*if (selected != null) {
           _controller.selectStudy(selected.uid, study);
         }*/
-      },
-      onStudiesSelected: (studies) {
-        /*if (selected != null) {
+      //},
+      //onStudiesSelected: (studies) {
+      /*if (selected != null) {
           _controller.selectStudies(selected.uid, studies);
         }*/
-      },
+      //},
       username: username,
       isDisconnecting: isDisconnecting,
       onDisconnect: () {
         selectedSource.disconnect();
       },
-      initialScrollPosition: /*selected != null
-          ? _controller.getScrollPositionForSource(selected.uid)
-          :*/
-          0.0,
+      initialScrollPositions:
+          sourceController.getScrollPositionsForSource(selectedSource.uid),
       onScrollPositionChanged: (position) {
-        /*debugPrint(
-            'Database page received scroll position: $position for source: ${selected?.uid}');
+        debugPrint(
+            'Database page received scroll position: horizontal=${position.horizontal}, vertical=${position.vertical} for source: ${selectedSource.uid}');
+        final selected = sourceController.selectedSource;
         if (selected != null) {
-          _controller.saveScrollPositionForSource(selected.uid, position);
-        }*/
+          sourceController.saveScrollPositionsForSource(
+              selected.uid, position.horizontal, position.vertical);
+        }
       },
     );
   }
@@ -280,8 +279,17 @@ class _DatabasePageState extends BasePageState<DatabasePage> {
     if (selected == null) {
       return 'Database: None selected';
     }
-    final path = _buildSourcePath(selected);
-    return 'Database: $path';
+    String message = 'Database:${_buildSourcePath(selected)}';
+    final statuses = sourceController!.getSourceStatuses(selected.uid);
+    if (statuses.isNotEmpty) {
+      for (final status in statuses) {
+        if (status.status != OnisErrorCodes.none) {
+          message +=
+              ' -  ${status.sourceUid}: ${OnisErrorCodes.getErrorMessage(status.status)}';
+        }
+      }
+    }
+    return message;
   }
 
   String _buildSourcePath(DatabaseSource source) {

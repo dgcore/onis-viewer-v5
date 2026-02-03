@@ -14,14 +14,15 @@ class SourceState {
   SourceState();
   List<({String sourceUid, int status})> sourceStatuses = [];
   List<({database.Patient patient, database.Study study})> studies = [];
-  List<int> selectedStudyIndices = [];
-  double scrollPosition = 0.0;
-
+  List<({database.Patient patient, database.Study study})> selectedStudies = [];
+  double horizontalScrollPosition = 0.0;
+  double verticalScrollPosition = 0.0;
   void reset() {
     sourceStatuses.clear();
     studies.clear();
-    selectedStudyIndices.clear();
-    scrollPosition = 0.0;
+    selectedStudies.clear();
+    horizontalScrollPosition = 0.0;
+    verticalScrollPosition = 0.0;
   }
 }
 
@@ -88,6 +89,11 @@ class SourceController extends ISourceController {
     _sourceRegisteredSubscription?.cancel();
     _sourceUnregisteredSubscription?.cancel();
     super.dispose();
+  }
+
+  @override
+  void notifyUpdate() {
+    notifyListeners();
   }
 
   void _onSourceRegistered(DatabaseSource source) {
@@ -182,11 +188,9 @@ class SourceController extends ISourceController {
   /// Returns true if the source is connected and at least one study is selected
   @override
   bool canExport(String sourceUid) {
-    /*final api = OVApi();
-    final source = api.sources.findSourceByUid(sourceUid);
-    if (source == null) return false;
-    return source.isActive && hasSelectedStudies(sourceUid);*/
-    return false;
+    SourceState? sourceState = _sourceStates[sourceUid];
+    if (sourceState == null) return false;
+    return sourceState.selectedStudies.isNotEmpty;
   }
 
   /// Check if open is available for the given source
@@ -244,19 +248,59 @@ class SourceController extends ISourceController {
     SourceState? sourceState = _sourceStates[response.sourceUid];
     if (sourceState != null) {
       sourceState.reset();
-      for (FindPatientStudySourceResponse sourceResponse in response.sources) {
+      if (response.status == OnisErrorCodes.none) {
+        for (FindPatientStudySourceResponse sourceResponse
+            in response.sources) {
+          sourceState.sourceStatuses.add((
+            sourceUid: sourceResponse.sourceUid,
+            status: sourceResponse.status,
+          ));
+          sourceState.studies.addAll(sourceResponse.studies);
+        }
+      } else {
         sourceState.sourceStatuses.add((
-          sourceUid: sourceResponse.sourceUid,
-          status: sourceResponse.status,
+          sourceUid: response.sourceUid,
+          status: response.status,
         ));
-        sourceState.studies.addAll(sourceResponse.studies);
       }
       notifyListeners();
     }
   }
 
   @override
+  List<({String sourceUid, int status})> getSourceStatuses(String sourceUid) {
+    SourceState? sourceState = _sourceStates[sourceUid];
+    final statuses = sourceState?.sourceStatuses ?? [];
+    return List.unmodifiable(statuses);
+  }
+
+  @override
   List<({database.Patient patient, database.Study study})> getStudiesForSource(
           String sourceUid) =>
       _sourceStates[sourceUid]?.studies ?? [];
+
+  @override
+  List<({database.Patient patient, database.Study study})>
+      getSelectedStudiesForSource(String sourceUid) =>
+          _sourceStates[sourceUid]?.selectedStudies ?? [];
+
+  @override
+  ({double horizontal, double vertical}) getScrollPositionsForSource(
+      String sourceUid) {
+    SourceState? sourceState = _sourceStates[sourceUid];
+    return (
+      horizontal: sourceState?.horizontalScrollPosition ?? 0.0,
+      vertical: sourceState?.verticalScrollPosition ?? 0.0
+    );
+  }
+
+  @override
+  void saveScrollPositionsForSource(
+      String sourceUid, double horizontalPosition, double verticalPosition) {
+    SourceState? sourceState = _sourceStates[sourceUid];
+    if (sourceState != null) {
+      sourceState.horizontalScrollPosition = horizontalPosition;
+      sourceState.verticalScrollPosition = verticalPosition;
+    }
+  }
 }

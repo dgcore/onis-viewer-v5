@@ -11,6 +11,7 @@ abstract class ISourceController extends ChangeNotifier {
 
   int get totalStudyCount;
 
+  void notifyUpdate();
   void selectSourceByUid(String sourceUid);
   void expandSourceNode(String sourceUid,
       {bool expand = true, bool expandChildren = false});
@@ -24,4 +25,11 @@ abstract class ISourceController extends ChangeNotifier {
   void clearStudies(String sourceUid);
   List<({database.Patient patient, database.Study study})> getStudiesForSource(
       String sourceUid);
+  List<({database.Patient patient, database.Study study})>
+      getSelectedStudiesForSource(String sourceUid);
+  ({double horizontal, double vertical}) getScrollPositionsForSource(
+      String sourceUid);
+  void saveScrollPositionsForSource(
+      String sourceUid, double horizontalPosition, double verticalPosition);
+  List<({String sourceUid, int status})> getSourceStatuses(String sourceUid);
 }

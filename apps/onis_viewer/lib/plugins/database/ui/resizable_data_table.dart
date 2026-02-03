@@ -5,31 +5,37 @@ import 'package:onis_viewer/core/models/database/patient.dart' as database;
 import 'package:onis_viewer/core/models/database/study.dart' as database;
 
 import '../../../core/constants.dart';
-import '../../../core/models/study.dart';
+import '../../../core/ui/column_configuration.dart';
+import 'database_table_column_config.dart';
 
 /// A resizable data table that allows column width adjustment
 class ResizableDataTable extends StatefulWidget {
   final List<({database.Patient patient, database.Study study})> studies;
-  //final List<Study> selectedStudies; // Changed from Study? to List<Study>
-  final ValueChanged<Study>? onStudySelected;
-  final ValueChanged<List<Study>>?
-      onStudiesSelected; // New callback for multi-selection
+  final List<({database.Patient patient, database.Study study})>
+      selectedStudies;
+  final VoidCallback? onStudySelectionChanged;
+  /*final ValueChanged<({database.Patient patient, database.Study study})>?
+      onStudySelected;
+  final ValueChanged<List<({database.Patient patient, database.Study study})>>?
+      onStudiesSelected;*/
   final int? sortColumnIndex;
   final bool sortAscending;
   final ValueChanged<int?>? onSort;
-  final double initialScrollPosition;
-  final ValueChanged<double>? onScrollPositionChanged;
+  final ({double horizontal, double vertical}) initialScrollPositions;
+  final ValueChanged<({double horizontal, double vertical})>?
+      onScrollPositionChanged;
 
   const ResizableDataTable({
     super.key,
     required this.studies,
-    //required this.selectedStudies, // Changed from optional to required
-    this.onStudySelected,
-    this.onStudiesSelected, // New callback
+    required this.selectedStudies,
+    this.onStudySelectionChanged,
+    //this.onStudySelected,
+//    this.onStudiesSelected,
     this.sortColumnIndex,
     this.sortAscending = true,
     this.onSort,
-    this.initialScrollPosition = 0.0,
+    this.initialScrollPositions = const (horizontal: 0.0, vertical: 0.0),
     this.onScrollPositionChanged,
   });
 
@@ -39,57 +45,57 @@ class ResizableDataTable extends StatefulWidget {
 
 class _ResizableDataTableState extends State<ResizableDataTable>
     with WidgetsBindingObserver {
-  final List<double> _columnWidths = [
-    150.0,
-    200.0,
-    100.0,
-    150.0
-  ]; // ID, Name, Sex, Birth Date
-  final List<bool> _isDragging = [false, false, false, false];
+  // Column configuration
+  late ColumnConfigurationList _columnConfig;
+
+  // Derived state from column configuration
+  List<ColumnConfiguration> get _sortedColumns => _columnConfig.sortedColumns;
+  int get _columnCount => _sortedColumns.length;
+
+  // Column dragging state
+  late List<bool> _isDragging;
   final double _minColumnWidth = 80.0;
   final double _maxColumnWidth = 400.0;
 
-  // Column reordering state
-  final List<int> _columnOrder = [
-    0,
-    1,
-    2,
-    3
-  ]; // Default order: Patient ID, Name, Sex, Birth Date
+  // Column reordering state (stores column IDs in display order)
+  late List<String> _columnOrder;
   int? _draggedColumnIndex;
   int? _dropTargetIndex;
   bool _isDraggingColumn = false;
   Offset? _dragOffset;
   final GlobalKey _stackKey = GlobalKey();
 
-  // Column definitions
-  final List<Map<String, dynamic>> _columnDefinitions = [
-    {'title': 'Patient ID', 'key': 'patientId', 'isNumeric': false},
-    {'title': 'Name', 'key': 'name', 'isNumeric': false},
-    {'title': 'Sex', 'key': 'sex', 'isNumeric': false},
-    {'title': 'Birth Date', 'key': 'birthDate', 'isNumeric': false},
-  ];
-
-  // Filter controllers
-  final List<TextEditingController> _filterControllers = [
-    TextEditingController(), // ID filter
-    TextEditingController(), // Name filter
-    TextEditingController(), // Sex filter
-    TextEditingController(), // Birth Date filter
-  ];
+  // Filter controllers (one per column)
+  late List<TextEditingController> _filterControllers;
 
   // Selection state
-  //Study? _lastSelectedStudy; // Track last selected study for range selection
+  ({
+    database.Patient patient,
+    database.Study study
+  })? _lastSelectedStudy; // Track last selected study for range selection
   late ScrollController _scrollController;
   late ScrollController _verticalScrollController;
 
   @override
   void initState() {
     super.initState();
-    _scrollController =
-        ScrollController(initialScrollOffset: widget.initialScrollPosition);
+
+    // Initialize column configuration with defaults
+    _columnConfig = DatabaseTableColumnConfig.createDefault();
+    _columnOrder = _sortedColumns.map((col) => col.id).toList();
+    _isDragging = List.filled(_columnCount, false);
+    _filterControllers = List.generate(
+      _columnCount,
+      (index) => TextEditingController(),
+    );
+
+    _scrollController = ScrollController(
+        initialScrollOffset: widget.initialScrollPositions.horizontal);
     _scrollController.addListener(_onScrollChanged);
-    _verticalScrollController = ScrollController();
+
+    _verticalScrollController = ScrollController(
+        initialScrollOffset: widget.initialScrollPositions.vertical);
+    _verticalScrollController.addListener(_onScrollChanged);
 
     // Add listeners to filter controllers
     for (final controller in _filterControllers) {
@@ -104,6 +110,7 @@ class _ResizableDataTableState extends State<ResizableDataTable>
     // Dispose filter controllers
     _scrollController.removeListener(_onScrollChanged);
     _scrollController.dispose();
+    _verticalScrollController.removeListener(_onScrollChanged);
     _verticalScrollController.dispose();
     for (final controller in _filterControllers) {
       controller.dispose();
@@ -117,11 +124,18 @@ class _ResizableDataTableState extends State<ResizableDataTable>
   void didUpdateWidget(ResizableDataTable oldWidget) {
     super.didUpdateWidget(oldWidget);
 
-    // If the initial scroll position changed, update the scroll controller
-    if (oldWidget.initialScrollPosition != widget.initialScrollPosition) {
+    // If the initial scroll positions changed, update the scroll controllers
+    if (oldWidget.initialScrollPositions.horizontal !=
+        widget.initialScrollPositions.horizontal) {
       debugPrint(
-          'Restoring scroll position to: ${widget.initialScrollPosition}');
-      _scrollController.jumpTo(widget.initialScrollPosition);
+          'Restoring horizontal scroll position to: ${widget.initialScrollPositions.horizontal}');
+      _scrollController.jumpTo(widget.initialScrollPositions.horizontal);
+    }
+    if (oldWidget.initialScrollPositions.vertical !=
+        widget.initialScrollPositions.vertical) {
+      debugPrint(
+          'Restoring vertical scroll position to: ${widget.initialScrollPositions.vertical}');
+      _verticalScrollController.jumpTo(widget.initialScrollPositions.vertical);
     }
   }
 
@@ -143,8 +157,12 @@ class _ResizableDataTableState extends State<ResizableDataTable>
   }
 
   void _onScrollChanged() {
-    debugPrint('Scroll position changed: ${_scrollController.offset}');
-    widget.onScrollPositionChanged?.call(_scrollController.offset);
+    final horizontal = _scrollController.offset;
+    final vertical = _verticalScrollController.offset;
+    debugPrint(
+        'Scroll position changed: horizontal=$horizontal, vertical=$vertical');
+    widget.onScrollPositionChanged
+        ?.call((horizontal: horizontal, vertical: vertical));
   }
 
   /// Get filtered studies based on current filter values
@@ -189,48 +207,87 @@ class _ResizableDataTableState extends State<ResizableDataTable>
     }).toList();
   }*/
 
+  // Helper method to get column width by index in display order
+  double _getColumnWidth(int displayIndex) {
+    if (displayIndex >= 0 && displayIndex < _columnOrder.length) {
+      final columnId = _columnOrder[displayIndex];
+      return _columnConfig.getWidthById(columnId) ?? 120.0;
+    }
+    return 120.0;
+  }
+
+  // Helper method to get column configuration by index in display order
+  ColumnConfiguration? _getColumnConfig(int displayIndex) {
+    if (displayIndex >= 0 && displayIndex < _columnOrder.length) {
+      final columnId = _columnOrder[displayIndex];
+      return _columnConfig.getById(columnId);
+    }
+    return null;
+  }
+
+  // Helper method to update column width
+  void _updateColumnWidth(String columnId, double newWidth) {
+    final column = _columnConfig.getById(columnId);
+    if (column != null) {
+      final updated = column.copyWith(
+          width: newWidth.clamp(_minColumnWidth, _maxColumnWidth));
+      _columnConfig = _columnConfig.updateColumn(updated);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final totalColumnWidth = _columnWidths.reduce((a, b) => a + b);
-        final resizeHandlesWidth = _columnWidths.length * 4.0;
+        final totalColumnWidth = _sortedColumns.fold<double>(
+          0.0,
+          (sum, col) => sum + col.width,
+        );
+        final resizeHandlesWidth = _columnCount * 4.0;
         const toggleButtonWidth = 80.0;
         final totalWidth =
             totalColumnWidth + resizeHandlesWidth + toggleButtonWidth;
-        final availableWidth = constraints.maxWidth;
-        final needsHorizontalScroll = totalWidth > availableWidth;
+
+        // Use parent width if total width is smaller, otherwise use total width
+        // This ensures the table fills the parent when it's smaller
+        final tableWidth = totalWidth < constraints.maxWidth
+            ? constraints.maxWidth
+            : totalWidth;
+        final shouldFillSpace = totalWidth < constraints.maxWidth;
 
         return Stack(
           key: _stackKey,
           children: [
             // Horizontal scroll view containing the entire table
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
+            Scrollbar(
               controller: _scrollController,
-              child: SizedBox(
-                width: needsHorizontalScroll ? totalWidth : availableWidth,
-                child: Column(
-                  children: [
-                    // Header row
-                    _buildHeaderRow(),
-                    // Filter bar
-                    _buildFilterBar(),
-                    // Data rows with vertical scrolling
-                    SizedBox(
-                      height: constraints.maxHeight -
-                          120, // Reserve space for header and filter
-                      child: SingleChildScrollView(
-                        controller: _verticalScrollController,
-                        child: Column(
-                          children: widget.studies
-                              .map((study) =>
-                                  _buildDataRow(study.patient, study.study))
-                              .toList(),
+              thumbVisibility: true,
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                controller: _scrollController,
+                child: SizedBox(
+                  width: tableWidth,
+                  height: constraints.maxHeight,
+                  child: Column(
+                    children: [
+                      // Header row
+                      _buildHeaderRow(shouldFillSpace: shouldFillSpace),
+                      // Filter bar
+                      _buildFilterBar(shouldFillSpace: shouldFillSpace),
+                      // Data rows with vertical scrolling
+                      Expanded(
+                        child: SingleChildScrollView(
+                          controller: _verticalScrollController,
+                          child: Column(
+                            children: widget.studies
+                                .map((study) => _buildDataRow(study,
+                                    shouldFillSpace: shouldFillSpace))
+                                .toList(),
+                          ),
                         ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -240,31 +297,37 @@ class _ResizableDataTableState extends State<ResizableDataTable>
                 _dragOffset != null)
               Positioned(
                 left: _dragOffset!.dx -
-                    (_columnWidths[_draggedColumnIndex!] /
+                    (_getColumnWidth(_draggedColumnIndex!) /
                         2), // Center horizontally
                 top: _dragOffset!.dy - 15, // Small offset above cursor
                 child: Material(
                   elevation: 8.0,
                   borderRadius: BorderRadius.circular(4),
-                  child: Container(
-                    width: _columnWidths[_draggedColumnIndex!],
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: OnisViewerConstants.paddingMedium,
-                      vertical: OnisViewerConstants.paddingSmall,
-                    ),
-                    decoration: BoxDecoration(
-                      color: OnisViewerConstants.primaryColor
-                          .withValues(alpha: 0.9),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Text(
-                      _columnDefinitions[_draggedColumnIndex!]['title'],
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
+                  child: Builder(
+                    builder: (context) {
+                      final columnConfig =
+                          _getColumnConfig(_draggedColumnIndex!);
+                      return Container(
+                        width: _getColumnWidth(_draggedColumnIndex!),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: OnisViewerConstants.paddingMedium,
+                          vertical: OnisViewerConstants.paddingSmall,
+                        ),
+                        decoration: BoxDecoration(
+                          color: OnisViewerConstants.primaryColor
+                              .withValues(alpha: 0.9),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          columnConfig?.title ?? '',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      );
+                    },
                   ),
                 ),
               ),
@@ -275,7 +338,7 @@ class _ResizableDataTableState extends State<ResizableDataTable>
   }
 
   /// Build the header row with resizable columns
-  Widget _buildHeaderRow() {
+  Widget _buildHeaderRow({bool shouldFillSpace = false}) {
     return Container(
       decoration: BoxDecoration(
         color: OnisViewerConstants.tabBarColor,
@@ -287,161 +350,169 @@ class _ResizableDataTableState extends State<ResizableDataTable>
         ),
       ),
       child: Row(
-        children: _columnOrder.asMap().entries.map((entry) {
-          final displayIndex = entry.key;
-          final columnIndex = entry.value;
-          final columnDef = _columnDefinitions[columnIndex];
+        children: [
+          ..._columnOrder.asMap().entries.map((entry) {
+            final displayIndex = entry.key;
+            final columnId = entry.value;
+            final columnConfig = _columnConfig.getById(columnId);
+            if (columnConfig == null) return const SizedBox.shrink();
 
-          return Row(
-            children: [
-              // Draggable header cell
-              GestureDetector(
-                onPanStart: (details) {
-                  final RenderBox? stackBox = _stackKey.currentContext
-                      ?.findRenderObject() as RenderBox?;
-                  if (stackBox != null) {
-                    final localPosition =
-                        stackBox.globalToLocal(details.globalPosition);
-                    setState(() {
-                      _isDraggingColumn = true;
-                      _draggedColumnIndex = columnIndex;
-                      _dragOffset = localPosition;
-                    });
-                  }
-                },
-                onPanUpdate: (details) {
-                  final RenderBox? stackBox = _stackKey.currentContext
-                      ?.findRenderObject() as RenderBox?;
-                  if (stackBox != null) {
-                    final localPosition =
-                        stackBox.globalToLocal(details.globalPosition);
-                    setState(() {
-                      _dragOffset = localPosition;
-                    });
-                  }
-
-                  // Calculate which column we're hovering over
-                  final RenderBox renderBox =
-                      context.findRenderObject() as RenderBox;
-                  final localPosition =
-                      renderBox.globalToLocal(details.globalPosition);
-
-                  // Calculate the position of each column to determine drop target
-                  double currentX = 0;
-                  bool foundTarget = false;
-
-                  for (int i = 0; i < _columnOrder.length; i++) {
-                    final colIndex = _columnOrder[i];
-                    final colWidth = _columnWidths[colIndex];
-
-                    // Check if mouse is within this column's bounds
-                    if (localPosition.dx >= currentX &&
-                        localPosition.dx <= currentX + colWidth) {
-                      // If dragging over a different column, set it as drop target
-                      if (colIndex != _draggedColumnIndex) {
-                        setState(() {
-                          _dropTargetIndex = i;
-                        });
-                      } else {
-                        // If dragging over the same column, clear the drop target
-                        setState(() {
-                          _dropTargetIndex = null;
-                        });
-                      }
-                      foundTarget = true;
-                      break;
+            return Row(
+              children: [
+                // Draggable header cell
+                GestureDetector(
+                  onPanStart: (details) {
+                    final RenderBox? stackBox = _stackKey.currentContext
+                        ?.findRenderObject() as RenderBox?;
+                    if (stackBox != null) {
+                      final localPosition =
+                          stackBox.globalToLocal(details.globalPosition);
+                      setState(() {
+                        _isDraggingColumn = true;
+                        _draggedColumnIndex = displayIndex;
+                        _dragOffset = localPosition;
+                      });
                     }
-                    currentX += colWidth;
-                  }
+                  },
+                  onPanUpdate: (details) {
+                    final RenderBox? stackBox = _stackKey.currentContext
+                        ?.findRenderObject() as RenderBox?;
+                    if (stackBox != null) {
+                      final localPosition =
+                          stackBox.globalToLocal(details.globalPosition);
+                      setState(() {
+                        _dragOffset = localPosition;
+                      });
+                    }
 
-                  // If not found in any column, check if we're at the end
-                  if (!foundTarget && localPosition.dx > currentX) {
+                    // Calculate which column we're hovering over
+                    final RenderBox renderBox =
+                        context.findRenderObject() as RenderBox;
+                    final localPosition =
+                        renderBox.globalToLocal(details.globalPosition);
+
+                    // Calculate the position of each column to determine drop target
+                    double currentX = 0;
+                    bool foundTarget = false;
+
+                    for (int i = 0; i < _columnOrder.length; i++) {
+                      final colWidth = _getColumnWidth(i);
+
+                      // Check if mouse is within this column's bounds
+                      if (localPosition.dx >= currentX &&
+                          localPosition.dx <= currentX + colWidth) {
+                        // If dragging over a different column, set it as drop target
+                        if (i != _draggedColumnIndex) {
+                          setState(() {
+                            _dropTargetIndex = i;
+                          });
+                        } else {
+                          // If dragging over the same column, clear the drop target
+                          setState(() {
+                            _dropTargetIndex = null;
+                          });
+                        }
+                        foundTarget = true;
+                        break;
+                      }
+                      currentX += colWidth;
+                    }
+
+                    // If not found in any column, check if we're at the end
+                    if (!foundTarget && localPosition.dx > currentX) {
+                      setState(() {
+                        _dropTargetIndex =
+                            _columnOrder.length; // Drop at the end
+                      });
+                    }
+                  },
+                  onPanEnd: (details) {
+                    if (_draggedColumnIndex != null &&
+                        _dropTargetIndex != null) {
+                      _reorderColumn(_draggedColumnIndex!, _dropTargetIndex!);
+                    }
                     setState(() {
-                      _dropTargetIndex = _columnOrder.length; // Drop at the end
+                      _isDraggingColumn = false;
+                      _draggedColumnIndex = null;
+                      _dropTargetIndex = null;
+                      _dragOffset = null;
                     });
-                  }
-                },
-                onPanEnd: (details) {
-                  if (_draggedColumnIndex != null && _dropTargetIndex != null) {
-                    _reorderColumn(_draggedColumnIndex!, _dropTargetIndex!);
-                  }
-                  setState(() {
-                    _isDraggingColumn = false;
-                    _draggedColumnIndex = null;
-                    _dropTargetIndex = null;
-                    _dragOffset = null;
-                  });
-                },
-                child: ClipRect(
-                  child: Stack(
-                    children: [
-                      Container(
-                        decoration: BoxDecoration(
-                          color: _draggedColumnIndex == columnIndex
-                              ? OnisViewerConstants.surfaceColor
-                                  .withValues(alpha: 0.5)
-                              : _dropTargetIndex == displayIndex
-                                  ? OnisViewerConstants.primaryColor
-                                      .withValues(alpha: 0.2)
-                                  : null,
+                  },
+                  child: ClipRect(
+                    child: Stack(
+                      children: [
+                        Container(
+                          decoration: BoxDecoration(
+                            color: _draggedColumnIndex == displayIndex
+                                ? OnisViewerConstants.surfaceColor
+                                    .withValues(alpha: 0.5)
+                                : _dropTargetIndex == displayIndex
+                                    ? OnisViewerConstants.primaryColor
+                                        .withValues(alpha: 0.2)
+                                    : null,
+                          ),
+                          child: _buildHeaderCell(
+                            columnConfig.title,
+                            displayIndex,
+                            isNumeric: columnConfig.isNumeric,
+                          ),
                         ),
-                        child: _buildHeaderCell(columnDef['title'], columnIndex,
-                            isNumeric: columnDef['isNumeric']),
-                      ),
-                      if (_dropTargetIndex == displayIndex)
-                        Positioned.fill(
-                          child: Container(
-                            decoration: BoxDecoration(
-                              border: Border.all(
-                                color: OnisViewerConstants.primaryColor,
-                                width: 2,
+                        if (_dropTargetIndex == displayIndex)
+                          Positioned.fill(
+                            child: Container(
+                              decoration: BoxDecoration(
+                                border: Border.all(
+                                  color: OnisViewerConstants.primaryColor,
+                                  width: 2,
+                                ),
                               ),
                             ),
                           ),
-                        ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
-              ),
-              // Resize handle
-              _buildResizeHandle(columnIndex),
-            ],
-          );
-        }).toList(),
+                // Resize handle
+                _buildResizeHandle(displayIndex),
+              ],
+            );
+          }),
+          // Add spacer to fill remaining space when table is smaller than parent
+          if (shouldFillSpace) const Spacer(),
+        ],
       ),
     );
   }
 
   /// Reorder columns based on drag and drop
-  void _reorderColumn(int draggedColumn, int targetIndex) {
-    final oldIndex = _columnOrder.indexOf(draggedColumn);
+  void _reorderColumn(int draggedIndex, int targetIndex) {
+    if (draggedIndex < 0 || draggedIndex >= _columnOrder.length) return;
+    if (targetIndex < 0 || targetIndex > _columnOrder.length) return;
+
+    final draggedColumnId = _columnOrder[draggedIndex];
+    final oldIndex = draggedIndex;
 
     // If dropping on the same column, cancel the operation
     if (oldIndex == targetIndex) {
       return;
     }
 
-    if (oldIndex != -1 &&
-        targetIndex >= 0 &&
-        targetIndex <= _columnOrder.length &&
-        oldIndex != targetIndex) {
-      setState(() {
-        // Remove the dragged column first
-        _columnOrder.removeAt(oldIndex);
+    setState(() {
+      // Remove the dragged column first
+      _columnOrder.removeAt(oldIndex);
 
-        // Insert at the target position
-        // If dropping at the end (after last column), append to the end
-        if (targetIndex >= _columnOrder.length) {
-          _columnOrder.add(draggedColumn);
-        } else {
-          _columnOrder.insert(targetIndex, draggedColumn);
-        }
-      });
-    }
+      // Insert at the target position
+      // If dropping at the end (after last column), append to the end
+      if (targetIndex >= _columnOrder.length) {
+        _columnOrder.add(draggedColumnId);
+      } else {
+        _columnOrder.insert(targetIndex, draggedColumnId);
+      }
+    });
   }
 
   /// Build the filter bar
-  Widget _buildFilterBar() {
+  Widget _buildFilterBar({bool shouldFillSpace = false}) {
     return Container(
       decoration: BoxDecoration(
         color: OnisViewerConstants.surfaceColor,
@@ -453,51 +524,107 @@ class _ResizableDataTableState extends State<ResizableDataTable>
         ),
       ),
       child: Row(
-        children: _columnOrder.map((columnIndex) {
-          final columnDef = _columnDefinitions[columnIndex];
-          String hintText;
+        children: [
+          ..._columnOrder.asMap().entries.map((entry) {
+            final displayIndex = entry.key;
+            final columnId = entry.value;
+            final columnConfig = _columnConfig.getById(columnId);
+            if (columnConfig == null) return const SizedBox.shrink();
 
-          // Get the correct hint text based on column definition
-          switch (columnDef['key']) {
-            case 'patientId':
-              hintText = 'Filter Patient ID...';
-              break;
-            case 'name':
-              hintText = 'Filter Name...';
-              break;
-            case 'sex':
-              hintText = 'Filter Sex...';
-              break;
-            case 'birthDate':
-              hintText = 'Filter Date...';
-              break;
-            default:
-              hintText = 'Filter...';
-          }
+            String hintText;
 
-          return Row(
-            children: [
-              // Filter cell
-              _buildFilterCell(columnIndex, hintText),
-              // Resize handle
-              _buildResizeHandle(columnIndex),
-            ],
-          );
-        }).toList(),
+            // Get the correct hint text based on column id
+            switch (columnId) {
+              case 'source':
+                hintText = 'Filter Source...';
+                break;
+              case 'patientId':
+                hintText = 'Filter Patient ID...';
+                break;
+              case 'patientName':
+                hintText = 'Filter Patient Name...';
+                break;
+              case 'birthDate':
+                hintText = 'Filter Birth Date...';
+                break;
+              case 'sex':
+                hintText = 'Filter Sex...';
+                break;
+              case 'age':
+                hintText = 'Filter Age...';
+                break;
+              case 'modalities':
+                hintText = 'Filter Modalities...';
+                break;
+              case 'studyDate':
+                hintText = 'Filter Study Date...';
+                break;
+              case 'studyTime':
+                hintText = 'Filter Study Time...';
+                break;
+              case 'bodyParts':
+                hintText = 'Filter Body Parts...';
+                break;
+              case 'accnum':
+                hintText = 'Filter Accession Number...';
+                break;
+              case 'studyId':
+                hintText = 'Filter Study ID...';
+                break;
+              case 'description':
+                hintText = 'Filter Description...';
+                break;
+              case 'instanceNumber':
+                hintText = 'Filter Instance Number...';
+                break;
+              case 'comment':
+                hintText = 'Filter Comment...';
+                break;
+              case 'stations':
+                hintText = 'Filter Stations...';
+                break;
+              case 'seriesCount':
+                hintText = 'Filter Series Count...';
+                break;
+              case 'imagesCount':
+                hintText = 'Filter Images Count...';
+                break;
+              case 'reportsCount':
+                hintText = 'Filter Reports Count...';
+                break;
+              case 'status':
+                hintText = 'Filter Status...';
+                break;
+              default:
+                hintText = 'Filter...';
+            }
+
+            return Row(
+              children: [
+                // Filter cell
+                _buildFilterCell(displayIndex, hintText),
+                // Resize handle
+                _buildResizeHandle(displayIndex),
+              ],
+            );
+          }),
+          // Add spacer to fill remaining space when table is smaller than parent
+          if (shouldFillSpace) const Spacer(),
+        ],
       ),
     );
   }
 
   /// Build a filter cell
-  Widget _buildFilterCell(int columnIndex, String hintText) {
+  Widget _buildFilterCell(int displayIndex, String hintText) {
     return Container(
-      width: _columnWidths[columnIndex],
+      width: _getColumnWidth(displayIndex),
       padding: const EdgeInsets.symmetric(
         horizontal: OnisViewerConstants.paddingSmall,
         vertical: OnisViewerConstants.paddingSmall,
       ),
       child: TextField(
-        controller: _filterControllers[columnIndex],
+        controller: _filterControllers[displayIndex],
         style: const TextStyle(
           color: OnisViewerConstants.textColor,
           fontSize: 12,
@@ -539,17 +666,17 @@ class _ResizableDataTableState extends State<ResizableDataTable>
   }
 
   /// Build a header cell
-  Widget _buildHeaderCell(String label, int columnIndex,
+  Widget _buildHeaderCell(String label, int displayIndex,
       {bool isNumeric = false}) {
     return GestureDetector(
       onTap: () {
         widget.onSort?.call(
-            widget.sortColumnIndex == columnIndex && widget.sortAscending
+            widget.sortColumnIndex == displayIndex && widget.sortAscending
                 ? null
-                : columnIndex);
+                : displayIndex);
       },
       child: Container(
-        width: _columnWidths[columnIndex],
+        width: _getColumnWidth(displayIndex),
         padding: const EdgeInsets.symmetric(
           horizontal: OnisViewerConstants.paddingMedium,
           vertical: OnisViewerConstants.paddingSmall,
@@ -565,9 +692,11 @@ class _ResizableDataTableState extends State<ResizableDataTable>
                   fontSize: 14,
                 ),
                 textAlign: isNumeric ? TextAlign.right : TextAlign.left,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
             ),
-            if (widget.sortColumnIndex == columnIndex)
+            if (widget.sortColumnIndex == displayIndex)
               Icon(
                 widget.sortAscending
                     ? Icons.arrow_upward
@@ -582,23 +711,31 @@ class _ResizableDataTableState extends State<ResizableDataTable>
   }
 
   /// Build a resize handle
-  Widget _buildResizeHandle(int columnIndex) {
+  Widget _buildResizeHandle(int displayIndex) {
+    if (displayIndex >= _columnOrder.length) return const SizedBox.shrink();
+    final columnId = _columnOrder[displayIndex];
+
     return GestureDetector(
       onPanStart: (details) {
         setState(() {
-          _isDragging[columnIndex] = true;
+          if (displayIndex < _isDragging.length) {
+            _isDragging[displayIndex] = true;
+          }
         });
       },
       onPanUpdate: (details) {
         setState(() {
-          _columnWidths[columnIndex] =
-              (_columnWidths[columnIndex] + details.delta.dx)
-                  .clamp(_minColumnWidth, _maxColumnWidth);
+          final currentWidth = _getColumnWidth(displayIndex);
+          final newWidth = (currentWidth + details.delta.dx)
+              .clamp(_minColumnWidth, _maxColumnWidth);
+          _updateColumnWidth(columnId, newWidth);
         });
       },
       onPanEnd: (details) {
         setState(() {
-          _isDragging[columnIndex] = false;
+          if (displayIndex < _isDragging.length) {
+            _isDragging[displayIndex] = false;
+          }
         });
       },
       // Don't handle tap events - let them pass through to the cell
@@ -608,15 +745,17 @@ class _ResizableDataTableState extends State<ResizableDataTable>
         cursor: SystemMouseCursors.resizeLeftRight,
         child: Container(
           width: 4, // Reduced from 8 to 4 pixels
-          color: _isDragging[columnIndex]
-              ? OnisViewerConstants.primaryColor.withValues(alpha: 0.3)
-              : Colors.transparent,
+          color:
+              (displayIndex < _isDragging.length && _isDragging[displayIndex])
+                  ? OnisViewerConstants.primaryColor.withValues(alpha: 0.3)
+                  : Colors.transparent,
           child: Center(
             child: Container(
               width: 1, // Reduced from 2 to 1 pixel
               height: 20,
               decoration: BoxDecoration(
-                color: _isDragging[columnIndex]
+                color: (displayIndex < _isDragging.length &&
+                        _isDragging[displayIndex])
                     ? OnisViewerConstants.primaryColor
                     : OnisViewerConstants.tabButtonColor,
                 borderRadius: BorderRadius.circular(1),
@@ -629,14 +768,14 @@ class _ResizableDataTableState extends State<ResizableDataTable>
   }
 
   /// Build a data row
-  Widget _buildDataRow(database.Patient patient, database.Study study) {
-    final isSelected = false;
-    //widget.selectedStudies.any((s) => s.id == study.id);
+  Widget _buildDataRow(({database.Patient patient, database.Study study}) study,
+      {bool shouldFillSpace = false}) {
+    final isSelected = widget.selectedStudies.contains(study);
 
     return GestureDetector(
       onTapDown: (details) {
         // Check for modifier keys in the mouse event
-        _handleRowSelection(patient, study);
+        _handleRowSelection(study);
       },
       child: Container(
         decoration: BoxDecoration(
@@ -651,49 +790,141 @@ class _ResizableDataTableState extends State<ResizableDataTable>
           ),
         ),
         child: Row(
-          children: _columnOrder.map((columnIndex) {
-            final columnDef = _columnDefinitions[columnIndex];
-            String cellData;
+          children: [
+            ..._columnOrder.asMap().entries.map((entry) {
+              final displayIndex = entry.key;
+              final columnId = entry.value;
+              final columnConfig = _columnConfig.getById(columnId);
+              if (columnConfig == null) return const SizedBox.shrink();
 
-            // Get the correct data based on column definition
-            switch (columnDef['key']) {
-              case 'patientId':
-                cellData = patient.pid;
-                break;
-              case 'name':
-                cellData = patient.name;
-                break;
-              case 'sex':
-                cellData = patient.sex;
-                break;
-              case 'birthDate':
-                //cellData = _formatDate(patient.birthDate);
-                cellData = 'N/A';
-                break;
-              default:
-                cellData = 'N/A';
-            }
+              String cellData;
 
-            return Row(
-              children: [
-                // Data cell
-                _buildDataCell(
-                    cellData, columnIndex, isSelected, patient, study),
-                // Resize handle
-                _buildResizeHandle(columnIndex),
-              ],
-            );
-          }).toList(),
+              // Get the correct data based on column id
+              switch (columnId) {
+                case 'source':
+                  cellData = study.patient.sourceUid.isNotEmpty
+                      ? study.patient.sourceUid
+                      : study.study.sourceUid.isNotEmpty
+                          ? study.study.sourceUid
+                          : 'N/A';
+                  break;
+                case 'patientId':
+                  cellData = study.patient.pid.isNotEmpty
+                      ? study.patient.pid
+                      : study.patient.id;
+                  break;
+                case 'patientName':
+                  // Concatenate name, ideogram, and phonetic
+                  final parts = <String>[];
+                  if (study.patient.name.isNotEmpty)
+                    parts.add(study.patient.name);
+                  if (study.patient.ideogram.isNotEmpty)
+                    parts.add(study.patient.ideogram);
+                  if (study.patient.phonetic.isNotEmpty)
+                    parts.add('(${study.patient.phonetic})');
+                  cellData = parts.join(' ');
+                  break;
+                case 'birthDate':
+                  cellData = study.patient.birthDate != null
+                      ? _formatDate(study.patient.birthDate!)
+                      : 'N/A';
+                  break;
+                case 'sex':
+                  cellData =
+                      study.patient.sex.isNotEmpty ? study.patient.sex : 'N/A';
+                  break;
+                case 'age':
+                  cellData =
+                      study.study.age.isNotEmpty ? study.study.age : 'N/A';
+                  break;
+                case 'modalities':
+                  cellData = study.study.modalities.isNotEmpty
+                      ? study.study.modalities
+                      : 'N/A';
+                  break;
+                case 'studyDate':
+                  cellData = study.study.studyDate != null &&
+                          study.study.studyDate!.isNotEmpty
+                      ? _formatStudyDate(study.study.studyDate!)
+                      : 'N/A';
+                  break;
+                case 'studyTime':
+                  cellData = study.study.studyTime != null &&
+                          study.study.studyTime!.isNotEmpty
+                      ? study.study.studyTime!
+                      : 'N/A';
+                  break;
+                case 'bodyParts':
+                  cellData = study.study.bodyParts.isNotEmpty
+                      ? study.study.bodyParts
+                      : 'N/A';
+                  break;
+                case 'accnum':
+                  cellData = study.study.accnum.isNotEmpty
+                      ? study.study.accnum
+                      : 'N/A';
+                  break;
+                case 'studyId':
+                  cellData = study.study.studyId.isNotEmpty
+                      ? study.study.studyId
+                      : 'N/A';
+                  break;
+                case 'description':
+                  cellData =
+                      study.study.desc.isNotEmpty ? study.study.desc : 'N/A';
+                  break;
+                case 'instanceNumber':
+                  cellData = study.study.imcnt.toString();
+                  break;
+                case 'comment':
+                  cellData = study.study.comment.isNotEmpty
+                      ? study.study.comment
+                      : 'N/A';
+                  break;
+                case 'stations':
+                  cellData = study.study.stations.isNotEmpty
+                      ? study.study.stations
+                      : 'N/A';
+                  break;
+                case 'seriesCount':
+                  cellData = study.study.srcnt.toString();
+                  break;
+                case 'imagesCount':
+                  cellData = study.study.imcnt.toString();
+                  break;
+                case 'reportsCount':
+                  cellData = study.study.rptcnt.toString();
+                  break;
+                case 'status':
+                  cellData = study.study.status.toString();
+                  break;
+                default:
+                  cellData = 'N/A';
+              }
+
+              return Row(
+                children: [
+                  // Data cell
+                  _buildDataCell(cellData, displayIndex, isSelected,
+                      study.patient, study.study),
+                  // Resize handle
+                  _buildResizeHandle(displayIndex),
+                ],
+              );
+            }),
+            // Add spacer to fill remaining space when table is smaller than parent
+            if (shouldFillSpace) const Spacer(),
+          ],
         ),
       ),
     );
   }
 
   /// Build a data cell
-  Widget _buildDataCell(String text, int columnIndex, bool isSelected,
+  Widget _buildDataCell(String text, int displayIndex, bool isSelected,
       database.Patient patient, database.Study study) {
     return Container(
-      width: _columnWidths[columnIndex],
+      width: _getColumnWidth(displayIndex),
       padding: const EdgeInsets.symmetric(
         horizontal: OnisViewerConstants.paddingMedium,
         vertical: OnisViewerConstants.paddingSmall,
@@ -713,80 +944,89 @@ class _ResizableDataTableState extends State<ResizableDataTable>
   }
 
   /// Handle row selection with keyboard modifiers
-  void _handleRowSelection(database.Patient patient, database.Study study) {
-    /*debugPrint('Row selection triggered for study: ${study.name}');
-    print("Shift pressed: $isShiftPressed");
-    print("Ctrl/Cmd pressed: $isCtrlOrCmdPressed");
-
-    final currentSelection = List<Study>.from(widget.selectedStudies);
-    final isCurrentlySelected = currentSelection.any((s) => s.id == study.id);
-
-    debugPrint('Current selection count: ${currentSelection.length}');
-    debugPrint('Is currently selected: $isCurrentlySelected');
-    debugPrint(
-        'Ctrl pressed: $isCtrlOrCmdPressed, Shift pressed: $isShiftPressed');
+  void _handleRowSelection(
+      ({database.Patient patient, database.Study study}) study) {
+    final isCurrentlySelected = widget.selectedStudies.contains(study);
 
     if (isShiftPressed && _lastSelectedStudy != null) {
       // Range selection mode (Shift + click)
       final lastIndex =
-          _filteredStudies.indexWhere((s) => s.id == _lastSelectedStudy!.id);
-      final currentIndex = _filteredStudies.indexWhere((s) => s.id == study.id);
+          widget.studies.indexWhere((s) => s == _lastSelectedStudy);
+      final currentIndex = widget.studies.indexWhere((s) => s == study);
 
       if (lastIndex != -1 && currentIndex != -1) {
         final startIndex = lastIndex < currentIndex ? lastIndex : currentIndex;
         final endIndex = lastIndex < currentIndex ? currentIndex : lastIndex;
-
         // Clear current selection and add range
-        currentSelection.clear();
+        widget.selectedStudies.clear();
         for (int i = startIndex; i <= endIndex; i++) {
-          currentSelection.add(_filteredStudies[i]);
+          widget.selectedStudies.add(widget.studies[i]);
         }
-        debugPrint(
-            'Range selection from index $startIndex to $endIndex (${currentSelection.length} studies)');
+        widget.onStudySelectionChanged?.call();
       }
     } else if (isCtrlOrCmdPressed) {
-      // Multi-selection mode (manual toggle or Ctrl/Cmd + click)
+      // Multi-selection mode (Ctrl/Cmd + click)
       if (isCurrentlySelected) {
         // Remove from selection
-        currentSelection.removeWhere((s) => s.id == study.id);
-        debugPrint('Removed from selection');
+        widget.selectedStudies.remove(study);
       } else {
         // Add to selection
-        currentSelection.add(study);
-        debugPrint('Added to selection');
+        widget.selectedStudies.add(study);
       }
+      widget.onStudySelectionChanged?.call();
     } else {
       // Single selection mode
-      if (isCurrentlySelected && currentSelection.length == 1) {
+      if (isCurrentlySelected && widget.selectedStudies.length == 1) {
         // If only this item is selected, deselect it
-        currentSelection.clear();
-        debugPrint('Deselected single item');
+        widget.selectedStudies.clear();
       } else {
         // Select only this item
-        currentSelection.clear();
-        currentSelection.add(study);
-        debugPrint('Selected single item');
+        widget.selectedStudies.clear();
+        widget.selectedStudies.add(study);
       }
+      widget.onStudySelectionChanged?.call();
     }
 
     // Update last selected study for range selection
     _lastSelectedStudy = study;
 
-    debugPrint('Final selection count: ${currentSelection.length}');
+    // Build list of selected Study objects for callbacks
+    /*final selectedStudies = widget.studies
+        .where((s) {
+          final id = s.study.id.isNotEmpty ? s.study.id : s.study.uid;
+          return _selectedStudyIds.contains(id);
+        })
+        .map((s) => _convertToStudy(s.patient, s.study))
+        .toList();
 
     // Call the appropriate callback
-    debugPrint(
-        'Calling onStudiesSelected with ${currentSelection.length} studies');
-    widget.onStudiesSelected?.call(currentSelection);
-    if (currentSelection.length == 1) {
-      debugPrint('Calling onStudySelected with single study');
-      widget.onStudySelected?.call(currentSelection.first);
-    }*/
+    widget.onStudiesSelected?.call(selectedStudies);
+    if (selectedStudies.length == 1) {
+      widget.onStudySelected?.call(selectedStudies.first);
+    }
+
+    // Update UI
+    setState(() {});*/
   }
 
   /// Format date for display
   String _formatDate(DateTime date) {
     return '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}';
+  }
+
+  /// Format study date from YYYYMMDD format
+  String _formatStudyDate(String dateStr) {
+    if (dateStr.length >= 8) {
+      try {
+        final year = dateStr.substring(0, 4);
+        final month = dateStr.substring(4, 6);
+        final day = dateStr.substring(6, 8);
+        return '$day/$month/$year';
+      } catch (e) {
+        return dateStr;
+      }
+    }
+    return dateStr;
   }
 
   bool get isShiftPressed =>
