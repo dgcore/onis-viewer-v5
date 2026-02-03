@@ -31,4 +31,5 @@ abstract class ISourceController extends ChangeNotifier {
       String sourceUid);
   void saveScrollPositionsForSource(
       String sourceUid, double horizontalPosition, double verticalPosition);
+  List<({String sourceUid, int status})> getSourceStatuses(String sourceUid);
 }

@@ -77,7 +77,7 @@ class OnisErrorCodes {
   static const int fileDelete = 539;
 
   // Input charset
-  static const int inputCharset = 550;
+  static const int inputCharset = 545;
 
   // Directory errors
   static const int dirCreate = 550;
@@ -165,9 +165,250 @@ class OnisErrorCodes {
   static const int usbMultipleDrives = 2601;
   static const int usbUnmountFailed = 2602;
 
+  static String getErrorMessage(int errorCode) {
+    switch (errorCode) {
+      case none:
+        return 'None';
+      case param:
+        return 'Parameter error';
+      case canceled:
+        return 'Operation canceled';
+      case memory:
+        return 'Memory error';
+      case permission:
+        return 'Permission error';
+      case notAvailable:
+        return 'Not available';
+      case networkReceive:
+        return 'Network receive error';
+      case networkClosed:
+        return 'Network closed error';
+      case networkConnection:
+        return 'Network connection error';
+      case networkSsl:
+        return 'Network SSL error';
+      case networkSend:
+        return 'Network send error';
+      case networkUnknownCmd:
+        return 'Network unknown command error';
+      case networkDatagram:
+        return 'Network datagram error';
+      case urlResolve:
+        return 'URL resolve error';
+      case targetNetworkConnection:
+        return 'Target network connection error';
+      case dbConnection:
+        return 'Database connection error';
+      case dbQuery:
+        return 'Database query error';
+      case dbNull:
+        return 'Database null error';
+      case dbValue:
+        return 'Database value error';
+      case dbValueLength:
+        return 'Database value length error';
+      case dbTransaction:
+        return 'Database transaction error';
+      case dbTransactionCommit:
+        return 'Database transaction commit error';
+      case dbConsistency:
+        return 'Database consistency error';
+      case dbUpdate:
+        return 'Database update error';
+      case unknown:
+        return 'Unknown error';
+      case internal:
+        return 'Internal error';
+      case resource:
+        return 'Resource error';
+      case noSupport:
+        return 'No support error';
+      case notFound:
+        return 'Not found error';
+      case allFailed:
+        return 'All failed error';
+      case someFailure:
+        return 'Some failure error';
+      case duplicate:
+        return 'Duplicate error';
+      case busy:
+        return 'Busy error';
+      case overflow:
+        return 'Overflow error';
+      case invalidResponse:
+        return 'Invalid response error';
+      case logicError:
+        return 'Logic error error';
+      case timeout:
+        return 'Timeout error';
+      case invalidUser:
+        return 'Invalid user error';
+      case invalidSession:
+        return 'Invalid session error';
+      case targetPermission:
+        return 'Target permission error';
+      case sessionExceededLimit:
+        return 'Session exceeded limit error';
+      case invalidCsrf:
+        return 'Invalid CSRF error';
+      case media:
+        return 'Media error';
+      case noFile:
+        return 'No file error';
+      case fileWrite:
+        return 'File write error';
+      case fileRead:
+        return 'File read error';
+      case fileOpen:
+        return 'File open error';
+      case fileFormat:
+        return 'File format error';
+      case fileCreate:
+        return 'File create error';
+      case fileMissing:
+        return 'File missing error';
+      case fileConversion:
+        return 'File conversion error';
+      case invalidStream:
+        return 'Invalid stream error';
+      case fileRename:
+        return 'File rename error';
+      case fileCopy:
+        return 'File copy error';
+      case fileMove:
+        return 'File move error';
+      case fileSize:
+        return 'File size error';
+      case endOfFile:
+        return 'End of file error';
+      case fileDelete:
+        return 'File delete error';
+      case inputCharset:
+        return 'Input charset error';
+      case dirCreate:
+        return 'Directory create error';
+      case dirDelete:
+        return 'Directory delete error';
+      case dirRename:
+        return 'Directory rename error';
+      case dirOpen:
+        return 'Directory open error';
+      case tagValueInvalidWithDefaultRepertoire:
+        return 'Tag value invalid with default repertoire error';
+      case tagNameConflict:
+        return 'Tag name conflict error';
+      case tagInsert:
+        return 'Tag insert error';
+      case tagNoCompatibleRepertoire:
+        return 'Tag no compatible repertoire error';
+      case tagUnsupportedRepertoire:
+        return 'Tag unsupported repertoire error';
+      case anonymizeTag:
+        return 'Anonymize tag error';
+      case invalidDcm:
+        return 'Invalid DICOM error';
+      case missingSopUid:
+        return 'Missing SOP UID error';
+      case missingSeriesUid:
+        return 'Missing series UID error';
+      case missingStudyUid:
+        return 'Missing study UID error';
+      case missingModality:
+        return 'Missing modality error';
+      case missingPatientId:
+        return 'Missing patient ID error';
+      case extractFrame:
+        return 'Extract frame error';
+      case changeTransfer:
+        return 'Change transfer error';
+      case sopclassNotSupported:
+        return 'SOP class not supported error';
+      case failedToStore:
+        return 'Failed to store error';
+      case conflict:
+        return 'Conflict error';
+      case addDicomDir:
+        return 'Add DICOM directory error';
+      case createDicomDir:
+        return 'Create DICOM directory error';
+      case writeDicomDir:
+        return 'Write DICOM directory error';
+      case createDicomFile:
+        return 'Create DICOM file error';
+      case dcmCharset:
+        return 'DICOM charset error';
+      case aeRejection:
+        return 'AE rejection error';
+      case destination:
+        return 'Destination error';
+      case invalidPalette:
+        return 'Invalid palette error';
+      case invalidImage:
+        return 'Invalid image error';
+      case failedToExtractImage:
+        return 'Failed to extract image error';
+      case noImage:
+        return 'No image error';
+      case circular:
+        return 'Circular error';
+      case zipCreate:
+        return 'Zip create error';
+      case zipAddFile:
+        return 'Zip add file error';
+      case zipSourceFile:
+        return 'Zip source file error';
+      case missingRecordingPlan:
+        return 'Missing recording plan error';
+      case notCapturing:
+        return 'Not capturing error';
+      case startPlaying:
+        return 'Start playing error';
+      case startStreaming:
+        return 'Start streaming error';
+      case signalLost:
+        return 'Signal lost error';
+      case examMissing:
+        return 'Exam missing error';
+      case wrongExam:
+        return 'Wrong exam error';
+      case noExamSession:
+        return 'No exam session error';
+      case alreadyRecording:
+        return 'Already recording error';
+      case startRecording:
+        return 'Start recording error';
+      case rs232:
+        return 'RS232 error';
+      case invalidRequest:
+        return 'Invalid request error';
+      case notReady:
+        return 'Not ready error';
+      case mediaClosed:
+        return 'Media closed error';
+      case decoding:
+        return 'Decoding error';
+      case seek:
+        return 'Seek error';
+      case capacityOver:
+        return 'Capacity over error';
+      case frameRateConflict:
+        return 'Frame rate conflict error';
+      case encoding:
+        return 'Encoding error';
+      case usbDriveNotFound:
+        return 'USB drive not found error';
+      case usbMultipleDrives:
+        return 'USB multiple drives error';
+      case usbUnmountFailed:
+        return 'USB unmount failed error';
+      default:
+        return 'Unknown error';
+    }
+  }
+
   /// Check if an integer value is a valid error code
   /// Returns true if the value matches any known error code constant
-  static bool isValid(int value) {
+  /*static bool isValid(int value) {
     // Check against all known error codes
     return value == none ||
         value == param ||
@@ -286,5 +527,5 @@ class OnisErrorCodes {
         value == usbDriveNotFound ||
         value == usbMultipleDrives ||
         value == usbUnmountFailed;
-  }
+  }*/
 }

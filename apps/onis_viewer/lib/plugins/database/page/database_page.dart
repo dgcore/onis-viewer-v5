@@ -108,9 +108,7 @@ class _DatabasePageState extends BasePageState<DatabasePage> {
           onSearch: () async {
             if (selected != null) {
               final response = await sourceController.findStudies(selected.uid);
-              if (response.status == OnisErrorCodes.none) {
-                sourceController.setStudies(response);
-              }
+              sourceController.setStudies(response);
             }
           },
           canOpen: canOpen,
@@ -281,8 +279,17 @@ class _DatabasePageState extends BasePageState<DatabasePage> {
     if (selected == null) {
       return 'Database: None selected';
     }
-    final path = _buildSourcePath(selected);
-    return 'Database: $path';
+    String message = 'Database:${_buildSourcePath(selected)}';
+    final statuses = sourceController!.getSourceStatuses(selected.uid);
+    if (statuses.isNotEmpty) {
+      for (final status in statuses) {
+        if (status.status != OnisErrorCodes.none) {
+          message +=
+              ' -  ${status.sourceUid}: ${OnisErrorCodes.getErrorMessage(status.status)}';
+        }
+      }
+    }
+    return message;
   }
 
   String _buildSourcePath(DatabaseSource source) {

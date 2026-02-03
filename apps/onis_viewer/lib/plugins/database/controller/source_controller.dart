@@ -188,11 +188,9 @@ class SourceController extends ISourceController {
   /// Returns true if the source is connected and at least one study is selected
   @override
   bool canExport(String sourceUid) {
-    /*final api = OVApi();
-    final source = api.sources.findSourceByUid(sourceUid);
-    if (source == null) return false;
-    return source.isActive && hasSelectedStudies(sourceUid);*/
-    return false;
+    SourceState? sourceState = _sourceStates[sourceUid];
+    if (sourceState == null) return false;
+    return sourceState.selectedStudies.isNotEmpty;
   }
 
   /// Check if open is available for the given source
@@ -250,15 +248,30 @@ class SourceController extends ISourceController {
     SourceState? sourceState = _sourceStates[response.sourceUid];
     if (sourceState != null) {
       sourceState.reset();
-      for (FindPatientStudySourceResponse sourceResponse in response.sources) {
+      if (response.status == OnisErrorCodes.none) {
+        for (FindPatientStudySourceResponse sourceResponse
+            in response.sources) {
+          sourceState.sourceStatuses.add((
+            sourceUid: sourceResponse.sourceUid,
+            status: sourceResponse.status,
+          ));
+          sourceState.studies.addAll(sourceResponse.studies);
+        }
+      } else {
         sourceState.sourceStatuses.add((
-          sourceUid: sourceResponse.sourceUid,
-          status: sourceResponse.status,
+          sourceUid: response.sourceUid,
+          status: response.status,
         ));
-        sourceState.studies.addAll(sourceResponse.studies);
       }
       notifyListeners();
     }
+  }
+
+  @override
+  List<({String sourceUid, int status})> getSourceStatuses(String sourceUid) {
+    SourceState? sourceState = _sourceStates[sourceUid];
+    final statuses = sourceState?.sourceStatuses ?? [];
+    return List.unmodifiable(statuses);
   }
 
   @override
