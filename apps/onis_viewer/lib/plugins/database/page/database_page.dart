@@ -378,6 +378,18 @@ class _DatabasePageState extends BasePageState<DatabasePage> {
               // Use the showMessage method from BasePageState which handles Scaffold properly
               showMessage(
                   'Selected ${filePaths.length} file(s):\n${filePaths.take(3).join('\n')}${filePaths.length > 3 ? '\n...' : ''}');
+
+              final sourceController = _dbApi?.sourceController;
+              final selected = sourceController?.selectedSource;
+              if (selected != null) {
+                for (final filePath in filePaths) {
+                  final response = await sourceController!
+                      .importDicomFile(selected.uid, filePath);
+                  if (response != null) {
+                    debugPrint('Import response: $response');
+                  }
+                }
+              }
             }
           }
         } catch (e, stackTrace) {

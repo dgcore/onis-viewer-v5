@@ -29,6 +29,8 @@ public:
                 drogon::Post);
   ADD_METHOD_TO(http_drogon_controller::find_studies, "/studies/find",
                 drogon::Post);
+  ADD_METHOD_TO(http_drogon_controller::dicom_import, "/dicom/import",
+                drogon::Post);
   METHOD_LIST_END
 
   // Accounts
@@ -41,6 +43,11 @@ public:
 
   // Find Studies
   void find_studies(
+      const drogon::HttpRequestPtr& req,
+      std::function<void(const drogon::HttpResponsePtr&)>&& callback) const;
+
+  // Import:
+  void dicom_import(
       const drogon::HttpRequestPtr& req,
       std::function<void(const drogon::HttpResponsePtr&)>&& callback) const;
 

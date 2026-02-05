@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
@@ -19,6 +20,10 @@ class SiteAsyncRequest implements AsyncRequest {
   @override
   final Map<String, dynamic>? data;
 
+  /// Files to upload (file path -> field name mapping)
+  /// If provided, the request will be sent as multipart/form-data
+  final Map<String, String>? files;
+
   /// Stream controller for request cancellation
   //StreamController<bool>? _cancellationController;
 
@@ -34,17 +39,26 @@ class SiteAsyncRequest implements AsyncRequest {
   /// Current HTTP request being processed
   http.Request? _currentRequest;
 
+  /// Current multipart request being processed (for file uploads)
+  http.MultipartRequest? _currentMultipartRequest;
+
   /// Constructor
   ///
   /// [baseUrl] - The base URL for the HTTP requests
   /// [requestType] - The type of request to make
   /// [data] - The JSON data for the request
+  /// [files] - Map of file paths to field names for file uploads (multipart/form-data)
   SiteAsyncRequest({
     required this.baseUrl,
     required this.requestType,
     this.data,
+    this.files,
   }) : _client = http.Client() {
     debugPrint('SiteAsyncRequest created with baseUrl: $baseUrl');
+    if (files != null && files!.isNotEmpty) {
+      debugPrint(
+          'SiteAsyncRequest created with ${files!.length} file(s) to upload');
+    }
   }
 
   @override
@@ -79,35 +93,86 @@ class SiteAsyncRequest implements AsyncRequest {
       // Build the request URL based on the request type
       final url = _buildUrl(requestType);
 
-      debugPrint('SiteAsyncRequest.send() - creating HTTP request');
-      // Create the HTTP request
-      _currentRequest = http.Request('POST', Uri.parse(url));
-      _currentRequest!.headers['Content-Type'] = 'application/json';
+      http.StreamedResponse response;
 
-      // Add request data if provided
-      if (data != null) {
-        _currentRequest!.body = jsonEncode(data);
-      }
-
-      debugPrint('SiteAsyncRequest.send() - starting 10 second delay');
-      //await Future.delayed(const Duration(seconds: 10));
-      debugPrint('SiteAsyncRequest.send() - 10 second delay completed');
-
-      // Check if cancelled during the delay
-      /*if (_isCancelled) {
+      // Check if we need to send files (multipart/form-data)
+      if (files != null && files!.isNotEmpty) {
         debugPrint(
-            'SiteAsyncRequest.send() - request was cancelled during delay');
-        return _createCancelledResponse();
-      }*/
+            'SiteAsyncRequest.send() - creating multipart request for file upload');
+        // Create multipart request for file uploads
+        _currentMultipartRequest =
+            http.MultipartRequest('POST', Uri.parse(url));
 
-      debugPrint(
-          'SiteAsyncRequest.send() - sending HTTP request to: ${_currentRequest!.url}');
-      debugPrint(
-          'SiteAsyncRequest.send() - request headers: ${_currentRequest!.headers}');
-      debugPrint(
-          'SiteAsyncRequest.send() - request body: ${_currentRequest!.body}');
-      // Send the request
-      final response = await _client.send(_currentRequest!);
+        // Add files to the multipart request
+        for (final entry in files!.entries) {
+          final filePath = entry.key;
+          final fieldName = entry.value;
+          final file = File(filePath);
+
+          if (await file.exists()) {
+            final fileSize = await file.length();
+            debugPrint(
+                'SiteAsyncRequest.send() - adding file: $filePath ($fileSize bytes) as field: $fieldName');
+
+            final fileStream = file.openRead();
+            final fileName = file.path.split('/').last;
+            final multipartFile = http.MultipartFile(
+              fieldName,
+              fileStream,
+              fileSize,
+              filename: fileName,
+            );
+            _currentMultipartRequest!.files.add(multipartFile);
+          } else {
+            debugPrint(
+                'SiteAsyncRequest.send() - warning: file does not exist: $filePath');
+          }
+        }
+
+        // Add JSON data as form fields (convert to string)
+        if (data != null) {
+          for (final entry in data!.entries) {
+            final value = entry.value;
+            // Convert value to string for form field
+            final stringValue = value is String
+                ? value
+                : value is Map || value is List
+                    ? jsonEncode(value)
+                    : value.toString();
+            _currentMultipartRequest!.fields[entry.key] = stringValue;
+          }
+        }
+
+        debugPrint(
+            'SiteAsyncRequest.send() - sending multipart request to: ${_currentMultipartRequest!.url}');
+        debugPrint(
+            'SiteAsyncRequest.send() - request fields: ${_currentMultipartRequest!.fields}');
+        debugPrint(
+            'SiteAsyncRequest.send() - request files: ${_currentMultipartRequest!.files.length}');
+
+        // Send the multipart request
+        response = await _currentMultipartRequest!.send();
+      } else {
+        debugPrint('SiteAsyncRequest.send() - creating JSON request');
+        // Create the HTTP request for JSON
+        _currentRequest = http.Request('POST', Uri.parse(url));
+        _currentRequest!.headers['Content-Type'] = 'application/json';
+
+        // Add request data if provided
+        if (data != null) {
+          _currentRequest!.body = jsonEncode(data);
+        }
+
+        debugPrint(
+            'SiteAsyncRequest.send() - sending HTTP request to: ${_currentRequest!.url}');
+        debugPrint(
+            'SiteAsyncRequest.send() - request headers: ${_currentRequest!.headers}');
+        debugPrint(
+            'SiteAsyncRequest.send() - request body length: ${_currentRequest!.body.length} bytes');
+
+        // Send the request
+        response = await _client.send(_currentRequest!);
+      }
 
       // Check if request was cancelled
       if (_isCancelled) {
@@ -120,7 +185,16 @@ class SiteAsyncRequest implements AsyncRequest {
       if (response.statusCode >= 200 && response.statusCode < 300) {
         // Success - parse the response data
         final responseBody = await response.stream.bytesToString();
-        final responseData = jsonDecode(responseBody) as Map<String, dynamic>?;
+        Map<String, dynamic>? responseData;
+
+        try {
+          responseData = jsonDecode(responseBody) as Map<String, dynamic>?;
+        } catch (e) {
+          debugPrint(
+              'SiteAsyncRequest.send() - failed to parse JSON response: $e');
+          // If response is not JSON, return it as a simple message
+          responseData = {'message': responseBody};
+        }
 
         debugPrint('SiteAsyncRequest.send() - returning success response');
         return _createSuccessResponse(response.statusCode, responseData);
@@ -143,6 +217,7 @@ class SiteAsyncRequest implements AsyncRequest {
       //await cancellationSubscription.cancel();
 
       _currentRequest = null;
+      _currentMultipartRequest = null;
 
       // Close the cancellation controller
       /*if (_cancellationController != null &&
@@ -167,8 +242,9 @@ class SiteAsyncRequest implements AsyncRequest {
     // Set cancellation flag
     _isCancelled = true;
 
-    if (_currentRequest != null) {
+    if (_currentRequest != null || _currentMultipartRequest != null) {
       _currentRequest = null;
+      _currentMultipartRequest = null;
 
       // Add cancellation signal and close
       /*if (_cancellationController != null &&
@@ -195,7 +271,7 @@ class SiteAsyncRequest implements AsyncRequest {
       case RequestType.findStudies:
         return '$baseUrl/studies/find';
       case RequestType.import:
-        return '$baseUrl/api/import';
+        return '$baseUrl/dicom/import';
       case RequestType.export:
         return '$baseUrl/api/export';
       case RequestType.login:

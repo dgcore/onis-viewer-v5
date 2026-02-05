@@ -55,9 +55,11 @@ set(SERVER_SOURCES
     src/services/requests/request_service.cpp
     src/services/requests/request_service_authenticate.cpp
     src/services/requests/request_find_studies.cpp
+    src/services/requests/request_import_dicom_file.cpp
     src/services/requests/sessions/request_session.cpp
     src/services/requests/request_database.cpp
     src/services/requests/sessions/request_session_access_cache.cpp
+    src/services/requests/store/local_store_request.cpp
     src/services/config/config_service.cpp
     src/database/site_database.cpp
     src/database/site_database_organization.cpp
