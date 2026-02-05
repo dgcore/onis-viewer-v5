@@ -133,7 +133,7 @@ class SiteChildSource extends DatabaseSource {
   /// Overrides the base class method to create SiteAsyncRequest instances
   @override
   AsyncRequest? createRequest(RequestType requestType,
-      [Map<String, dynamic>? data]) {
+      [Map<String, dynamic>? data, Map<String, String>? files]) {
     // For now, we'll create a basic SiteAsyncRequest
     // In a real implementation, you would need to get the base URL from metadata or configuration
     //final baseUrl = metadata['baseUrl'] as String? ?? 'https://api.example.com';
@@ -155,6 +155,7 @@ class SiteChildSource extends DatabaseSource {
       baseUrl: baseUrl,
       requestType: requestType,
       data: data,
+      files: files,
     );
   }
 
@@ -205,7 +206,7 @@ class SiteSource extends DatabaseSource {
   /// Overrides the base class method to create SiteAsyncRequest instances
   @override
   AsyncRequest? createRequest(RequestType requestType,
-      [Map<String, dynamic>? data]) {
+      [Map<String, dynamic>? data, Map<String, String>? files]) {
     // Get the base URL from metadata or use default localhost server
     //final baseUrl = metadata['baseUrl'] as String? ?? 'https://127.0.0.1:5555';
     final baseUrl = 'https://127.0.0.1:5555';
@@ -213,6 +214,7 @@ class SiteSource extends DatabaseSource {
       baseUrl: baseUrl,
       requestType: requestType,
       data: data,
+      files: files,
     );
   }
 

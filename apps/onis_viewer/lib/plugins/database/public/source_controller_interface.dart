@@ -20,6 +20,8 @@ abstract class ISourceController extends ChangeNotifier {
   bool canExport(String sourceUid);
   bool canOpen(String sourceUid);
   bool canTransfer(String sourceUid);
+  Future<Map<String, dynamic>?> importDicomFile(
+      String sourceUid, String filePath);
   Future<FindPatientStudyResponse> findStudies(String sourceUid);
   void setStudies(FindPatientStudyResponse response);
   void clearStudies(String sourceUid);

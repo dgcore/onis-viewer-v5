@@ -30,6 +30,16 @@
 	<string>NSApplication</string>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>This app needs to connect to local network services for authentication and data access.</string>
+	<key>NSDocumentsFolderUsageDescription</key>
+	<string>This app needs access to documents to import files.</string>
+	<key>NSDownloadsFolderUsageDescription</key>
+	<string>This app needs access to downloads to import files.</string>
+	<key>NSDesktopFolderUsageDescription</key>
+	<string>This app needs access to the desktop to import files.</string>
+	<key>NSRemovableVolumesUsageDescription</key>
+	<string>This app needs access to removable volumes to import files.</string>
+	<key>NSFileProviderDomainUsageDescription</key>
+	<string>This app needs access to files to import data.</string>
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsArbitraryLoads</key>

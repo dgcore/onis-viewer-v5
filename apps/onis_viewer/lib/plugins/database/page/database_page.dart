@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:onis_viewer/core/error_codes.dart';
 import 'package:onis_viewer/plugins/database/public/source_controller_interface.dart';
@@ -100,7 +101,12 @@ class _DatabasePageState extends BasePageState<DatabasePage> {
 
         return DatabaseToolbar(
           onPreferences: () => {},
-          onImport: () => {},
+          onImport: () {
+            // Use the state's context instead of the AnimatedBuilder context
+            if (mounted) {
+              _handleImport(this.context);
+            }
+          },
           onExport: () => {},
           onTransfer: () => {},
           onOpen: () => {},
@@ -300,5 +306,145 @@ class _DatabasePageState extends BasePageState<DatabasePage> {
       current = current.parent;
     }
     return segments.join(' > ');
+  }
+
+  /// Handle import button click - show file/folder picker
+  Future<void> _handleImport(BuildContext context) async {
+    if (!mounted || !context.mounted) {
+      debugPrint('Context not mounted in _handleImport');
+      return;
+    }
+
+    try {
+      debugPrint('Opening import dialog...');
+      // Show dialog to choose between files or folders
+      final choice = await showDialog<String>(
+        context: context,
+        builder: (BuildContext dialogContext) {
+          return AlertDialog(
+            title: const Text('Import'),
+            content: const Text('What would you like to import?'),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  debugPrint('User selected: files');
+                  Navigator.of(dialogContext).pop('files');
+                },
+                child: const Text('Files'),
+              ),
+              TextButton(
+                onPressed: () {
+                  debugPrint('User selected: folder');
+                  Navigator.of(dialogContext).pop('folder');
+                },
+                child: const Text('Folder'),
+              ),
+              TextButton(
+                onPressed: () {
+                  debugPrint('User cancelled dialog');
+                  Navigator.of(dialogContext).pop();
+                },
+                child: const Text('Cancel'),
+              ),
+            ],
+          );
+        },
+      );
+
+      debugPrint('Dialog returned: $choice');
+      if (choice == null || !mounted || !context.mounted) {
+        debugPrint('No choice or context not mounted');
+        return;
+      }
+
+      if (choice == 'files') {
+        // Pick files
+        try {
+          final result = await FilePicker.platform.pickFiles(
+            allowMultiple: true,
+            type: FileType.any,
+            dialogTitle: 'Select files to import',
+          );
+          if (!mounted || !context.mounted) return;
+
+          if (result != null && result.files.isNotEmpty) {
+            final filePaths = result.files
+                .map((file) => file.path ?? '')
+                .where((path) => path.isNotEmpty)
+                .toList();
+            if (filePaths.isNotEmpty) {
+              debugPrint('Selected files: $filePaths');
+              // TODO: Handle selected files
+              // Use the showMessage method from BasePageState which handles Scaffold properly
+              showMessage(
+                  'Selected ${filePaths.length} file(s):\n${filePaths.take(3).join('\n')}${filePaths.length > 3 ? '\n...' : ''}');
+
+              final sourceController = _dbApi?.sourceController;
+              final selected = sourceController?.selectedSource;
+              if (selected != null) {
+                for (final filePath in filePaths) {
+                  final response = await sourceController!
+                      .importDicomFile(selected.uid, filePath);
+                  if (response != null) {
+                    debugPrint('Import response: $response');
+                  }
+                }
+              }
+            }
+          }
+        } catch (e, stackTrace) {
+          debugPrint('Error in file picker: $e');
+          debugPrint('Stack trace: $stackTrace');
+          if (mounted) {
+            showMessage('Error opening file picker: $e', isError: true);
+          }
+        }
+      } else if (choice == 'folder') {
+        // Pick folder
+        debugPrint('Opening directory picker...');
+        try {
+          // On macOS, we need to wait for the dialog to fully close before opening the file picker
+          // This ensures the system is ready to show the file picker dialog
+          //await Future.delayed(const Duration(milliseconds: 300));
+
+          if (!mounted || !context.mounted) {
+            debugPrint('Context not mounted before opening directory picker');
+            return;
+          }
+
+          debugPrint('Calling getDirectoryPath...');
+          String? selectedDirectory =
+              await FilePicker.platform.getDirectoryPath(
+            dialogTitle: 'Select folder to import',
+          );
+
+          debugPrint('Directory picker result: $selectedDirectory');
+
+          if (!mounted || !context.mounted) return;
+
+          if (selectedDirectory != null && selectedDirectory.isNotEmpty) {
+            debugPrint('Selected directory: $selectedDirectory');
+            // TODO: Handle selected folder
+            showMessage('Selected folder: $selectedDirectory');
+          } else {
+            debugPrint(
+                'Directory picker was cancelled by user or returned null/empty');
+            // This is normal if user cancels - don't show error
+          }
+        } catch (e, stackTrace) {
+          debugPrint('Error in directory picker: $e');
+          debugPrint('Stack trace: $stackTrace');
+          if (mounted) {
+            showMessage('Error opening folder picker: $e', isError: true);
+          }
+        }
+      }
+    } catch (e, stackTrace) {
+      debugPrint('Error in _handleImport: $e');
+      debugPrint('Stack trace: $stackTrace');
+      if (mounted) {
+        showMessage('Error: $e', isError: true);
+      }
+    }
   }
 }

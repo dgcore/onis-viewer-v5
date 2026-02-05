@@ -269,8 +269,12 @@ abstract class DatabaseSource extends ChangeNotifier {
   /// Create an AsyncRequest for the specified request type
   /// Should be overridden by subclasses to provide specific request implementations
   /// Default implementation returns null
+  /// 
+  /// [requestType] - The type of request to create
+  /// [data] - Optional JSON data for the request
+  /// [files] - Optional map of file paths to field names for file uploads (multipart/form-data)
   AsyncRequest? createRequest(RequestType requestType,
-      [Map<String, dynamic>? data]) {
+      [Map<String, dynamic>? data, Map<String, String>? files]) {
     // Default implementation - subclasses should override
     return null;
   }

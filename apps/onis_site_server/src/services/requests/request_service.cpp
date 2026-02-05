@@ -145,6 +145,9 @@ void request_service::process_request(const request_data_ptr& req) {
       case request_type::kFindStudies:
         process_find_studies_request(req);
         break;
+      case request_type::kImportDicom:
+        process_import_dicom_file_request(req);
+        break;
       default:
         break;
     }

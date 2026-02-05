@@ -267,6 +267,49 @@ class SourceController extends ISourceController {
     }
   }
 
+  /// Import a DICOM file to the specified source
+  ///
+  /// [sourceUid] - The unique identifier of the source
+  /// [filePath] - The path to the file to import
+  ///
+  /// The file will be uploaded in binary mode using multipart/form-data
+  @override
+  Future<Map<String, dynamic>?> importDicomFile(
+      String sourceUid, String filePath) async {
+    final source = _databaseSourceManager.findSourceByUid(sourceUid);
+    if (source == null) {
+      return null;
+    }
+
+    // Create request with file upload (multipart/form-data)
+    // The file will be sent as a binary stream, efficient for large files
+    final files = <String, String>{
+      filePath: 'file', // Field name for the file on the server
+    };
+
+    final data = <String, dynamic>{
+      'source': "ab827b22-a4b9-44a4-96d8-28c6d2a29884", //source.uid,
+      'type': 0,
+    };
+
+    final request = source.createRequest(RequestType.import, data, files);
+    if (request == null) {
+      return null;
+    }
+
+    try {
+      final response = await request.send();
+      if (response.isSuccess && response.data != null) {
+        return response.data;
+      } else {
+        return null;
+      }
+    } catch (e) {
+      // Handle any errors during file upload
+      return null;
+    }
+  }
+
   @override
   List<({String sourceUid, int status})> getSourceStatuses(String sourceUid) {
     SourceState? sourceState = _sourceStates[sourceUid];
