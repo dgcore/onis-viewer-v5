@@ -41,7 +41,6 @@ set(ONIS_KIT_SOURCES
 set(ONIS_KIT_HEADERS
     include/core/result.hpp
     include/core/object.hpp
-    include/core/types.hpp
     include/core/thread.hpp
     include/core/event.hpp
     include/database/database_interface.hpp

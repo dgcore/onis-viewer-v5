@@ -161,7 +161,7 @@ void site_database::find_user_for_session(const std::string& site_seq,
   // verify the password:
   std::string hashed_pwd = output[US_PASSWORD_KEY].asString();
   // if (!argon2_verify_password(password, hashed_pwd))
-  // res.set(OSRSP_REFUSED, EOS_PERMISSION, "", OSFALSE);
+  // res.set(OSRSP_REFUSED, EOS_PERMISSION, "", false);
 
   if (output.isMember(US_PASSWORD_KEY))
     output[US_PASSWORD_KEY] = "xxxxxxxxxx";
@@ -173,14 +173,14 @@ void site_database::find_user_for_session(const std::string& site_seq,
                         output[US_MEMBERSHIP_KEY]);
   /*if (flags & onis::server::info_user_partition_access &&
       res.status == OSRSP_SUCCESS)
-    find_partition_access(OSFALSE, output[BASE_SEQ_KEY].asString(),
+    find_partition_access(false, output[BASE_SEQ_KEY].asString(),
                           onis::db::nolock, output[US_PARTITION_ACCESS_KEY],
-                          NULL, OSTRUE, res);
+                          NULL, true, res);
   if (flags & onis::server::info_user_dicom_access &&
       res.status == OSRSP_SUCCESS)
-    find_dicom_access(OSFALSE, output[BASE_SEQ_KEY].asString(),
+    find_dicom_access(false, output[BASE_SEQ_KEY].asString(),
                       onis::db::nolock, output[US_DICOM_ACCESS_KEY], NULL,
-                      OSTRUE, res);*/
+                      true, res);*/
 }
 
 void site_database::get_user_permissions(const std::string& seq, json& output) {

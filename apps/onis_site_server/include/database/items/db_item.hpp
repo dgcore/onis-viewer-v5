@@ -1,7 +1,6 @@
 #pragma once
 
 #include "onis_kit/include/core/result.hpp"
-#include "onis_kit/include/core/types.hpp"
 #include "onis_kit/include/utilities/regex.hpp"
 
 #include <json/json.h>

@@ -37,7 +37,7 @@ void request_service::process_import_dicom_file_request(
 
   if (req->res.good()) {
     // get the storage media:
-    s32 media = -1;
+    std::int32_t media = -1;
     onis::string folder = get_current_media_folder(
         onis::server::media_for_images,
         req->res.status == OSRSP_SUCCESS ? partition[PT_VOLUME_KEY].asString()
@@ -54,7 +54,7 @@ void request_service::process_import_dicom_file_request(
     store.set_origin(req->session->user_seq,
                      "Imported by " + req->session->login,
                      req->log_info->get_client_ip());
-    u32 flags[4] = {0, onis::server::info_study_status, 0, 0};
+    std::uint32_t flags[4] = {0, onis::server::info_study_status, 0, 0};
     store.import_file(db, req->input["source"].asString(), &req->output, flags,
                       req->res);
 
@@ -70,13 +70,13 @@ void request_service::process_import_dicom_file_request(
 
 
   // verify the input:
-  onis::server::item::verify_string_value(req->input, "source", (b32)OSFALSE,
+  onis::server::item::verify_string_value(req->input, "source", (bool)false,
                                           req->res);
-  onis::server::item::verify_string_value(req->input, "type", (b32)OSFALSE,
+  onis::server::item::verify_string_value(req->input, "type", (bool)false,
                                           req->res);
   // onis::server::item::verify_int_or_uint_value(req->input, SO_TYPE_KEY,
   // req->res);
-  onis::server::item::verify_string_value(req->input, "image", (b32)OSFALSE,
+  onis::server::item::verify_string_value(req->input, "image", (bool)false,
                                           req->res);
   onis::astring from_path = req->input["image"].asString();
   // onis::util::string::convert_utf8_to_local(req->input["image"].asString(),
@@ -84,11 +84,11 @@ void request_service::process_import_dicom_file_request(
   _prepare_file(from_path, &import_data->image_path1, NULL,
                 &import_data->delete_image_file, req->res);
   if (req->res.status == OSRSP_SUCCESS) {
-    // s32 type = req->input[SO_TYPE_KEY].asInt();
+    // std::int32_t type = req->input[SO_TYPE_KEY].asInt();
     onis::astring stype = req->input[SO_TYPE_KEY].asString();
-    s32 type = onis::util::string::convert_to_s32(stype);
+    std::int32_t type = onis::util::string::convert_to_s32(stype);
     if (type != onis::server::source::type_partition &&
         type != onis::server::source::type_dicom_client)
-      req->res.set(OSRSP_FAILURE, EOS_PARAM, "", OSFALSE);
+      req->res.set(OSRSP_FAILURE, EOS_PARAM, "", false);
   }*/
 }

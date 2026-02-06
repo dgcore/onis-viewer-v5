@@ -3,8 +3,6 @@
 
 #include <string>
 
-#include "./types.hpp"
-
 namespace onis {
 
 #define EOS_NONE 0

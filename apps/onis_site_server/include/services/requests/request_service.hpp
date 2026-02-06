@@ -90,19 +90,19 @@ private:
                                const request_database& db,
                                const request_session_ptr& session,
                                const Json::Value& user) const;*/
-  /*void _get_session_permissions(b32 only_privileges,
+  /*void _get_session_permissions(bool only_privileges,
                                 search_access_result* result,
                                 sdb_access_ptr& db,
                                 const request_session_ptr& session,
                                 const Json::Value& user, onis::aresult& res);
   void _get_session_permission_from_role(
-      b32 only_privileges, const request_session_ptr& session,
+      bool only_privileges, const request_session_ptr& session,
       search_access_result* result, search_access_memo* memo,
       const sdb_access_ptr& db, const onis::astring& role_seq,
       const onis::astring& site_seq,
       std::map<onis::astring, std::int32_t>& circular_loop, onis::aresult& res);
   void _get_session_permission_from_role(
-      b32 privileges, b32 partitions, b32 dicom, b32 pref,
+      bool privileges, bool partitions, bool dicom, bool pref,
       const request_session_ptr& session, search_access_result* result,
       search_access_memo* memo, const sdb_access_ptr& db,
       const onis::astring& role_seq, const onis::astring& site_seq,

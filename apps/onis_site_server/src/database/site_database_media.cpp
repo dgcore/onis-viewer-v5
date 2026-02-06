@@ -11,7 +11,7 @@ using onis::database::lock_mode;
 ////////////////////////////////////////////////////////////////////////////////
 
 std::string site_database::get_media_columns(std::uint32_t flags,
-                                             b32 add_table_name) {
+                                             bool add_table_name) {
   std::string prefix = add_table_name ? "pacs_media." : "";
   std::string columns =
       prefix + "id, " + prefix + "site_id, " + prefix + "volume_id";
@@ -36,7 +36,7 @@ void site_database::read_media_record(onis_kit::database::database_row& rec,
     *volume_seq = rec.get_string("volume_id");
   }
   std::string folder;
-  f64 ratio = 0.0;
+  double ratio = 0.0;
   if (flags & onis::database::info_media_data) {
     output[ME_TYPE_KEY] = rec.get_int(ME_TYPE_KEY);
     output[ME_NUM_KEY] = rec.get_int(ME_NUM_KEY);
@@ -67,7 +67,7 @@ void site_database::read_media_record(onis_kit::database::database_row& rec,
       output[ME_FREE_BYTES_KEY] = available_space;
       if (flags & onis::database::info_media_data) {
         if (info.total_space > 0) {
-          f32 tmp = (f32)available_space / (f32)total_space;
+          float tmp = (float)available_space / (float)total_space;
           if ((1.0 - tmp) * 100.0 > ratio)
             output[ME_STATUS_KEY] = onis::server::media_full;
           else

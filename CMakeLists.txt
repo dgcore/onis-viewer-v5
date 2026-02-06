@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(ONIS5 VERSION 5.0.0 LANGUAGES CXX)
+project(ONIS5 VERSION 5.0.0 LANGUAGES C CXX)
 
 # Set C++ standard
 set(CMAKE_CXX_STANDARD 17)
@@ -44,6 +44,30 @@ endif()
 # Add onis_kit library
 if(EXISTS "${CMAKE_SOURCE_DIR}/libs/onis_kit")
     add_subdirectory(libs/onis_kit)
+endif()
+
+# Add DICOM libraries (must be built before site server)
+if(EXISTS "${CMAKE_SOURCE_DIR}/libs/dicom")
+    # Build dependencies first (DCMTK depends on these)
+    if(EXISTS "${CMAKE_SOURCE_DIR}/libs/dicom/ijg8")
+        add_subdirectory(libs/dicom/ijg8)
+    endif()
+    if(EXISTS "${CMAKE_SOURCE_DIR}/libs/dicom/ijg12")
+        add_subdirectory(libs/dicom/ijg12)
+    endif()
+    if(EXISTS "${CMAKE_SOURCE_DIR}/libs/dicom/ijg16")
+        add_subdirectory(libs/dicom/ijg16)
+    endif()
+    if(EXISTS "${CMAKE_SOURCE_DIR}/libs/dicom/iconv")
+        add_subdirectory(libs/dicom/iconv)
+    endif()
+    if(EXISTS "${CMAKE_SOURCE_DIR}/libs/dicom/onis_j2k_kit")
+        add_subdirectory(libs/dicom/onis_j2k_kit)
+    endif()
+    # Build DCMTK (depends on ijg8, ijg12, ijg16, onis_j2k_kit)
+    if(EXISTS "${CMAKE_SOURCE_DIR}/libs/dicom/dcmtk-3.6.0")
+        add_subdirectory(libs/dicom/dcmtk-3.6.0)
+    endif()
 endif()
 
 # Add applications

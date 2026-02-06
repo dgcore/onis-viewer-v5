@@ -97,6 +97,19 @@ target_include_directories(onis_site_server PRIVATE
     ${DROGON_INCLUDE_DIRS}
     ${JSONCPP_INCLUDE_DIRS}
     ${jwt-cpp_SOURCE_DIR}/include
+    # DICOM library includes
+    ${CMAKE_SOURCE_DIR}/../../libs/dicom/dcmtk-3.6.0/config/include
+    ${CMAKE_SOURCE_DIR}/../../libs/dicom/dcmtk-3.6.0/dcmdata/include
+    ${CMAKE_SOURCE_DIR}/../../libs/dicom/dcmtk-3.6.0/dcmimage/include
+    ${CMAKE_SOURCE_DIR}/../../libs/dicom/dcmtk-3.6.0/dcmimgle/include
+    ${CMAKE_SOURCE_DIR}/../../libs/dicom/dcmtk-3.6.0/dcmjpeg/include
+    ${CMAKE_SOURCE_DIR}/../../libs/dicom/dcmtk-3.6.0/dcmjpls/include
+    ${CMAKE_SOURCE_DIR}/../../libs/dicom/dcmtk-3.6.0/dcmnet/include
+    ${CMAKE_SOURCE_DIR}/../../libs/dicom/dcmtk-3.6.0/dcmsr/include
+    ${CMAKE_SOURCE_DIR}/../../libs/dicom/dcmtk-3.6.0/ofstd/include
+    ${CMAKE_SOURCE_DIR}/../../libs/dicom/dcmtk-3.6.0/oflog/include
+    ${CMAKE_SOURCE_DIR}/../../libs/dicom/iconv/include
+    ${CMAKE_SOURCE_DIR}/../../libs/dicom/onis_j2k_kit/public
 )
 
 # Link libraries
@@ -109,9 +122,13 @@ target_link_libraries(onis_site_server PRIVATE
     OpenSSL::SSL
     OpenSSL::Crypto
     jwt-cpp::jwt-cpp
-    # Add other libraries as needed:
-    # ${DCMTK_LIBRARIES}
-    # ${BOOST_LIBRARIES}
+    # DICOM libraries
+    dcmtk-3.6.0
+    ijg8
+    ijg12
+    ijg16
+    iconv
+    onis_j2k_kit
 )
 
 # Add library search directories
@@ -119,6 +136,7 @@ target_link_directories(onis_site_server PRIVATE
     ${CMAKE_SOURCE_DIR}/../../build/lib
     ${CMAKE_SOURCE_DIR}/../../libs/onis_kit/build
     "/Applications/Postgres.app/Contents/Versions/15/lib"
+    # DICOM libraries will be built in the build directory
 )
 
 # Compiler definitions
