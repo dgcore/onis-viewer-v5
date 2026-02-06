@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.20)
 project(onis_kit VERSION 1.0.0 LANGUAGES CXX)
 
 # Set C++ standard
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # Find required packages
@@ -27,6 +27,7 @@ set(ONIS_KIT_SOURCES
     src/core/result.cpp
     src/core/thread.cpp
     src/core/event.cpp
+    src/dicom/dicom.cpp
     src/database/postgresql/postgresql_connection.cpp
     src/database/postgresql/postgresql_query.cpp
     src/database/postgresql/postgresql_result.cpp
@@ -43,6 +44,7 @@ set(ONIS_KIT_HEADERS
     include/core/object.hpp
     include/core/thread.hpp
     include/core/event.hpp
+    include/dicom/dicom.hpp
     include/database/database_interface.hpp
     include/database/postgresql/postgresql.hpp
     include/database/postgresql/postgresql_connection.hpp
