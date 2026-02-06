@@ -39,6 +39,10 @@ wavelet transform with filter 5-3 (reversible) and filter 9-7 (irreversible).
 The functions in DWT.C are used by some function in TCD.C.
 */
 
+/* Forward declarations */
+typedef struct opj_tcd_tilecomp opj_tcd_tilecomp_t;
+typedef struct opj_tccp opj_tccp_t;
+
 /** @defgroup DWT DWT - Implementation of a discrete wavelet transform */
 /*@{*/
 

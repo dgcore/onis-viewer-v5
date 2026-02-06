@@ -18,6 +18,12 @@
  * and USE_MAC_MEMMGR.
  */
 
+/* Include necessary headers for type definitions */
+#ifndef JPEGLIB_H
+#include "jinclude12.h"
+#include "jpeglib12.h"
+#endif
+
 /* Short forms of external names for systems with brain-damaged linkers. */
 
 #ifdef NEED_SHORT_EXTERNAL_NAMES

@@ -12,6 +12,12 @@
  * machine-dependent tuning (e.g., assembly coding).
  */
 
+/* Include necessary headers for type definitions */
+#ifndef JPEGLIB_H
+#include "jinclude12.h"
+#include "jpeglib12.h"
+#endif
+
 /*
  * A forward DCT routine is given a pointer to a work area of type DCTELEM[];
  * the DCT is to be performed in-place in that buffer.  Type DCTELEM is int

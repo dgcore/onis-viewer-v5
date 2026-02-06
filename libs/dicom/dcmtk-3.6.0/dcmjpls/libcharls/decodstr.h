@@ -7,6 +7,7 @@
 #define CHARLS_DECODERSTATEGY
 
 #include "config.h"
+#include "dcmtk/ofstd/ofaptr.h"  // for OFauto_ptr
 #include "procline.h"
 #include "streams.h"
 #include "util.h"

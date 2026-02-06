@@ -10,6 +10,12 @@
  * applications using the library shouldn't need to include this file.
  */
 
+/* Include necessary headers for type definitions */
+#ifndef JPEGLIB_H
+#include "jinclude12.h"
+#include "jpeglib12.h"
+#endif
+
 /* Declarations for both compression & decompression */
 
 typedef enum {                 /* Operating modes for buffer controllers */

@@ -5,6 +5,8 @@
 #ifndef CHARLS_COLORTRANSFORM
 #define CHARLS_COLORTRANSFORM
 
+#include "util.h" // for Triplet and Quad
+
 //
 // This file defines simple classes that define (lossless) color transforms.
 // They are invoked in processline.h to convert between decoded values and the

@@ -12,6 +12,14 @@
 #ifndef JLOSSY_H
 #define JLOSSY_H
 
+/* This header needs jpeglib16.h to be included first for type definitions */
+/* If jpeglib16.h hasn't been included yet, include it now */
+#ifndef JPEGLIB_H
+#include "jconfig16.h"
+#include "jmorecfg16.h"
+#include "jpeglib16.h"
+#endif
+
 /* Lossy-specific compression codec (compressor proper) */
 typedef struct {
   struct jpeg_c_codec pub; /* public fields */

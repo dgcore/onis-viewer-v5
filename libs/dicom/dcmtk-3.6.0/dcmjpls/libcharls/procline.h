@@ -5,6 +5,8 @@
 #ifndef CHARLS_PROCESSLINE
 #define CHARLS_PROCESSLINE
 
+#include "dcmtk/ofstd/ofbmanip.h"  // for OFBitmanipTemplate
+#include "dcmtk/ofstd/ofvector.h"  // for OFVector
 #include "clrtrans.h"
 
 //

@@ -12,6 +12,13 @@
 #ifndef JLOSSLS_H
 #define JLOSSLS_H
 
+/* This header needs jpeglib8.h to be included first for type definitions */
+/* If jpeglib8.h hasn't been included yet, include it now */
+#ifndef JPEGLIB_H
+#include "jinclude8.h"
+#include "jpeglib8.h"
+#endif
+
 /*
  * Table H.1: Predictors for lossless coding.
  */

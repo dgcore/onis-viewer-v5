@@ -65,6 +65,7 @@
 #define DULFSM_H
 
 #include "dcmtk/config/osconfig.h" /* make sure OS specific configuration is included first */
+#include "dulstruc.h" /* for PRIVATE_NETWORKKEY and PRIVATE_ASSOCIATIONKEY */
 
 #define A_ASSOCIATE_REQ_LOCAL_USER 0
 #define TRANS_CONN_CONFIRM_LOCAL_USER 1

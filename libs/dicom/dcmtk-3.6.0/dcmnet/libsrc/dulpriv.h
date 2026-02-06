@@ -73,6 +73,7 @@
 #define DULPRIVATE_H
 
 #include "dcmtk/config/osconfig.h" /* make sure OS specific configuration is included first */
+#include "dulstruc.h" /* for PRV_ASSOCIATEPDU and DUL_REJECTRELEASEABORTPDU */
 
 #define PRV_DEFAULTTIMEOUT -1
 #define PRV_LISTENBACKLOG 50

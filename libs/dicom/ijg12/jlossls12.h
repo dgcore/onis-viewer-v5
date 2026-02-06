@@ -12,6 +12,13 @@
 #ifndef JLOSSLS_H
 #define JLOSSLS_H
 
+/* This header needs jpeglib12.h to be included first for type definitions */
+/* If jpeglib12.h hasn't been included yet, include it now */
+#ifndef JPEGLIB_H
+#include "jinclude12.h"
+#include "jpeglib12.h"
+#endif
+
 /*
  * Table H.1: Predictors for lossless coding.
  */

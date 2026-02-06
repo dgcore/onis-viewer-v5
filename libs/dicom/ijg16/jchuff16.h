@@ -10,6 +10,12 @@
  * progressive encoder (jcphuff.c).  No other modules need to see these.
  */
 
+/* Include necessary headers for type definitions */
+#ifndef JPEGLIB_H
+#include "jinclude16.h"
+#include "jpeglib16.h"
+#endif
+
 /* The legal range of a DCT coefficient is
  *  -1024 .. +1023  for 8-bit data;
  * -16384 .. +16383 for 12-bit data.
@@ -46,10 +52,10 @@ typedef struct {
 
 /* Expand a Huffman table definition into the derived format */
 EXTERN(void)
-jpeg_make_c_derived_tbl
-    JPP((j_compress_ptr cinfo, boolean isDC, int tblno, c_derived_tbl** pdtbl));
+jpeg_make_c_derived_tbl JPP((j_compress_ptr cinfo, boolean isDC, int tblno,
+                             c_derived_tbl** pdtbl));
 
 /* Generate an optimal table definition given the specified counts */
 EXTERN(void)
-jpeg_gen_optimal_table
-    JPP((j_compress_ptr cinfo, JHUFF_TBL* htbl, long freq[]));
+jpeg_gen_optimal_table JPP((j_compress_ptr cinfo, JHUFF_TBL* htbl,
+                            long freq[]));

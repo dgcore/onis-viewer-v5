@@ -18,6 +18,12 @@
  * and USE_MAC_MEMMGR.
  */
 
+/* Include necessary headers for type definitions */
+#ifndef JPEGLIB_H
+#include "jinclude16.h"
+#include "jpeglib16.h"
+#endif
+
 /* Short forms of external names for systems with brain-damaged linkers. */
 
 #ifdef NEED_SHORT_EXTERNAL_NAMES
@@ -57,8 +63,8 @@ jpeg_free_small JPP((j_common_ptr cinfo, void* object, size_t sizeofobject));
 
 EXTERN(void FAR*) jpeg_get_large JPP((j_common_ptr cinfo, size_t sizeofobject));
 EXTERN(void)
-jpeg_free_large
-    JPP((j_common_ptr cinfo, void FAR* object, size_t sizeofobject));
+jpeg_free_large JPP((j_common_ptr cinfo, void FAR* object,
+                     size_t sizeofobject));
 
 /*
  * The macro MAX_ALLOC_CHUNK designates the maximum number of bytes that may
@@ -169,8 +175,8 @@ typedef struct backing_store_struct {
  */
 
 EXTERN(void)
-jpeg_open_backing_store
-    JPP((j_common_ptr cinfo, backing_store_ptr info, long total_bytes_needed));
+jpeg_open_backing_store JPP((j_common_ptr cinfo, backing_store_ptr info,
+                             long total_bytes_needed));
 
 /*
  * These routines take care of any system-dependent initialization and

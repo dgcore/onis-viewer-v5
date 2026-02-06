@@ -12,6 +12,12 @@
  * machine-dependent tuning (e.g., assembly coding).
  */
 
+/* Include necessary headers for type definitions */
+#ifndef JPEGLIB_H
+#include "jinclude8.h"
+#include "jpeglib8.h"
+#endif
+
 /*
  * A forward DCT routine is given a pointer to a work area of type DCTELEM[];
  * the DCT is to be performed in-place in that buffer.  Type DCTELEM is int
@@ -95,29 +101,29 @@ EXTERN(void) jpeg_fdct_ifast JPP((DCTELEM * data));
 EXTERN(void) jpeg_fdct_float JPP((FAST_FLOAT * data));
 
 EXTERN(void)
-jpeg_idct_islow
-    JPP((j_decompress_ptr cinfo, jpeg_component_info* compptr,
-         JCOEFPTR coef_block, JSAMPARRAY output_buf, JDIMENSION output_col));
+jpeg_idct_islow JPP((j_decompress_ptr cinfo, jpeg_component_info* compptr,
+                     JCOEFPTR coef_block, JSAMPARRAY output_buf,
+                     JDIMENSION output_col));
 EXTERN(void)
-jpeg_idct_ifast
-    JPP((j_decompress_ptr cinfo, jpeg_component_info* compptr,
-         JCOEFPTR coef_block, JSAMPARRAY output_buf, JDIMENSION output_col));
+jpeg_idct_ifast JPP((j_decompress_ptr cinfo, jpeg_component_info* compptr,
+                     JCOEFPTR coef_block, JSAMPARRAY output_buf,
+                     JDIMENSION output_col));
 EXTERN(void)
-jpeg_idct_float
-    JPP((j_decompress_ptr cinfo, jpeg_component_info* compptr,
-         JCOEFPTR coef_block, JSAMPARRAY output_buf, JDIMENSION output_col));
+jpeg_idct_float JPP((j_decompress_ptr cinfo, jpeg_component_info* compptr,
+                     JCOEFPTR coef_block, JSAMPARRAY output_buf,
+                     JDIMENSION output_col));
 EXTERN(void)
-jpeg_idct_4x4
-    JPP((j_decompress_ptr cinfo, jpeg_component_info* compptr,
-         JCOEFPTR coef_block, JSAMPARRAY output_buf, JDIMENSION output_col));
+jpeg_idct_4x4 JPP((j_decompress_ptr cinfo, jpeg_component_info* compptr,
+                   JCOEFPTR coef_block, JSAMPARRAY output_buf,
+                   JDIMENSION output_col));
 EXTERN(void)
-jpeg_idct_2x2
-    JPP((j_decompress_ptr cinfo, jpeg_component_info* compptr,
-         JCOEFPTR coef_block, JSAMPARRAY output_buf, JDIMENSION output_col));
+jpeg_idct_2x2 JPP((j_decompress_ptr cinfo, jpeg_component_info* compptr,
+                   JCOEFPTR coef_block, JSAMPARRAY output_buf,
+                   JDIMENSION output_col));
 EXTERN(void)
-jpeg_idct_1x1
-    JPP((j_decompress_ptr cinfo, jpeg_component_info* compptr,
-         JCOEFPTR coef_block, JSAMPARRAY output_buf, JDIMENSION output_col));
+jpeg_idct_1x1 JPP((j_decompress_ptr cinfo, jpeg_component_info* compptr,
+                   JCOEFPTR coef_block, JSAMPARRAY output_buf,
+                   JDIMENSION output_col));
 
 /*
  * Macros for handling fixed-point arithmetic; these are used by many

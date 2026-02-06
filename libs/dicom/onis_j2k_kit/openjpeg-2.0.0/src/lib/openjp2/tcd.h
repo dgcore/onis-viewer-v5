@@ -31,6 +31,8 @@
  */
 #ifndef __TCD_H
 #define __TCD_H
+
+#include "tgt.h" /* for opj_tgt_tree_t */
 /**
 @file tcd.h
 @brief Implementation of a tile coder/decoder (TCD)

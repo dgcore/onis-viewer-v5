@@ -11,6 +11,12 @@
  * No other modules need to see these.
  */
 
+/* Include necessary headers for type definitions */
+#ifndef JPEGLIB_H
+#include "jinclude16.h"
+#include "jpeglib16.h"
+#endif
+
 /* Short forms of external names for systems with brain-damaged linkers. */
 
 #ifdef NEED_SHORT_EXTERNAL_NAMES
@@ -155,9 +161,9 @@ typedef struct { /* Bitreading working state within an MCU */
 
 /* Load up the bit buffer to a depth of at least nbits */
 EXTERN(boolean)
-jpeg_fill_bit_buffer
-    JPP((bitread_working_state * state, register bit_buf_type get_buffer,
-         register int bits_left, int nbits));
+jpeg_fill_bit_buffer JPP((bitread_working_state * state,
+                          register bit_buf_type get_buffer,
+                          register int bits_left, int nbits));
 
 /*
  * Code for extracting next Huffman-coded symbol from input bit stream.
@@ -208,9 +214,9 @@ jpeg_fill_bit_buffer
 
 /* Out-of-line case for Huffman code fetching */
 EXTERN(int)
-jpeg_huff_decode
-    JPP((bitread_working_state * state, register bit_buf_type get_buffer,
-         register int bits_left, d_derived_tbl* htbl, int min_bits));
+jpeg_huff_decode JPP((bitread_working_state * state,
+                      register bit_buf_type get_buffer, register int bits_left,
+                      d_derived_tbl* htbl, int min_bits));
 
 /* Common fields between sequential, progressive and lossless Huffman entropy
  * decoder master structs.

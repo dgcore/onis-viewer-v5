@@ -29,6 +29,10 @@
  */
 #ifndef __T1_H
 #define __T1_H
+
+/* Forward declarations */
+typedef struct opj_tcd_tile opj_tcd_tile_t;
+typedef struct opj_tcp opj_tcp_t;
 /**
 @file t1.h
 @brief Implementation of the tier-1 coding (coding of code-block coefficients)
