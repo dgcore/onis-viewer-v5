@@ -102,13 +102,13 @@ void site_database::find_role_by_seq(const std::string& seq,
         get_role_membership(output[BASE_SEQ_KEY].asString(),
                             output[RO_MEMBERSHIP_KEY]);
       /*if (flags & onis::database::info_role_partition_access)
-        find_partition_access(OSTRUE, output[BASE_SEQ_KEY].asString(),
+        find_partition_access(true, output[BASE_SEQ_KEY].asString(),
                               onis::db::nolock, output[RO_PARTITION_ACCESS_KEY],
-                              NULL, OSTRUE);
+                              NULL, true);
       if (flags & onis::database::info_role_dicom_access)
-        find_dicom_access(OSTRUE, output[BASE_SEQ_KEY].asString(),
+        find_dicom_access(true, output[BASE_SEQ_KEY].asString(),
                           onis::db::nolock, output[RO_DICOM_ACCESS_KEY], NULL,
-                          OSTRUE);*/
+                          true);*/
       return;
     }
   }
@@ -157,13 +157,13 @@ void site_database::find_roles_for_site(const std::string& site_seq,
         get_role_membership(item[BASE_SEQ_KEY].asString(),
                             item[RO_MEMBERSHIP_KEY]);
       /*if (flags & onis::database::info_role_partition_access)
-        find_partition_access(OSTRUE, item[BASE_SEQ_KEY].asString(),
+        find_partition_access(true, item[BASE_SEQ_KEY].asString(),
                               onis::db::nolock, item[RO_PARTITION_ACCESS_KEY],
-                              NULL, OSTRUE);
+                              NULL, true);
       if (flags & onis::database::info_role_dicom_access)
-        find_dicom_access(OSTRUE, item[BASE_SEQ_KEY].asString(),
+        find_dicom_access(true, item[BASE_SEQ_KEY].asString(),
                           onis::db::nolock, item[RO_DICOM_ACCESS_KEY], NULL,
-                          OSTRUE);*/
+                          true);*/
       output.append(std::move(item));
     }
   }
@@ -326,11 +326,11 @@ void site_database::modify_role(const json& role) {
   }
 
   /*if (flags & onis::server::info_role_partition_access)
-    update_partition_access(OSTRUE, role_seq, role[RO_PARTITION_ACCESS_KEY],
+    update_partition_access(true, role_seq, role[RO_PARTITION_ACCESS_KEY],
                             res);
 
   if (flags & onis::server::info_role_dicom_access)
-    update_dicom_access(OSTRUE, role_seq, role[RO_DICOM_ACCESS_KEY], res);*/
+    update_dicom_access(true, role_seq, role[RO_DICOM_ACCESS_KEY], res);*/
 }
 
 //------------------------------------------------------------------------------
@@ -350,10 +350,10 @@ void site_database::delete_role(const std::string& seq) {
   execute_query(query);
 
   // delete the partition access:
-  /*delete_partition_access(OSTRUE, seq, res);
+  /*delete_partition_access(true, seq, res);
 
   // delete the dicom access:
-  delete_dicom_access(OSTRUE, seq, res);*/
+  delete_dicom_access(true, seq, res);*/
 
   // delete the role:
   sql = "DELETE FROM pacs_roles WHERE id=?";
@@ -444,7 +444,7 @@ void site_database::modify_role_permission_value(
   // Excute query:
   auto result = execute_query(query);
   if (result->get_affected_rows() == 0 && create) {
-    /*if (!exist_permission(OSTRUE, role_seq, permission_seq, res)) {
+    /*if (!exist_permission(true, role_seq, permission_seq, res)) {
       std::string seq = onis::util::uuid::generate_random_uuid();
       sql =
           "INSERT INTO PACS_ROLE_HAS_ROLE_ITEMS (ID, ROLE_ID, ITEM_ID, "

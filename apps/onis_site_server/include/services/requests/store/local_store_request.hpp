@@ -80,13 +80,12 @@ private:
   // onis::core::date_time _current_time;
 
   // utilities:
-  /*void _set_error_status(s32 status, s32 reason, onis::aresult& res);
-  void _check_study_date_format();
-  Json::Value* _find_matching_patient(Json::Value& patients);
-  Json::Value* _find_online_study(Json::Value& items, b32 allow_none,
-                                  onis::aresult& res);
+  /*void _set_error_status(std::int32_t status, std::int32_t reason,
+  onis::aresult& res); void _check_study_date_format(); Json::Value*
+  _find_matching_patient(Json::Value& patients); Json::Value*
+  _find_online_study(Json::Value& items, bool allow_none, onis::aresult& res);
   Json::Value* _find_conflict_study(Json::Value& items, onis::aresult& res);
-  b32 _study_is_in_conflict(const Json::Value* item, onis::aresult& res);
+  bool _study_is_in_conflict(const Json::Value* item, onis::aresult& res);
 
   // process:
   void _add_new_image_to_partition(const sdb_access_ptr& db,

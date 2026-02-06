@@ -8,7 +8,6 @@
 #include <unordered_map>
 
 #include "./event.hpp"
-#include "./types.hpp"
 
 #define DGMSG_COMMAND 10
 #define DGMSG_TIMER 15
@@ -32,7 +31,7 @@ struct message {
 //-----------------------------------------------------------------------------
 
 struct timer_info {
-  u8 id;
+  std::uint8_t id;
   std::chrono::microseconds duration;
   bool pending;
   bool should_quit;
@@ -62,14 +61,14 @@ public:
   virtual bool post_message_tothread_(std::uint32_t id, std::uint64_t wParam,
                                       std::uint64_t lParam);
   virtual bool on_idle();
-  virtual bool set_timer(u8 timer_id, std::uint32_t milliSec);
-  virtual bool kill_timer(u8 timer_id);
-  virtual void on_timer(u8 timer_id);
+  virtual bool set_timer(std::uint8_t timer_id, std::uint32_t milliSec);
+  virtual bool kill_timer(std::uint8_t timer_id);
+  virtual void on_timer(std::uint8_t timer_id);
   std::uint64_t get_pending_message_count();
 
 private:
   std::queue<message*> messages_;
-  std::unordered_map<u8, timer_info*> timers_;
+  std::unordered_map<std::uint8_t, timer_info*> timers_;
   std::unique_ptr<std::thread> thread_;
   std::recursive_mutex _message_mutex;
   event message_event_;

@@ -1,7 +1,6 @@
 #pragma once
 
 #include <string>
-#include "../core/types.hpp"
 
 #define OS_REGEX_AE "^[a-zA-Z0-9]{1,16}$"
 #define OS_REGEX_IP                                                            \

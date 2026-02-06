@@ -3,7 +3,6 @@
 #include <memory>
 #include <string>
 #include <vector>
-#include "onis_kit/include/core/types.hpp"
 #include "onis_kit/include/database/database_interface.hpp"
 
 namespace onis {

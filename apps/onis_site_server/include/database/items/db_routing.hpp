@@ -196,7 +196,7 @@ struct routing {
       item[AR_RULES_KEY] = Json::Value(Json::arrayValue);
     if (flags & info_auto_routing_statistics)
       item[AR_STAT_KEY] = 0;
-    return OSTRUE;
+    return true;
   }
 
   static void verify(const json& input, bool with_seq) {

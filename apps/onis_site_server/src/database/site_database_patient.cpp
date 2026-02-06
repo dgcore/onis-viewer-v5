@@ -208,23 +208,21 @@ const std::string& partition_seq, const onis::core::date_time& dt,
 const onis::astring& charset, const onis::astring& pid,
 const onis::astring& name, const onis::astring& ideogram,
 const onis::astring& phonetic, const onis::astring& birthdate,
-const onis::astring birthtime, const onis::astring& sex, s32 study_count,
-s32 series_count, s32 image_count, const onis::astring& origin_id,
-const onis::astring& origin_name, const onis::astring& origin_ip,
-Json::Value& patient, onis::aresult& res);
-onis::astring create_patient_insertion_string(
-const onis::astring& partition_seq, const onis::core::date_time& dt,
-const onis::astring& default_pid, const onis::dicom_base_ptr& dataset,
-const onis::astring& origin_id, const onis::astring& origin_name,
-const onis::astring& origin_ip, Json::Value& patient);
-onis::astring create_patient_insertion_string(
-const onis::astring& partition_seq, const onis::core::date_time& dt,
-const onis::astring& charset, const onis::astring& pid,
-const onis::astring& name, const onis::astring& ideogram,
-const onis::astring& phonetic, const onis::astring& birthdate,
-const onis::astring birthtime, const onis::astring& sex, s32 study_count,
-s32 series_count, s32 image_count, const onis::astring& origin_id,
-const onis::astring& origin_name, const onis::astring& origin_ip,
+const onis::astring birthtime, const onis::astring& sex, std::int32_t
+study_count, std::int32_t series_count, std::int32_t image_count, const
+onis::astring& origin_id, const onis::astring& origin_name, const onis::astring&
+origin_ip, Json::Value& patient, onis::aresult& res); onis::astring
+create_patient_insertion_string( const onis::astring& partition_seq, const
+onis::core::date_time& dt, const onis::astring& default_pid, const
+onis::dicom_base_ptr& dataset, const onis::astring& origin_id, const
+onis::astring& origin_name, const onis::astring& origin_ip, Json::Value&
+patient); onis::astring create_patient_insertion_string( const onis::astring&
+partition_seq, const onis::core::date_time& dt, const onis::astring& charset,
+const onis::astring& pid, const onis::astring& name, const onis::astring&
+ideogram, const onis::astring& phonetic, const onis::astring& birthdate, const
+onis::astring birthtime, const onis::astring& sex, std::int32_t study_count,
+std::int32_t series_count, std::int32_t image_count, const onis::astring&
+origin_id, const onis::astring& origin_name, const onis::astring& origin_ip,
 Json::Value& patient);
 void site_database::modify_patient(const Json::Value& patient,
                                    std::uint32_t flags) {}

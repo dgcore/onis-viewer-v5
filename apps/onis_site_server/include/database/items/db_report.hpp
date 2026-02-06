@@ -102,20 +102,19 @@ static void verify(const json& input, bool with_seq, std::uint32_t must_flags) {
     onis::database::item::verify_string_value(input, RPT_CRDATE_KEY, false,
                                               false);
     if (!onis::util::datetime::extract_date_and_time(
-            input[RPT_CREATE_DATE_KEY].asString(), dt, OSFALSE, OSTRUE) ||
+            input[RPT_CREATE_DATE_KEY].asString(), dt, false, true) ||
         !onis::util::datetime::extract_date_and_time(
-            input[RPT_MODIF_DATE_KEY].asString(), dt, OSFALSE, OSTRUE) ||
+            input[RPT_MODIF_DATE_KEY].asString(), dt, false, true) ||
         !onis::util::datetime::extract_date_and_time(
-            input[RPT_VERIF_DATE_KEY].asString(), dt, OSFALSE, OSTRUE))
-      res.set(OSRSP_FAILURE, EOS_PARAM, "", OSFALSE);
+            input[RPT_VERIF_DATE_KEY].asString(), dt, false, true))
+      res.set(OSRSP_FAILURE, EOS_PARAM, "", false);
   }
   if (flags & info_report_update) {
     onis::database::item::verify_integer_value(input, RPT_UPDATE_KEY, false, 0,
                                                1);
     onis::core::date_time dt;
-    if (!onis::util::datetime::extract_date_and_time(value, dt, OSFALSE,
-                                                     OSTRUE))
-      res.set(OSRSP_FAILURE, EOS_PARAM, "", OSFALSE);
+    if (!onis::util::datetime::extract_date_and_time(value, dt, false, true))
+      res.set(OSRSP_FAILURE, EOS_PARAM, "", false);
   }
 }
 

@@ -107,7 +107,7 @@ void thread::event_loop(thread* thiz) {
             ignore = true;
         }
         if (!ignore)
-          thiz->on_timer((u8)msg->wParam);
+          thiz->on_timer((std::uint8_t)msg->wParam);
       } else {
         thiz->process_message(msg->id, msg->wParam, msg->lParam);
         if (lastMessage)
@@ -176,7 +176,7 @@ std::uint64_t thread::get_pending_message_count() {
 // Timers
 //----------------------------------------------------------------------------
 
-bool thread::set_timer(u8 id, std::uint32_t millisec) {
+bool thread::set_timer(std::uint8_t id, std::uint32_t millisec) {
   std::lock_guard<std::recursive_mutex> lock(_message_mutex);
 
   // Prevent duplicates
@@ -212,7 +212,7 @@ bool thread::set_timer(u8 id, std::uint32_t millisec) {
   return true;
 }
 
-bool thread::kill_timer(u8 id) {
+bool thread::kill_timer(std::uint8_t id) {
   std::lock_guard<std::recursive_mutex> lock(_message_mutex);
   auto it = timers_.find(id);
   if (it == timers_.end())
@@ -238,6 +238,6 @@ bool thread::kill_timer(u8 id) {
   return true;
 }
 
-void thread::on_timer(u8 timer_id) {}
+void thread::on_timer(std::uint8_t timer_id) {}
 
 }  // namespace onis

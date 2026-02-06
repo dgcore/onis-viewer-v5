@@ -200,7 +200,7 @@ void request_service::analyze_partition_access_from_role(
     if (partition_access[PTA_ACTIVE_KEY].asInt() == 0)
       return;
 
-    /*s32 mode = superuser ?
+    /*std::int32_t mode = superuser ?
     onis::server::partition_access::all_partitions|onis::server::partition_access::all_albums|onis::server::partition_access::all_smart_albums
     : access[PTA_MODE_KEY].asInt(); if (mode &
     onis::server::partition_access::all_partitions|| mode &
