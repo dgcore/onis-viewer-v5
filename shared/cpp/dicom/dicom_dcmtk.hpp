@@ -264,3 +264,61 @@ protected:
   bool is_mpeg_frame_{false};
   // onis::bitmap_ptr _mpeg_bmp;
 };
+
+///////////////////////////////////////////////////////////////////////
+// odicom_manager
+///////////////////////////////////////////////////////////////////////
+
+class dicom_dcmtk_manager : public onis::dicom_manager {
+public:
+  // static creator:
+  static onis::dicom_manager_ptr create();
+
+  // constructor:
+  dicom_dcmtk_manager();
+
+  // destructor:
+  ~dicom_dcmtk_manager();
+
+  // dicom objects:
+  onis::dicom_file_ptr create_dicom_file() const;
+  onis::dicom_dataset_ptr create_dicom_dataset() const;
+  onis::dicom_dir_ptr create_dicom_dir() const;
+
+  // character sets:
+  const onis::dicom_charset* find_character_set_by_code(
+      const std::string& code) const;
+  const onis::dicom_charset* find_character_set_by_escape(
+      const std::string& escape, const onis::dicom_charset_info** info,
+      bool* g0) const;
+  const onis::dicom_charset* find_character_set_by_iso_number(
+      const std::string& number, const onis::dicom_charset_info** info) const;
+  const onis::dicom_charset* find_character_set_by_info(
+      const onis::dicom_charset_info* info) const;
+  const onis::dicom_charset_list* get_character_set_list() const;
+  const onis::dicom_charset* get_default_character_set() const;
+
+  // utilities:
+  void create_instance_uid(std::int32_t level, std::string& uid) const;
+
+protected:
+  // members:
+  onis::dicom_charset_list charsets;
+  void init_character_set();
+  std::string build_escape(std::uint8_t v1, std::uint8_t v2,
+                           std::uint8_t v3 = 0);
+  onis::dicom_charset* add_charset(const std::string& code,
+                                   const std::string& name,
+                                   const std::string& no_ext_term,
+                                   const std::string& ext_term,
+                                   bool single_byte, const std::string& g0,
+                                   const std::string& g1,
+                                   const std::string& code_page);
+  void add_charset_info(onis::dicom_charset* set,
+                        const std::string& no_ext_term,
+                        const std::string& ext_term, bool single_byte,
+                        const std::string& g0, const std::string& g1,
+                        const std::string& code_page);
+
+  // boost::random::random_device* _rng;
+};

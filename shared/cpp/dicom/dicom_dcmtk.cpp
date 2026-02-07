@@ -1,40 +1,68 @@
 #include "./dicom_dcmtk.hpp"
 #include <ctime>
 #include <iomanip>
+#include <random>
 #include <sstream>
 #include "../../../libs/onis_kit/include/core/result.hpp"
 #include "../../../libs/onis_kit/include/utilities/dicom.hpp"
 #include "../../../libs/onis_kit/include/utilities/filesystem.hpp"
 #include "../../../libs/onis_kit/include/utilities/string.hpp"
 
-/*#include "dcmtk/dcmdata/dcddirif.h"
-#include "dcmtk/dcmdata/dcistrmb.h"
-#include "dcmtk/dcmdata/dcistrmf.h"
-#include "dcmtk/dcmdata/dcitem.h"
-#include "dcmtk/dcmdata/dcostrmb.h"
-#include "dcmtk/dcmdata/dcostrmf.h"
-#include "dcmtk/dcmdata/dcpixseq.h"
-#include "dcmtk/dcmdata/dcpxitem.h"
-#include "dcmtk/dcmdata/dcrledrg.h"
-#include "dcmtk/dcmdata/dcrleerg.h"
-#include "dcmtk/dcmdata/dcrlerp.h"
-#include "dcmtk/dcmdata/dctk.h"
-#include "dcmtk/dcmdata/dcxfer.h"
-#include "dcmtk/dcmimage/dicopx.h"
-#include "dcmtk/dcmimage/diregist.h"
-#include "dcmtk/dcmimgle/dcmimage.h"
-#include "dcmtk/dcmjpeg/dipijpeg.h"
-#include "dcmtk/dcmjpeg/djdecode.h"
-#include "dcmtk/dcmjpeg/djencode.h"
-#include "dcmtk/dcmjpeg/djrplol.h"
-#include "dcmtk/dcmjpeg/djrploss.h"
-#include "dcmtk/dcmjpls/djdecode.h"
-#include "dcmtk/dcmjpls/djencode.h"
-#include "dcmtk/dcmpstat/dcmpstat.h"
-#include "dcmtk/ofstd/ofcmdln.h"
-#include "dcmtk/ofstd/ofstd.h"*/
+void dcmtk_init() {
+  OFBool opt_huffmanOptimize = OFTrue;
+  OFCmdUnsignedInt opt_smoothing = 0;
+  int opt_compressedBits = 0;  // 0=auto, 8/12/16=force
+  E_CompressionColorSpaceConversion opt_compCSconversion = ECC_lossyYCbCr;
+  E_DecompressionColorSpaceConversion opt_decompCSconversion =
+      EDC_photometricInterpretation;
+  E_SubSampling opt_sampleFactors = ESS_444;
+  OFBool opt_useYBR422 = OFFalse;
+  OFCmdUnsignedInt opt_fragmentSize = 0;  // 0=unlimited
+  OFBool opt_createOffsetTable = OFTrue;
+  int opt_windowType =
+      0; /* default: no windowing; 1=Wi, 2=Wl, 3=Wm, 4=Wh, 5=Ww, 6=Wn, 7=Wr */
+  OFCmdUnsignedInt opt_windowParameter = 0;
+  OFCmdFloat opt_windowCenter = 0.0, opt_windowWidth = 0.0;
+  E_UIDCreation opt_uidcreation = EUC_default;
+  OFBool opt_secondarycapture = OFFalse;
+  OFCmdUnsignedInt opt_roiLeft = 0, opt_roiTop = 0, opt_roiWidth = 0,
+                   opt_roiHeight = 0;
+  OFBool opt_usePixelValues = OFTrue;
+  OFBool opt_useModalityRescale = OFFalse;
+  OFBool opt_trueLossless = OFTrue;
 
-// #include "dcmtk/dcmdata/dcdatset.h"
+  OFBool opt_acceptWrongPaletteTags = OFFalse;
+  OFBool opt_acrNemaCompatibility = OFFalse;
+
+  // register global decompression codecs
+  DJDecoderRegistration::registerCodecs(opt_decompCSconversion,
+                                        opt_uidcreation);
+
+  // register global compression codecs
+  DJEncoderRegistration::registerCodecs(
+      opt_compCSconversion, opt_uidcreation, opt_huffmanOptimize,
+      OFstatic_cast(int, opt_smoothing), opt_compressedBits,
+      OFstatic_cast(Uint32, opt_fragmentSize), opt_createOffsetTable,
+      opt_sampleFactors, opt_useYBR422, opt_secondarycapture, opt_windowType,
+      opt_windowParameter, opt_windowCenter, opt_windowWidth, opt_roiLeft,
+      opt_roiTop, opt_roiWidth, opt_roiHeight, opt_usePixelValues,
+      opt_useModalityRescale, opt_acceptWrongPaletteTags,
+      opt_acrNemaCompatibility, opt_trueLossless);
+
+  DJLSEncoderRegistration::registerCodecs();
+  DJLSDecoderRegistration::registerCodecs();
+  DcmRLEDecoderRegistration::registerCodecs();
+  DcmRLEEncoderRegistration::registerCodecs();
+}
+
+void dcmtk_deinit() {
+  DJEncoderRegistration::cleanup();
+  DJDecoderRegistration::cleanup();
+  DJLSEncoderRegistration::cleanup();
+  DJLSDecoderRegistration::cleanup();
+  DcmRLEDecoderRegistration::cleanup();
+  DcmRLEEncoderRegistration::cleanup();
+}
 
 ///////////////////////////////////////////////////////////////////////
 // dicom_file_tmp_buffer
@@ -3578,4 +3606,262 @@ E_TransferSyntax dicom_dcmtk_file::get_transfer_syntax_from_name(
     return EXS_MPEG4BDcompatibleHighProfileLevel4_1;
   } else
     return EXS_Unknown;
+}
+
+///////////////////////////////////////////////////////////////////////
+// odicom_manager
+///////////////////////////////////////////////////////////////////////
+
+//-----------------------------------------------------------------------
+// static creator
+//-----------------------------------------------------------------------
+
+onis::dicom_manager_ptr dicom_dcmtk_manager::create() {
+  return std::make_shared<dicom_dcmtk_manager>();
+}
+
+//-----------------------------------------------------------------------
+// constructor
+//-----------------------------------------------------------------------
+
+dicom_dcmtk_manager::dicom_dcmtk_manager() : onis::dicom_manager() {
+  init_character_set();
+}
+
+//-----------------------------------------------------------------------
+// destructor
+//-----------------------------------------------------------------------
+
+dicom_dcmtk_manager::~dicom_dcmtk_manager() {
+  for (auto charset : charsets) {
+    delete charset;
+  }
+}
+
+//-----------------------------------------------------------------------
+// dicom objects
+//-----------------------------------------------------------------------
+
+onis::dicom_file_ptr dicom_dcmtk_manager::create_dicom_file() const {
+  // shared_from_this() in const method returns shared_ptr<const T>
+  // Need to cast to non-const for the create function
+  return dicom_dcmtk_file::create(
+      std::const_pointer_cast<onis::dicom_manager>(shared_from_this()));
+}
+
+onis::dicom_dataset_ptr dicom_dcmtk_manager::create_dicom_dataset() const {
+  // shared_from_this() in const method returns shared_ptr<const T>
+  // Need to cast to non-const for the create function
+  return dicom_dcmtk_dataset::create(
+      std::const_pointer_cast<onis::dicom_manager>(shared_from_this()));
+}
+
+onis::dicom_dir_ptr dicom_dcmtk_manager::create_dicom_dir() const {
+  // DICOM directory creation not yet implemented
+  return nullptr;
+}
+
+//-----------------------------------------------------------------------
+// character sets
+//-----------------------------------------------------------------------
+
+const onis::dicom_charset* dicom_dcmtk_manager::find_character_set_by_code(
+    const std::string& code) const {
+  for (auto charset : charsets) {
+    if (charset->code == code)
+      return charset;
+  }
+  return nullptr;
+}
+
+const onis::dicom_charset* dicom_dcmtk_manager::find_character_set_by_escape(
+    const std::string& escape, const onis::dicom_charset_info** info,
+    bool* g0) const {
+  for (auto charset : charsets) {
+    for (auto charset_info : charset->info) {
+      if (escape == charset_info->esc_g0) {
+        if (g0)
+          *g0 = true;
+        if (info)
+          *info = charset_info;
+        return charset;
+      } else if (escape == charset_info->esc_g1) {
+        if (g0)
+          *g0 = false;
+        if (info)
+          *info = charset_info;
+        return charset;
+      }
+    }
+  }
+  return nullptr;
+}
+
+const onis::dicom_charset*
+dicom_dcmtk_manager::find_character_set_by_iso_number(
+    const std::string& number, const onis::dicom_charset_info** info) const {
+  for (auto charset : charsets) {
+    for (auto charset_info : charset->info) {
+      if (charset_info->defined_term == number ||
+          charset_info->no_extention_term == number) {
+        if (info)
+          *info = charset_info;
+        return charset;
+      }
+    }
+  }
+  return nullptr;
+}
+
+const onis::dicom_charset* dicom_dcmtk_manager::find_character_set_by_info(
+    const onis::dicom_charset_info* info) const {
+  for (auto charset : charsets) {
+    for (auto charset_info : charset->info) {
+      if (charset_info == info) {
+        return charset;
+      }
+    }
+  }
+  return nullptr;
+}
+
+const onis::dicom_charset_list* dicom_dcmtk_manager::get_character_set_list()
+    const {
+  return &charsets;
+}
+
+const onis::dicom_charset* dicom_dcmtk_manager::get_default_character_set()
+    const {
+  return charsets.front();
+}
+
+std::string dicom_dcmtk_manager::build_escape(std::uint8_t v1, std::uint8_t v2,
+                                              std::uint8_t v3) {
+  std::string res;
+  res += 0x1B;
+  res += v1;
+  res += v2;
+  if (v3 != 0)
+    res += v3;
+  return res;
+}
+
+void dicom_dcmtk_manager::init_character_set() {
+  add_charset("DEFAULT", "Default", "", "ISO 2022 IR 6", true,
+              build_escape(0x28, 0x42), "", "ISO-IR-6");
+  add_charset("LATIN1", "Latin 1", "ISO_IR 100", "ISO 2022 IR 100", true,
+              build_escape(0x28, 0x42), build_escape(0x2D, 0x41), "ISO-IR-100");
+  add_charset("LATIN2", "Latin 2", "ISO_IR 101", "ISO 2022 IR 101", true,
+              build_escape(0x28, 0x42), build_escape(0x2D, 0x42), "ISO-IR-101");
+  add_charset("LATIN3", "Latin 3", "ISO_IR 109", "ISO 2022 IR 109", true,
+              build_escape(0x28, 0x42), build_escape(0x2D, 0x43), "ISO-IR-109");
+  add_charset("LATIN4", "Latin 4", "ISO_IR 110", "ISO 2022 IR 110", true,
+              build_escape(0x28, 0x42), build_escape(0x2D, 0x44), "ISO-IR-110");
+  add_charset("LATIN5", "Latin 5", "ISO_IR 148", "ISO 2022 IR 148", true,
+              build_escape(0x28, 0x42), build_escape(0x2D, 0x4D), "ISO-IR-148");
+  add_charset("CYRILLIC", "Cyrillic", "ISO_IR 144", "ISO 2022 IR 144", true,
+              build_escape(0x28, 0x42), build_escape(0x2D, 0x4C), "ISO-IR-144");
+  add_charset("ARABIC", "Arabic", "ISO_IR 127", "ISO 2022 IR 127", true,
+              build_escape(0x28, 0x42), build_escape(0x2D, 0x47), "ISO-IR-127");
+  add_charset("GREEK", "Greek", "ISO_IR 126", "ISO 2022 IR 126", true,
+              build_escape(0x28, 0x42), build_escape(0x2D, 0x46), "ISO-IR-126");
+  add_charset("HEBREW", "Hebrew", "ISO_IR 138", "ISO 2022 IR 138", true,
+              build_escape(0x28, 0x42), build_escape(0x2D, 0x48), "ISO-IR-138");
+  add_charset("THAI", "Thai", "ISO_IR 166", "ISO 2022 IR 166", true,
+              build_escape(0x28, 0x42), build_escape(0x2D, 0x54), "ISO-IR-166");
+
+  onis::dicom_charset* set = add_charset(
+      "JAPANESE", "Japanese", "ISO_IR 13", "ISO 2022 IR 13", true,
+      build_escape(0x28, 0x4A), build_escape(0x29, 0x49), "ISO-IR-13");
+  add_charset_info(set, "ISO_IR 87", "ISO 2022 IR 87", false,
+                   build_escape(0x24, 0x42),
+                   "" /*build_escape(0x24, 0x29, 0x42)*/, "ISO-IR-87");
+  add_charset_info(set, "ISO_IR 159", "ISO 2022 IR 159", false,
+                   build_escape(0x24, 0x28, 0x44),
+                   "" /*build_escape(0x24, 0x29, 0x44)*/, "ISO-IR-159");
+  add_charset("UNICODE", "Unicode", "ISO_IR 192", "ISO 2022 IR 192", false, "",
+              "", "UTF-8");
+}
+
+onis::dicom_charset* dicom_dcmtk_manager::add_charset(
+    const std::string& code, const std::string& name,
+    const std::string& no_ext_term, const std::string& ext_term,
+    bool single_byte, const std::string& g0, const std::string& g1,
+    const std::string& code_page) {
+  onis::dicom_charset* set = new onis::dicom_charset;
+  set->code = code;
+  set->name = name;
+  add_charset_info(set, no_ext_term, ext_term, single_byte, g0, g1, code_page);
+  charsets.push_back(set);
+  return set;
+}
+void dicom_dcmtk_manager::add_charset_info(
+    onis::dicom_charset* set, const std::string& no_ext_term,
+    const std::string& ext_term, bool single_byte, const std::string& g0,
+    const std::string& g1, const std::string& code_page) {
+  onis::dicom_charset_info* info = new onis::dicom_charset_info();
+  info->defined_term = ext_term;
+  info->no_extention_term = no_ext_term;
+  info->single_byte = single_byte;
+  info->esc_g0 = g0;
+  info->esc_g1 = g1;
+  info->code_page = code_page;
+  set->info.push_back(info);
+}
+
+//-----------------------------------------------------------------------
+// utilities
+//-----------------------------------------------------------------------
+
+void dicom_dcmtk_manager::create_instance_uid(std::int32_t level,
+                                              std::string& uid) const {
+  uid = "1.2.392.200193";
+  switch (level) {
+    case 0:
+      uid += ".1.";
+      break;
+    case 1:
+      uid += ".2.";
+      break;
+    case 2:
+      uid += ".3.";
+      break;
+    case 3:
+      uid += ".4.";
+      break;
+    default:
+      uid += ".5.";
+      break;
+  };
+
+  // Use standard C++ random number generation
+  std::random_device rng;
+  std::uniform_int_distribution<std::size_t> index_dist(0,
+                                                        9);  // 0-9 for digits
+  std::string chars("1234567890");
+
+  // Generate first 10 random digits
+  for (std::int32_t i = 0; i < 10; i++)
+    uid += chars[index_dist(rng)];
+
+  // get today date:
+  onis::core::date_time dt;
+  dt.init_current_time();
+
+  // Format date as YYYYMMDD using standard C++
+  std::ostringstream date_oss;
+  date_oss << "." << std::setfill('0') << std::setw(4) << dt.year()
+           << std::setw(2) << dt.month() << std::setw(2) << dt.day();
+  uid += date_oss.str();
+
+  // process the time:
+  std::ostringstream time_oss;
+  time_oss << "." << std::setfill('0') << std::setw(2) << dt.hour()
+           << std::setw(2) << dt.minute() << std::setw(2) << dt.second() << "."
+           << dt.millisecond() << ".";
+  uid += time_oss.str();
+
+  // another random characters:
+  for (std::int32_t i = 0; i < 10; i++)
+    uid += chars[index_dist(rng)];
 }
