@@ -5,10 +5,8 @@
 #include <list>
 #include <memory>
 #include <string>
+#include "../core/date_time.hpp"
 #include "../core/file.hpp"
-
-using date_time_value = std::chrono::time_point<std::chrono::system_clock>;
-using time_value = std::chrono::hh_mm_ss<std::chrono::milliseconds>;
 
 #define TAG_COMMAND_LENGTH_TO_END 0x00000001UL
 #define TAG_AFFECTED_SOP_CLASS_UID 0x00000002UL   // ***
@@ -2065,14 +2063,14 @@ public:
   std::string sop_instance_uid;  // type 1
 
   // patient module:
-  std::string patient_name;            // type 2
-  std::string patient_id;              // type 2
-  date_time_value patient_birth_date;  // type 2
-  std::string patient_sex;             // type 2
+  std::string patient_name;                  // type 2
+  std::string patient_id;                    // type 2
+  onis::core::date_time patient_birth_date;  // type 2
+  std::string patient_sex;                   // type 2
 
   // general study:
   std::string study_uid;                 // type 1
-  date_time_value study_date;            // type 2
+  onis::core::date_time study_date;      // type 2
   std::string referring_physician_name;  // type 2
   std::string study_id;                  // type 2
   std::string accession_number;          // type 2
@@ -2083,7 +2081,7 @@ public:
   std::string series_uid;                 // type 1
   std::string series_num;                 // type 2
   std::string laterality;                 // type 2C
-  date_time_value series_date;            // type 3
+  onis::core::date_time series_date;      // type 3
   std::string performing_physician_name;  // type 3
   std::string series_description;         // type 3
   std::string body_part;                  // type 3
@@ -2097,13 +2095,13 @@ public:
   std::string device_software_versions;        // type 3
 
   // general image:
-  std::string instance_number;      // type 2
-  std::string patient_orientation;  // type 2C
-  date_time_value content_date;     // type 2C
-  std::string image_type;           // type 3
+  std::string instance_number;         // type 2
+  std::string patient_orientation;     // type 2C
+  onis::core::date_time content_date;  // type 2C
+  std::string image_type;              // type 3
 
   // sc module:
-  date_time_value date_of_secondary_capture;  // type 3
+  onis::core::date_time date_of_secondary_capture;  // type 3
 
   std::list<dicom_tag_info*> tags_to_copy;
 };
@@ -2117,7 +2115,7 @@ public:
   // constructor:
   dicom_hard_copy_info() {
     image_type = "DERIVED\\SECONDARY";
-    acquisition_date = std::chrono::system_clock::now();
+    acquisition_date.init_current_time();
     image_date = acquisition_date;
     series_date = acquisition_date;
 
@@ -2162,9 +2160,9 @@ public:
   std::string series_uid;
   std::string series_number;
   std::string sop_uid;
-  date_time_value acquisition_date;
-  date_time_value series_date;
-  date_time_value image_date;
+  onis::core::date_time acquisition_date;
+  onis::core::date_time series_date;
+  onis::core::date_time image_date;
   std::string creation_device_id;
   std::string device_manufacturer;
   std::string device_model_name;
@@ -2260,6 +2258,10 @@ struct dicom_image_info {
 // dicom_base
 ///////////////////////////////////////////////////////////////////////
 
+class dicom_manager;
+typedef std::shared_ptr<dicom_manager> dicom_manager_ptr;
+typedef std::weak_ptr<dicom_manager> dicom_manager_wptr;
+
 class dicom_frame;
 typedef std::shared_ptr<dicom_frame> dicom_frame_ptr;
 typedef std::weak_ptr<dicom_frame> dicom_frame_wptr;
@@ -2280,6 +2282,10 @@ public:
   virtual void lock() = 0;
   virtual void unlock() = 0;
 
+  dicom_manager_ptr get_manager() const {
+    return weak_manager_.lock();
+  }
+
   // get elements
   virtual void* get_next_element(std::int32_t target, void* elem,
                                  std::int32_t* tag, std::string* vr,
@@ -2298,10 +2304,11 @@ public:
   virtual bool get_binary_value(std::int32_t tag, const std::string& type,
                                 std::int32_t* length, std::uint8_t** data,
                                 const std::string& transfer_syntax) const = 0;
-  virtual bool get_date_range_element(std::int32_t tag, date_time_value* start,
-                                      date_time_value* stop) const = 0;
-  virtual bool get_time_range_element(std::int32_t tag, time_value* start,
-                                      time_value* stop) const = 0;
+  virtual bool get_date_range_element(std::int32_t tag,
+                                      onis::core::date_time* start,
+                                      onis::core::date_time* stop) const = 0;
+  virtual bool get_time_range_element(std::int32_t tag, onis::core::time* start,
+                                      onis::core::time* stop) const = 0;
   virtual dicom_sequence_item_ptr get_sequence_of_items(
       std::int32_t tag, bool create = false) = 0;
 
@@ -2314,7 +2321,7 @@ public:
       bool create) = 0;
   virtual bool set_us_element(std::int32_t tag, std::uint16_t value,
                               bool create = true) = 0;
-  virtual bool set_date_element(std::int32_t tag, date_time_value* dt,
+  virtual bool set_date_element(std::int32_t tag, onis::core::date_time* dt,
                                 bool create = true) = 0;
   virtual bool set_time_element(std::int32_t tag, std::int32_t hour,
                                 std::int32_t minute, std::int32_t second,
@@ -2356,6 +2363,8 @@ protected:
 
   // destructor:
   virtual ~dicom_base() {}
+
+  dicom_manager_wptr weak_manager_;
 };
 
 typedef std::shared_ptr<dicom_base> dicom_base_ptr;
@@ -2794,8 +2803,5 @@ protected:
   // destructor:
   virtual ~dicom_manager() = default;
 };
-
-typedef std::shared_ptr<dicom_manager> dicom_manager_ptr;
-typedef std::weak_ptr<dicom_manager> dicom_manager_wptr;
 
 }  // namespace onis

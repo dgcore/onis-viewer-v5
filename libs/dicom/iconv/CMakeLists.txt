@@ -45,3 +45,18 @@ add_library(iconv SHARED
 
 target_include_directories(iconv PRIVATE . include)
 
+# Add compiler definitions to ensure iconv functions are exported correctly
+target_compile_definitions(iconv PRIVATE
+    ICONV_EXPORTS
+    BUILDING_LIBICONV
+    BUILDING_LIBCHARSET
+)
+
+# Export iconv target so it can be used by other targets that export their dependencies
+install(TARGETS iconv
+    EXPORT iconvTargets
+    LIBRARY DESTINATION lib
+    ARCHIVE DESTINATION lib
+    RUNTIME DESTINATION bin
+)
+

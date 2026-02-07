@@ -76,6 +76,8 @@ set(SERVER_SOURCES
     src/database/site_database_study.cpp
     src/database/sql_builder.cpp
     src/database/site_database_pool.cpp
+
+    ../../shared/cpp/dicom/dicom_dcmtk.cpp
 )
 
 set(SERVER_HEADERS
@@ -87,6 +89,10 @@ add_executable(onis_site_server
     ${SERVER_HEADERS}
 )
 
+# Get the project root directory - CMAKE_SOURCE_DIR is the root of the source tree
+# Since this is a subdirectory, CMAKE_SOURCE_DIR points to the root CMakeLists.txt location
+set(PROJECT_ROOT "${CMAKE_SOURCE_DIR}")
+
 # Include directories
 target_include_directories(onis_site_server PRIVATE
     ${CMAKE_SOURCE_DIR}/shared/cpp
@@ -97,19 +103,22 @@ target_include_directories(onis_site_server PRIVATE
     ${DROGON_INCLUDE_DIRS}
     ${JSONCPP_INCLUDE_DIRS}
     ${jwt-cpp_SOURCE_DIR}/include
-    # DICOM library includes
-    ${CMAKE_SOURCE_DIR}/../../libs/dicom/dcmtk-3.6.0/config/include
-    ${CMAKE_SOURCE_DIR}/../../libs/dicom/dcmtk-3.6.0/dcmdata/include
-    ${CMAKE_SOURCE_DIR}/../../libs/dicom/dcmtk-3.6.0/dcmimage/include
-    ${CMAKE_SOURCE_DIR}/../../libs/dicom/dcmtk-3.6.0/dcmimgle/include
-    ${CMAKE_SOURCE_DIR}/../../libs/dicom/dcmtk-3.6.0/dcmjpeg/include
-    ${CMAKE_SOURCE_DIR}/../../libs/dicom/dcmtk-3.6.0/dcmjpls/include
-    ${CMAKE_SOURCE_DIR}/../../libs/dicom/dcmtk-3.6.0/dcmnet/include
-    ${CMAKE_SOURCE_DIR}/../../libs/dicom/dcmtk-3.6.0/dcmsr/include
-    ${CMAKE_SOURCE_DIR}/../../libs/dicom/dcmtk-3.6.0/ofstd/include
-    ${CMAKE_SOURCE_DIR}/../../libs/dicom/dcmtk-3.6.0/oflog/include
-    ${CMAKE_SOURCE_DIR}/../../libs/dicom/iconv/include
-    ${CMAKE_SOURCE_DIR}/../../libs/dicom/onis_j2k_kit/public
+    # DICOM library includes - DCMTK headers use paths like "dcmtk/dcmdata/..."
+    ${PROJECT_ROOT}/libs/dicom/dcmtk-3.6.0/config/include
+    ${PROJECT_ROOT}/libs/dicom/dcmtk-3.6.0/dcmdata/include
+    ${PROJECT_ROOT}/libs/dicom/dcmtk-3.6.0/dcmimage/include
+    ${PROJECT_ROOT}/libs/dicom/dcmtk-3.6.0/dcmimgle/include
+    ${PROJECT_ROOT}/libs/dicom/dcmtk-3.6.0/dcmjpeg/include
+    ${PROJECT_ROOT}/libs/dicom/dcmtk-3.6.0/dcmjpls/include
+    ${PROJECT_ROOT}/libs/dicom/dcmtk-3.6.0/dcmnet/include
+    ${PROJECT_ROOT}/libs/dicom/dcmtk-3.6.0/dcmpstat/include
+    ${PROJECT_ROOT}/libs/dicom/dcmtk-3.6.0/dcmsr/include
+    ${PROJECT_ROOT}/libs/dicom/dcmtk-3.6.0/ofstd/include
+    ${PROJECT_ROOT}/libs/dicom/dcmtk-3.6.0/oflog/include
+    ${PROJECT_ROOT}/libs/dicom/iconv/include
+    ${PROJECT_ROOT}/libs/dicom/onis_j2k_kit/public
+    # Shared DICOM implementation
+    ${PROJECT_ROOT}/shared/cpp/dicom
 )
 
 # Link libraries
@@ -142,6 +151,14 @@ target_link_directories(onis_site_server PRIVATE
 # Compiler definitions
 target_compile_definitions(onis_site_server PRIVATE
     ONIS_SITE_SERVER
+    # DCMTK requires these definitions to use modern C++ headers
+    USE_STD_CXX_INCLUDES
+    HAVE_STD_NAMESPACE
+    HAVE_SSTREAM
+    HAVE_CLASS_TEMPLATE
+    HAVE_STL
+    HAVE_STDIO_H
+    ONIS_FOR_MAC
 )
 
 # Installation
