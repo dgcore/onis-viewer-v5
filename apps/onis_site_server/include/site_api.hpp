@@ -3,6 +3,8 @@
 #include <memory>
 #include <string>
 #include "network/drogon/drogon_http_server.hpp"
+#include "onis_kit/include/core/exception.hpp"
+#include "onis_kit/include/dicom/dicom.hpp"
 #include "services/config/config_service.hpp"
 #include "services/requests/request_service.hpp"
 
@@ -28,19 +30,22 @@ public:
   // API lifecycle
   bool initialize(const std::string& config_file_path);
   void shutdown();
-  bool is_initialized() const;
+  [[nodiscard]] bool is_initialized() const;
 
   // Request service access
-  request_service_ptr get_request_service() const;
+  [[nodiscard]] request_service_ptr get_request_service() const;
 
   // Config service access
-  config_service_ptr get_config_service() const;
+  [[nodiscard]] config_service_ptr get_config_service() const;
 
   // HTTP server access
-  drogon_http_server_ptr get_http_server() const;
+  [[nodiscard]] drogon_http_server_ptr get_http_server() const;
+
+  // Managers:
+  [[nodiscard]] onis::dicom_manager_ptr get_dicom_manager() const;
 
   // Constructor and destructor
-  site_api();
+  site_api() noexcept;
   ~site_api();
 
 private:
@@ -48,12 +53,13 @@ private:
   static site_api_ptr instance_;
 
   // Internal state
-  bool initialized_;
+  bool initialized_{false};
 
   // Services
-  request_service_ptr request_service_;
-  config_service_ptr config_service_;
-  drogon_http_server_ptr http_server_;
+  request_service_ptr request_service_{nullptr};
+  config_service_ptr config_service_{nullptr};
+  drogon_http_server_ptr http_server_{nullptr};
+  onis::dicom_manager_ptr dicom_manager_;
 };
 
 ////////////////////////////////////////////////////////////////////////////////

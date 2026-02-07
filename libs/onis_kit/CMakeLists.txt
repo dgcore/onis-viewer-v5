@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.20)
 project(onis_kit VERSION 1.0.0 LANGUAGES CXX)
 
 # Set C++ standard
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # Find required packages
@@ -27,6 +27,8 @@ set(ONIS_KIT_SOURCES
     src/core/result.cpp
     src/core/thread.cpp
     src/core/event.cpp
+    src/core/date_time.cpp
+    src/dicom/dicom.cpp
     src/database/postgresql/postgresql_connection.cpp
     src/database/postgresql/postgresql_query.cpp
     src/database/postgresql/postgresql_result.cpp
@@ -35,6 +37,9 @@ set(ONIS_KIT_SOURCES
     src/database/sqlite/sqlite_result.cpp
     src/utilities/uuid.cpp
     src/utilities/regex.cpp
+    src/utilities/string.cpp
+    src/utilities/dicom.cpp
+    src/utilities/filesystem.cpp
 )
 
 # Header files
@@ -43,6 +48,7 @@ set(ONIS_KIT_HEADERS
     include/core/object.hpp
     include/core/thread.hpp
     include/core/event.hpp
+    include/dicom/dicom.hpp
     include/database/database_interface.hpp
     include/database/postgresql/postgresql.hpp
     include/database/postgresql/postgresql_connection.hpp
@@ -75,6 +81,14 @@ target_include_directories(onis_kit PUBLIC
     ${SQLITE3_INCLUDE_DIRS}
 )
 
+# Add iconv include directory for string conversion functions
+# This ensures the libiconv header is used instead of system iconv.h
+if(TARGET iconv)
+    target_include_directories(onis_kit PRIVATE
+        ${CMAKE_SOURCE_DIR}/libs/dicom/iconv/include
+    )
+endif()
+
 # Compiler definitions
 target_compile_definitions(onis_kit PRIVATE
     ONIS_KIT_LIBRARY
@@ -84,6 +98,7 @@ target_compile_definitions(onis_kit PRIVATE
 target_link_libraries(onis_kit PRIVATE
     ${POSTGRESQL_LIBRARIES}
     ${SQLITE3_LIBRARIES}
+    iconv  # Required for string conversion functions (built in libs/dicom/iconv)
 )
 
 # Add library directories
@@ -94,16 +109,15 @@ target_link_directories(onis_kit PRIVATE
 
 # Installation
 install(TARGETS onis_kit
-    EXPORT onis_kitTargets
     LIBRARY DESTINATION lib
     ARCHIVE DESTINATION lib
     RUNTIME DESTINATION bin
     PUBLIC_HEADER DESTINATION include/onis_kit
 )
 
-# Export targets
-install(EXPORT onis_kitTargets
-    FILE onis_kitTargets.cmake
-    NAMESPACE onis_kit::
-    DESTINATION lib/cmake/onis_kit
-) 
+# Export targets (commented out due to iconv dependency export issue)
+# install(EXPORT onis_kitTargets
+#     FILE onis_kitTargets.cmake
+#     NAMESPACE onis_kit::
+#     DESTINATION lib/cmake/onis_kit
+# ) 

@@ -6,6 +6,9 @@
 #include "onis_kit/include/core/result.hpp"
 #include "onis_kit/include/core/thread.hpp"
 
+extern void dcmtk_init();
+extern void dcmtk_deinit();
+
 ////////////////////////////////////////////////////////////////////////////////
 // main_thread class
 ////////////////////////////////////////////////////////////////////////////////
@@ -57,6 +60,7 @@ private:
 int main() {
   std::cout << "Starting ONIS Site Server..." << std::endl;
   std::cout << "Initialize app..." << std::endl;
+  dcmtk_init();
   main_thread th;
   th.run();
   std::cout << "Hit a key to stop the server" << std::endl;
@@ -64,6 +68,7 @@ int main() {
   std::cin >> cp_Buf;
   std::cout << "Ending process..." << std::endl;
   th.stop();
+  dcmtk_deinit();
   std::cout << "Process ended" << std::endl;
   return 0;
 }

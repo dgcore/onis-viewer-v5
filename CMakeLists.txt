@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.20)
 project(ONIS5 VERSION 5.0.0 LANGUAGES C CXX)
 
 # Set C++ standard
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # Build type
@@ -41,14 +41,9 @@ if(BUILD_ONIS_CORE)
     add_subdirectory(shared/cpp/onis_core)
 endif()
 
-# Add onis_kit library
-if(EXISTS "${CMAKE_SOURCE_DIR}/libs/onis_kit")
-    add_subdirectory(libs/onis_kit)
-endif()
-
-# Add DICOM libraries (must be built before site server)
+# Add DICOM libraries first (onis_kit depends on iconv)
 if(EXISTS "${CMAKE_SOURCE_DIR}/libs/dicom")
-    # Build dependencies first (DCMTK depends on these)
+    # Build dependencies first (DCMTK and onis_kit depend on these)
     if(EXISTS "${CMAKE_SOURCE_DIR}/libs/dicom/ijg8")
         add_subdirectory(libs/dicom/ijg8)
     endif()
@@ -61,6 +56,15 @@ if(EXISTS "${CMAKE_SOURCE_DIR}/libs/dicom")
     if(EXISTS "${CMAKE_SOURCE_DIR}/libs/dicom/iconv")
         add_subdirectory(libs/dicom/iconv)
     endif()
+endif()
+
+# Add onis_kit library (depends on iconv)
+if(EXISTS "${CMAKE_SOURCE_DIR}/libs/onis_kit")
+    add_subdirectory(libs/onis_kit)
+endif()
+
+# Continue with DICOM libraries (must be built before site server)
+if(EXISTS "${CMAKE_SOURCE_DIR}/libs/dicom")
     if(EXISTS "${CMAKE_SOURCE_DIR}/libs/dicom/onis_j2k_kit")
         add_subdirectory(libs/dicom/onis_j2k_kit)
     endif()
