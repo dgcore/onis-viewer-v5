@@ -1,5 +1,7 @@
 #include "../include/site_api.hpp"
 #include <iostream>
+#include "../../../libs/onis_kit/include/core/exception.hpp"
+#include "../../../shared/cpp/dicom/dicom_dcmtk.hpp"
 
 ////////////////////////////////////////////////////////////////////////////////
 // site_api class - Singleton
@@ -33,11 +35,7 @@ site_api& site_api::instance() {
 // Constructor and destructor
 //------------------------------------------------------------------------------
 
-site_api::site_api()
-    : initialized_(false),
-      request_service_(nullptr),
-      config_service_(nullptr),
-      http_server_(nullptr) {
+site_api::site_api() noexcept {
   std::cout << "site_api: Singleton instance created" << std::endl;
 }
 
@@ -70,14 +68,19 @@ bool site_api::initialize(const std::string& config_file_path) {
     if (!config_service_->load_config(config_file_path)) {
       std::cerr << "site_api: Failed to load configuration from: "
                 << config_file_path << std::endl;
-      std::cerr << "site_api: Config error: "
-                << config_service_->get_last_error() << std::endl;
       return false;
     }
 
     // Validate configuration
     if (!config_service_->is_valid()) {
       std::cerr << "site_api: Configuration is not valid" << std::endl;
+      return false;
+    }
+
+    // Initialize DICOM manager
+    dicom_manager_ = dicom_dcmtk_manager::create();
+    if (!dicom_manager_) {
+      std::cerr << "site_api: Failed to create DICOM manager" << std::endl;
       return false;
     }
 
@@ -101,25 +104,22 @@ bool site_api::initialize(const std::string& config_file_path) {
       // to avoid crash, we pause the application here:
       std::this_thread::sleep_for(std::chrono::milliseconds(3));
     }
-
-    // TODO: Initialize database pool with config values
-    // TODO: Configure HTTP server with config values
-
     initialized_ = true;
     std::cout << "site_api: Initialized successfully with config: "
               << config_file_path << std::endl;
     return true;
+  } catch (const onis::exception& e) {
+    std::cerr << "site_api: Initialization failed: " << e.what() << std::endl;
+    shutdown();
+    return false;
   } catch (const std::exception& e) {
     std::cerr << "site_api: Initialization failed: " << e.what() << std::endl;
+    shutdown();
     return false;
   }
 }
 
 void site_api::shutdown() {
-  if (!initialized_) {
-    return;
-  }
-
   try {
     // Shutdown HTTP server
     if (http_server_) {
@@ -137,8 +137,10 @@ void site_api::shutdown() {
       config_service_.reset();
     }
 
-    // TODO: Shutdown database pool
-
+    // Shutdown DICOM manager
+    if (dicom_manager_) {
+      dicom_manager_.reset();
+    }
     initialized_ = false;
     std::cout << "site_api: Shutdown completed" << std::endl;
   } catch (const std::exception& e) {
