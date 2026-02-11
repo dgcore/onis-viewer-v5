@@ -12,11 +12,11 @@ using json = Json::Value;
 
 namespace onis::database {
 
-const std::int32_t info_report_template_version = 2;
-const std::int32_t info_report_template_media = 4;
-const std::int32_t info_report_template_name = 8;
-const std::int32_t info_report_template_status = 16;
-const std::int32_t info_report_template_filters = 32;
+const std::uint32_t info_report_template_version = 2;
+const std::uint32_t info_report_template_media = 4;
+const std::uint32_t info_report_template_name = 8;
+const std::uint32_t info_report_template_status = 16;
+const std::uint32_t info_report_template_filters = 32;
 
 struct report_template {
   static void create(json& item, std::uint32_t flags) {

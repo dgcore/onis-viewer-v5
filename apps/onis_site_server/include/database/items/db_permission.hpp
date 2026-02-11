@@ -9,8 +9,8 @@ using json = Json::Value;
 
 namespace onis::database {
 
-const std::int32_t info_permission_name = 2;
-const std::int32_t info_permission_type = 4;
+const std::uint32_t info_permission_name = 2;
+const std::uint32_t info_permission_type = 4;
 
 struct permission {
   static void create(json& item, std::uint32_t flags) {

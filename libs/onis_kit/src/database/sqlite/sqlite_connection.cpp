@@ -8,7 +8,8 @@
 namespace onis_kit {
 namespace database {
 
-sqlite_connection::sqlite_connection() : db_(nullptr), connected_(false) {}
+sqlite_connection::sqlite_connection()
+    : db_(nullptr), connected_(false), in_transaction_(false) {}
 
 sqlite_connection::~sqlite_connection() {
   disconnect();
@@ -47,6 +48,11 @@ bool sqlite_connection::connect(const database_config& config) {
 
 void sqlite_connection::disconnect() {
   if (db_) {
+    // Rollback any pending transaction before disconnecting
+    if (in_transaction_) {
+      sqlite3_exec(db_, "ROLLBACK", nullptr, nullptr, nullptr);
+      in_transaction_ = false;
+    }
     sqlite3_close(db_);
     db_ = nullptr;
   }
@@ -221,6 +227,89 @@ std::string sqlite_connection::get_sqlite_error() const {
     return "No database connection";
   }
   return sqlite3_errmsg(db_);
+}
+
+bool sqlite_connection::begin_transaction() {
+  if (!is_connected()) {
+    set_last_error("Not connected to database");
+    return false;
+  }
+
+  if (in_transaction_) {
+    set_last_error("Transaction already in progress");
+    return false;
+  }
+
+  char* error_msg = nullptr;
+  int result =
+      sqlite3_exec(db_, "BEGIN TRANSACTION", nullptr, nullptr, &error_msg);
+  if (result != SQLITE_OK) {
+    std::string error = error_msg ? error_msg : "Unknown error";
+    set_last_error("Failed to begin transaction: " + error);
+    sqlite3_free(error_msg);
+    return false;
+  }
+
+  sqlite3_free(error_msg);
+  in_transaction_ = true;
+  clear_last_error();
+  return true;
+}
+
+bool sqlite_connection::commit() {
+  if (!is_connected()) {
+    set_last_error("Not connected to database");
+    return false;
+  }
+
+  if (!in_transaction_) {
+    set_last_error("No transaction in progress");
+    return false;
+  }
+
+  char* error_msg = nullptr;
+  int result = sqlite3_exec(db_, "COMMIT", nullptr, nullptr, &error_msg);
+  if (result != SQLITE_OK) {
+    std::string error = error_msg ? error_msg : "Unknown error";
+    set_last_error("Failed to commit transaction: " + error);
+    sqlite3_free(error_msg);
+    return false;
+  }
+
+  sqlite3_free(error_msg);
+  in_transaction_ = false;
+  clear_last_error();
+  return true;
+}
+
+bool sqlite_connection::rollback() {
+  if (!is_connected()) {
+    set_last_error("Not connected to database");
+    return false;
+  }
+
+  if (!in_transaction_) {
+    set_last_error("No transaction in progress");
+    return false;
+  }
+
+  char* error_msg = nullptr;
+  int result = sqlite3_exec(db_, "ROLLBACK", nullptr, nullptr, &error_msg);
+  if (result != SQLITE_OK) {
+    std::string error = error_msg ? error_msg : "Unknown error";
+    set_last_error("Failed to rollback transaction: " + error);
+    sqlite3_free(error_msg);
+    return false;
+  }
+
+  sqlite3_free(error_msg);
+  in_transaction_ = false;
+  clear_last_error();
+  return true;
+}
+
+bool sqlite_connection::in_transaction() const {
+  return in_transaction_;
 }
 
 }  // namespace database

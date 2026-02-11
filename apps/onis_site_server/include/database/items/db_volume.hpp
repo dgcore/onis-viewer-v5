@@ -10,9 +10,9 @@ using json = Json::Value;
 
 namespace onis::database {
 
-const std::int32_t info_volume_name = 2;
-const std::int32_t info_volume_description = 4;
-const std::int32_t info_volume_media = 8;
+const std::uint32_t info_volume_name = 2;
+const std::uint32_t info_volume_description = 4;
+const std::uint32_t info_volume_media = 8;
 
 struct volume {
   static void create(json& volume, std::uint32_t flags) {

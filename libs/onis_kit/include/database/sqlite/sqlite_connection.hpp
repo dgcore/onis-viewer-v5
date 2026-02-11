@@ -30,11 +30,18 @@ public:
   virtual bool ping() override;
   virtual std::string get_last_error() const override;
 
+  // Transaction management
+  virtual bool begin_transaction() override;
+  virtual bool commit() override;
+  virtual bool rollback() override;
+  virtual bool in_transaction() const override;
+
 private:
   sqlite3* db_;
   database_config config_;
   std::string last_error_;
   bool connected_;
+  bool in_transaction_;
 
   /// Set last error message
   void set_last_error(const std::string& error);

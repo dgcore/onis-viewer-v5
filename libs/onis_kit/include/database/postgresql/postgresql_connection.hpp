@@ -30,11 +30,18 @@ public:
   virtual bool ping() override;
   virtual std::string get_last_error() const override;
 
+  // Transaction management
+  virtual bool begin_transaction() override;
+  virtual bool commit() override;
+  virtual bool rollback() override;
+  virtual bool in_transaction() const override;
+
 private:
   PGconn* connection_;
   database_config config_;
   std::string last_error_;
   bool connected_;
+  bool in_transaction_;
 
   /// Build PostgreSQL connection string from config
   std::string build_connection_string(const database_config& config) const;

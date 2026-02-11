@@ -80,6 +80,24 @@ double postgresql_row::get_double(int& column_index, bool allow_null) const {
   return value ? std::stod(value) : 0.0;
 }
 
+double postgresql_row::get_float(int& column_index, bool allow_null) const {
+  if (column_index < 0 || column_index >= PQnfields(result_)) {
+    throw std::out_of_range("Column index out of range");
+  }
+
+  if (PQgetisnull(result_, row_index_, column_index)) {
+    if (!allow_null) {
+      throw std::invalid_argument("Null value not allowed");
+    }
+    column_index++;
+    return 0.0;
+  }
+
+  const char* value = PQgetvalue(result_, row_index_, column_index);
+  column_index++;
+  return value ? std::stof(value) : 0.0f;
+}
+
 bool postgresql_row::get_bool(int& column_index, bool allow_null) const {
   if (column_index < 0 || column_index >= PQnfields(result_)) {
     throw std::out_of_range("Column index out of range");
@@ -121,6 +139,12 @@ double postgresql_row::get_double(const std::string& column_name,
                                   bool allow_null) const {
   int column_index = get_column_index(column_name);
   return get_double(column_index, allow_null);
+}
+
+double postgresql_row::get_float(const std::string& column_name,
+                                 bool allow_null) const {
+  int column_index = get_column_index(column_name);
+  return get_float(column_index, allow_null);
 }
 
 bool postgresql_row::get_bool(const std::string& column_name,

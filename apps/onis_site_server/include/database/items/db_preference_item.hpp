@@ -14,11 +14,11 @@ using json = Json::Value;
 
 namespace onis::database {
 
-const std::int32_t info_pref_item_name = 1;
-const std::int32_t info_pref_item_status = 2;
-const std::int32_t info_pref_item_description = 4;
-const std::int32_t info_pref_item_shortcut = 8;
-const std::int32_t info_pref_item_data = 16;
+const std::uint32_t info_pref_item_name = 1;
+const std::uint32_t info_pref_item_status = 2;
+const std::uint32_t info_pref_item_description = 4;
+const std::uint32_t info_pref_item_shortcut = 8;
+const std::uint32_t info_pref_item_data = 16;
 
 struct preference_item {
   static void create(json& item, std::uint32_t flags) {

@@ -62,10 +62,12 @@ set(SERVER_SOURCES
     src/services/requests/store/local_store_request.cpp
     src/services/config/config_service.cpp
     src/database/site_database.cpp
+    src/database/site_database_compression.cpp
     src/database/site_database_organization.cpp
     src/database/site_database_permission.cpp
     src/database/site_database_site.cpp
     src/database/site_database_volume.cpp
+    src/database/site_database_media.cpp
     src/database/site_database_role.cpp
     src/database/site_database_group.cpp
     src/database/site_database_user.cpp
@@ -74,6 +76,9 @@ set(SERVER_SOURCES
     src/database/site_database_smart_album.cpp
     src/database/site_database_patient.cpp
     src/database/site_database_study.cpp
+    src/database/site_database_series.cpp
+    src/database/site_database_image.cpp
+    src/database/site_database_image.cpp
     src/database/sql_builder.cpp
     src/database/site_database_pool.cpp
 

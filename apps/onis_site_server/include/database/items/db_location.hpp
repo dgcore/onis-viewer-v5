@@ -15,13 +15,13 @@ using json = Json::Value;
 
 namespace onis::database {
 
-const std::int32_t info_location_name = 2;
-const std::int32_t info_location_type = 4;
-const std::int32_t info_location_org_name = 16;
-const std::int32_t info_location_site_name = 32;
-const std::int32_t info_location_url = 64;
-const std::int32_t info_location_login = 256;
-const std::int32_t info_location_password = 512;
+const std::uint32_t info_location_name = 2;
+const std::uint32_t info_location_type = 4;
+const std::uint32_t info_location_org_name = 16;
+const std::uint32_t info_location_site_name = 32;
+const std::uint32_t info_location_url = 64;
+const std::uint32_t info_location_login = 256;
+const std::uint32_t info_location_password = 512;
 
 struct location {
   static void create(json& item, std::uint32_t flags) {

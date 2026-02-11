@@ -25,8 +25,8 @@ const std::int32_t media_available = 1;
 const std::int32_t media_not_found = 2;
 const std::int32_t media_unknown = 3;
 
-const std::int32_t info_media_data = 2;
-const std::int32_t info_media_statistics = 4;
+const std::uint32_t info_media_data = 2;
+const std::uint32_t info_media_statistics = 4;
 
 struct media {
   static void create(json& media, std::uint32_t flags) {

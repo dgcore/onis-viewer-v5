@@ -13,13 +13,13 @@ using json = Json::Value;
 
 namespace onis::database {
 
-const std::int32_t info_dicom_ae_name = 2;
-const std::int32_t info_dicom_ae_status = 4;
-const std::int32_t info_dicom_ae_type = 8;
-const std::int32_t info_dicom_ae_comment = 16;
-const std::int32_t info_dicom_ae_clients = 32;
+const std::uint32_t info_dicom_ae_name = 2;
+const std::uint32_t info_dicom_ae_status = 4;
+const std::uint32_t info_dicom_ae_type = 8;
+const std::uint32_t info_dicom_ae_comment = 16;
+const std::uint32_t info_dicom_ae_clients = 32;
 
-const std::int32_t ae_type_local = 0;
+const std::uint32_t ae_type_local = 0;
 
 struct dicom_ae {
   static void create(json& ae, std::uint32_t flags) {

@@ -1,8 +1,13 @@
+#include <iomanip>
 #include <iostream>
 #include <list>
 #include <sstream>
+#include "../../include/database/items/db_series.hpp"
 #include "../../include/database/items/db_study.hpp"
 #include "../../include/database/site_database.hpp"
+#include "../../include/site_api.hpp"
+#include "onis_kit/include/utilities/date_time.hpp"
+#include "onis_kit/include/utilities/string.hpp"
 #include "onis_kit/include/utilities/uuid.hpp"
 
 using onis::database::lock_mode;
@@ -329,60 +334,463 @@ bool site_database::find_study_patient(const std::string& study_seq,
                                        bool for_client, lock_mode lock,
                                        Json::Value& output,
                                        std::string* partition_seq) {}
-/*void create_study_item_from_album(onis::odb_record& rec, std::uint32_t flags,
-                                  bool for_client, Json::Value& study,
-                                  std::int32_t* start_index, onis::aresult&
-res); void create_study_item(onis::odb_record& rec, std::uint32_t flags, bool
-for_client, onis::astring* patient_seq, Json::Value& study, std::int32_t*
-start_index, onis::aresult& res); void
+
+void site_database::find_online_and_conflicted_studies(
+    const std::string& partition_seq, const std::string& study_uid,
+    lock_mode lock, std::uint32_t patient_flags, std::uint32_t study_flags,
+    bool for_client, Json::Value& output) {
+  const auto study_columns = get_study_columns(study_flags, true);
+  const auto patient_columns = get_patient_columns(patient_flags, true);
+  const auto columns = patient_columns + ", " + study_columns;
+  const std::string from =
+      "pacs_studies inner join pacs_patients on pacs_patients.id = "
+      "pacs_studies.patient_id";
+  const auto clause =
+      "pacs_patients.partition_id=? and pacs_studies.uid=? and "
+      "(pacs_studies.status=? or pacs_studies.conflict_id is not null)";
+  auto query = create_and_prepare_query(columns, from, clause, lock, 0);
+
+  if (!query->bind_parameter(1, partition_seq)) {
+    std::throw_with_nested(
+        std::runtime_error("Failed to bind partition_id parameter"));
+  }
+  if (!query->bind_parameter(2, ONLINE_STATUS)) {
+    std::throw_with_nested(
+        std::runtime_error("Failed to bind partition_id parameter"));
+  }
+
+  auto result = execute_query(query);
+  if (result->has_rows()) {
+    while (auto row = result->get_next_row()) {
+      Json::Value& item = output.append(Json::objectValue);
+      item["patient"] = Json::Value(Json::objectValue);
+      item["study"] = Json::Value(Json::objectValue);
+      create_patient_and_study_item(*row, patient_flags, study_flags,
+                                    for_client, false, item["patient"],
+                                    item["study"]);
+    }
+  }
+}
+
+//------------------------------------------------------------------------------
+// Create studies
+//------------------------------------------------------------------------------
+
+std::unique_ptr<onis_kit::database::database_query>
+site_database::create_study_insertion_query(
+    const Json::Value* conflict_study, const std::string& partition_seq,
+    const std::string& patient_seq, const std::string& uid,
+    const onis::core::date_time& dt, const onis::dicom_base_ptr& dataset,
+    const std::string& origin_id, const std::string& origin_name,
+    const std::string& origin_ip, Json::Value& study) {
+  site_api_ptr api = site_api::get_instance();
+  onis::dicom_manager_ptr manager = api->get_dicom_manager();
+  std::string charset, date, time, accnum, study_id, desc, age, modality,
+      body_part, institution, station, comment;
+  onis::dicom_charset_info_list accnum_charsets, study_id_charsets,
+      desc_charsets, institution_charsets, station_charsets;
+
+  dataset->get_string_element(charset, TAG_SPECIFIC_CHARACTER_SET, "CS");
+  dataset->get_string_element(date, TAG_STUDY_DATE, "DA", charset);
+  dataset->get_string_element(time, TAG_STUDY_TIME, "TM", charset);
+  dataset->get_string_element(accnum, TAG_ACCESSION_NUMBER, "SH", charset,
+                              &accnum_charsets);
+  dataset->get_string_element(study_id, TAG_STUDY_ID, "SH", charset,
+                              &study_id_charsets);
+  dataset->get_string_element(desc, TAG_STUDY_DESCRIPTION, "LO", charset,
+                              &desc_charsets);
+  dataset->get_string_element(age, TAG_PATIENT_AGE, "AS", charset);
+  dataset->get_string_element(institution, TAG_INSTITUTION_NAME, "LO", charset,
+                              &institution_charsets);
+  dataset->get_string_element(station, TAG_STATION_NAME, "SH", charset,
+                              &station_charsets);
+  dataset->get_string_element(modality, TAG_MODALITY, "CS");
+  dataset->get_string_element(body_part, TAG_BODY_PART_EXAMINED, "CS");
+  if (institution.length() > 64)
+    institution = institution.substr(0, 64);
+  if (station.length() > 16)
+    station = station.substr(0, 16);
+
+  onis::core::date_time study_date;
+  onis::util::datetime::check_date_and_time_validity(date, time, &study_date);
+
+  charset = "";
+  onis::dicom_charset_list done;
+  for (std::int32_t i = 0; i < 5; i++) {
+    onis::dicom_charset_info_list* list;
+    switch (i) {
+      case 0:
+        list = &accnum_charsets;
+        break;
+      case 1:
+        list = &study_id_charsets;
+        break;
+      case 2:
+        list = &desc_charsets;
+        break;
+      case 3:
+        list = &institution_charsets;
+        break;
+      case 4:
+        list = &station_charsets;
+        break;
+      default:
+        list = NULL;
+        break;
+    };
+
+    onis::dicom_charset_info_list::const_iterator it1;
+    for (it1 = list->begin(); it1 != list->end(); it1++) {
+      const onis::dicom_charset* set =
+          manager->find_character_set_by_info(*it1);
+      if (set != NULL) {
+        if (std::find(done.begin(), done.end(), set) == done.end()) {
+          if (!charset.empty())
+            charset += "\\";
+          charset += set->code;
+          done.push_back(set);
+        }
+      }
+    }
+  }
+
+  return create_study_insertion_query(
+      partition_seq, patient_seq, dt, charset, uid, study_id, accnum, desc,
+      institution, age, date, time, modality, body_part, comment, station, 0, 0,
+      origin_id, origin_name, origin_ip,
+      conflict_study ? &((*conflict_study)["study"]) : NULL, study);
+}
+
+std::unique_ptr<onis_kit::database::database_query>
+site_database::create_study_insertion_query(
+    const std::string& partition_seq, const std::string& patient_seq,
+    const onis::core::date_time& dt, const std::string& charset,
+    const std::string& study_uid, const std::string& study_id,
+    const std::string& accnum, const std::string& description,
+    const std::string& institution, const std::string& age,
+    const std::string& study_date, const std::string& study_time,
+    const std::string& modalities, const std::string& bodyparts,
+    const std::string& comment, const std::string& stations,
+    std::int32_t series_count, std::int32_t image_count,
+    const std::string& origin_id, const std::string& origin_name,
+    const std::string& origin_ip, const Json::Value* conflict_study,
+    Json::Value& study) {
+  // Format date and time as YYYYMMDD HHMMSS using standard C++
+  std::ostringstream crdate_oss;
+  crdate_oss << std::setfill('0') << std::setw(4) << dt.year() << std::setw(2)
+             << dt.month() << std::setw(2) << dt.day() << " " << std::setw(2)
+             << dt.hour() << std::setw(2) << dt.minute() << std::setw(2)
+             << dt.second();
+  std::string crdate = crdate_oss.str();
+  std::string sql =
+      "INSERT INTO PACS_STUDIES (ID, PARTITION_ID, PATIENT_ID, UID, CHARSET, "
+      "STUDYDATE, STUDYTIME, MODALITIES, BODYPARTS, ACCNUM, STUDYID, "
+      "DESCRIPTION, AGE, INSTITUTION, COMMENT, STATIONS, SRCNT, IMCNT, RPTCNT, "
+      "STATUS, CONFLICT_ID, CRDATE, OID, ONAME, OIP) VALUES (?, ?, ?, ?, ?, ?, "
+      "?, ?, ?, ?, "
+      "?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+
+  auto query = prepare_query(sql, "create_study_insertion_query");
+
+  int index = 1;
+  std::string seq = onis::util::uuid::generate_random_uuid();
+  bind_parameter(query, index, seq, "id");
+  bind_parameter(query, index, partition_seq, "partition_id");
+  bind_parameter(query, index, patient_seq, "patient_id");
+  bind_parameter(query, index, study_uid, "uid");
+  bind_parameter(query, index, charset, "charset");
+  bind_parameter(query, index, study_date, "studydate");
+  bind_parameter(query, index, study_time, "studytime");
+  bind_parameter(query, index, modalities, "modalities");
+  bind_parameter(query, index, bodyparts, "bodyparts");
+  bind_parameter(query, index, accnum, "accnum");
+  bind_parameter(query, index, study_id, "studyid");
+  bind_parameter(query, index, description, "description");
+  bind_parameter(query, index, age, "age");
+  bind_parameter(query, index, institution, "institution");
+  bind_parameter(query, index, comment, "comment");
+  bind_parameter(query, index, stations, "stations");
+  bind_parameter(query, index, series_count, "srcnt");
+  bind_parameter(query, index, image_count, "imcnt");
+  bind_parameter(query, index, 0, "rptcnt");
+  if (conflict_study == nullptr) {
+    bind_parameter(query, index, ONLINE_STATUS, "status");
+    bind_parameter(query, index, nullptr, "conflict_id");
+  } else {
+    bind_parameter(query, index, seq, "status");
+    bind_parameter(query, index, (*conflict_study)[BASE_SEQ_KEY].asString(),
+                   "conflict_id");
+  }
+  bind_parameter(query, index, crdate, "crdate");
+  bind_parameter(query, index, origin_id, "oid");
+  bind_parameter(query, index, origin_name, "oname");
+  bind_parameter(query, index, origin_ip, "oip");
+
+  onis::database::study::create(study, onis::database::info_all, false);
+  study[ST_SEQ_KEY] = seq;
+  study[ST_UID_KEY] = study_uid;
+  study[ST_CHARSET_KEY] = charset;
+  study[ST_DATE_KEY] = study_date;
+  study[ST_TIME_KEY] = study_time;
+  study[ST_ACCNUM_KEY] = accnum;
+  study[ST_STUDYID_KEY] = study_id;
+  study[ST_DESC_KEY] = description;
+  study[ST_AGE_KEY] = age;
+  study[ST_MODALITIES_KEY] = modalities;
+  study[ST_BODYPARTS_KEY] = bodyparts;
+  study[ST_INSTITUTION_KEY] = institution;
+  study[ST_STATIONS_KEY] = stations;
+  study[ST_SRCNT_KEY] = series_count;
+  study[ST_IMCNT_KEY] = image_count;
+  study[ST_RPTCNT_KEY] = 0;
+  if (conflict_study == NULL) {
+    study[ST_STATUS_KEY] = ONLINE_STATUS;
+    study[ST_CONFLICT_KEY] = "";
+  } else {
+    study[ST_STATUS_KEY] = seq;
+    study[ST_CONFLICT_KEY] = (*conflict_study)[BASE_SEQ_KEY].asString();
+  }
+  study[ST_CRDATE_KEY] = crdate;
+  study[ST_ORIGIN_ID_KEY] = origin_id;
+  study[ST_ORIGIN_NAME_KEY] = origin_name;
+  study[ST_ORIGIN_IP_KEY] = origin_ip;
+
+  return query;
+}
+
+void site_database::create_study(
+    const std::string& partition_seq, const Json::Value* conflict_study,
+    const std::string& patient_seq, const onis::core::date_time& dt,
+    const std::string& study_uid, const onis::dicom_base_ptr& dataset,
+    const std::string& origin_id, const std::string& origin_name,
+    const std::string& origin_ip, Json::Value& study) {
+  auto query = create_study_insertion_query(
+      conflict_study, partition_seq, patient_seq, study_uid, dt, dataset,
+      origin_id, origin_name, origin_ip, study);
+  execute_and_check_affected(query, "Failed to create patient");
+}
+
+//------------------------------------------------------------------------------
+// Update studies
+//------------------------------------------------------------------------------
+
+bool site_database::update_study_modalities_bodyparts_and_station_names(
+    Json::Value& study, const std::string& ignore_series_seq) {
+  bool ret = false;
+
+  // memorize the previous values:
+  std::string prev_modalities = study[ST_MODALITIES_KEY].asString();
+  std::string prev_body_parts = study[ST_BODYPARTS_KEY].asString();
+  std::string prev_stations = study[ST_STATIONS_KEY].asString();
+
+  // prepare the new values:
+  std::vector<std::string> modalities;
+  std::vector<std::string> body_parts;
+  std::vector<std::string> stations;
+
+  // retrieve all the online series of the study:
+  Json::Value online_series(Json::arrayValue);
+  find_online_series(study[ST_SEQ_KEY].asString(),
+                     onis::database::info_series_modality |
+                         onis::database::info_series_body_part |
+                         onis::database::info_series_station,
+                     false, onis::database::lock_mode::NO_LOCK, online_series);
+
+  // construct the new values:
+  for (const auto& series : online_series) {
+    if (!ignore_series_seq.empty() &&
+        series[BASE_SEQ_KEY].asString() == ignore_series_seq)
+      continue;
+    std::string value = series[SR_MODALITY_KEY].asString();
+    if (!value.empty() && std::find(modalities.begin(), modalities.end(),
+                                    value) == modalities.end())
+      modalities.push_back(value);
+    value = series[SR_BODYPART_KEY].asString();
+    if (!value.empty() && std::find(body_parts.begin(), body_parts.end(),
+                                    value) == body_parts.end())
+      body_parts.push_back(value);
+    value = series[SR_STATION_KEY].asString();
+    if (!value.empty() &&
+        std::find(stations.begin(), stations.end(), value) == stations.end())
+      stations.push_back(value);
+  }
+
+  // reorder the new values:
+  onis::util::string::sort(modalities, true);
+  onis::util::string::sort(body_parts, true);
+  onis::util::string::sort(stations, true);
+
+  // create the new values:
+  for (std::int32_t i = 0; i < 3; i++) {
+    std::string key;
+    std::vector<std::string>* source;
+    switch (i) {
+      case 1:
+        key = ST_STATIONS_KEY;
+        source = &stations;
+        break;
+      case 2:
+        key = ST_BODYPARTS_KEY;
+        source = &body_parts;
+        break;
+      default:
+        key = ST_MODALITIES_KEY;
+        source = &modalities;
+        break;
+    };
+
+    std::string new_value;
+    for (std::vector<std::string>::const_iterator it = source->begin();
+         it != source->end(); it++) {
+      if (it != source->begin())
+        new_value += ", " + *it;
+      else
+        new_value = *it;
+    }
+    if (new_value != study[key].asString()) {
+      study[key] = new_value;
+      ret = true;
+    }
+  }
+  return ret;
+}
+
+//------------------------------------------------------------------------------
+// Modify studies
+//------------------------------------------------------------------------------
+
+void site_database::modify_study(const Json::Value& study,
+                                 std::uint32_t flags) {
+  // analyze the flags:
+  if (flags == 0)
+    flags = study[BASE_FLAGS_KEY].asUInt();
+  else {
+    std::uint32_t study_flags = study[BASE_FLAGS_KEY].asUInt();
+    if ((study_flags & flags) != flags) {
+      throw onis::exception(EOS_INTERNAL, "Invalid study flags");
+    }
+  }
+
+  // construct the sql command:
+  std::string sql = "UPDATE PACS_STUDIES SET ";
+  std::string values;
+
+  if (flags & onis::database::info_study_modalities)
+    values += ", MODALITIES=?";
+  if (flags & onis::database::info_study_body_parts)
+    values += ", BODYPARTS=?";
+  if (flags & onis::database::info_study_accnum)
+    values += ", ACCNUM=?";
+  if (flags & onis::database::info_study_id)
+    values += ", STUDYID=?";
+  if (flags & onis::database::info_study_description)
+    values += ", DESCRIPTION=?";
+  if (flags & onis::database::info_study_institution)
+    values += ", INSTITUTION=?";
+  if (flags & onis::database::info_study_comment)
+    values += ", COMMENT=?";
+  if (flags & onis::database::info_study_stations)
+    values += ", STATIONS=?";
+  if (flags & onis::database::info_study_age)
+    values += ", AGE=?";
+  if (flags & onis::database::info_study_date)
+    values += ", STUDYDATE=?, STUDYTIME=?";
+  if (flags & onis::database::info_study_statistics)
+    values += ", SRCNT=?, IMCNT=?, RPTCNT=?";
+  if (flags & onis::database::info_study_creation)
+    values += ", CRDATE=?, OID=?, ONAME=?, OIP=?";
+  if (flags & onis::database::info_study_status) {
+    values += ", STATUS=?";
+    if (study[ST_CONFLICT_KEY].asString().empty())
+      values += ", CONFLICT_ID=NULL";
+    else
+      values += ", CONFLICT_ID=?";
+  }
+  if (!values.empty()) {
+    sql += values.substr(2);
+    sql += " WHERE ID=?";
+
+    auto query = prepare_query(sql, "modify_study");
+    int index = 1;
+    if (flags & onis::database::info_study_modalities)
+      bind_parameter(query, index, study[ST_MODALITIES_KEY].asString(),
+                     "modalities");
+    if (flags & onis::database::info_study_body_parts)
+      bind_parameter(query, index, study[ST_BODYPARTS_KEY].asString(),
+                     "bodyparts");
+    if (flags & onis::database::info_study_accnum)
+      bind_parameter(query, index, study[ST_ACCNUM_KEY].asString(), "accnum");
+    if (flags & onis::database::info_study_id)
+      bind_parameter(query, index, study[ST_STUDYID_KEY].asString(), "studyid");
+    if (flags & onis::database::info_study_description)
+      bind_parameter(query, index, study[ST_DESC_KEY].asString(),
+                     "description");
+    if (flags & onis::database::info_study_institution)
+      bind_parameter(query, index, study[ST_INSTITUTION_KEY].asString(),
+                     "institution");
+    if (flags & onis::database::info_study_comment)
+      bind_parameter(query, index, study[ST_COMMENT_KEY].asString(), "comment");
+    if (flags & onis::database::info_study_stations)
+      bind_parameter(query, index, study[ST_STATIONS_KEY].asString(),
+                     "stations");
+    if (flags & onis::database::info_study_age)
+      bind_parameter(query, index, study[ST_AGE_KEY].asString(), "age");
+    if (flags & onis::database::info_study_date) {
+      bind_parameter(query, index, study[ST_DATE_KEY].asString(), "studydate");
+      bind_parameter(query, index, study[ST_TIME_KEY].asString(), "studytime");
+    }
+    if (flags & onis::database::info_study_statistics) {
+      bind_parameter(query, index, study[ST_SRCNT_KEY].asInt(), "series_count");
+      bind_parameter(query, index, study[ST_IMCNT_KEY].asInt(), "image_count");
+      bind_parameter(query, index, study[ST_RPTCNT_KEY].asInt(),
+                     "report_count");
+    }
+    if (flags & onis::database::info_study_creation) {
+      bind_parameter(query, index, study[ST_CRDATE_KEY].asString(), "crdate");
+      bind_parameter(query, index, study[ST_ORIGIN_ID_KEY].asString(),
+                     "origin_id");
+      bind_parameter(query, index, study[ST_ORIGIN_NAME_KEY].asString(),
+                     "origin_name");
+      bind_parameter(query, index, study[ST_ORIGIN_IP_KEY].asString(),
+                     "origin_ip");
+    }
+    if (flags & onis::database::info_study_status) {
+      bind_parameter(query, index, study[ST_STATUS_KEY].asString(), "status");
+      if (study[ST_CONFLICT_KEY].asString().empty())
+        bind_parameter(query, index, nullptr, "conflict_id");
+      else
+        bind_parameter(query, index, study[ST_CONFLICT_KEY].asString(),
+                       "conflict_id");
+    }
+    bind_parameter(query, index, study[BASE_SEQ_KEY].asString(), "id");
+    execute_and_check_affected(query, "Study not found");
+  }
+}
+
+/*void create_study_item_from_album(onis::odb_record& rec, std::uint32_t
+flags, bool for_client, Json::Value& study, std::int32_t* start_index,
+onis::aresult& res); void create_study_item(onis::odb_record& rec,
+std::uint32_t flags, bool for_client, onis::astring* patient_seq, Json::Value&
+study, std::int32_t* start_index, onis::aresult& res); void
 create_patient_and_study_item(onis::odb_record& rec, std::uint32_t
 patient_flags, std::uint32_t study_flags, bool for_client, bool for_album,
-Json::Value& patient, Json::Value& study, onis::aresult& res); void
-find_online_and_conflicted_studies(const onis::astring& partition_seq, const
-onis::astring& study_uid, std::int32_t lockmode, std::uint32_t patient_flags,
-                                        std::uint32_t study_flags, bool
-for_client, Json::Value& output, onis::aresult& res); void
+Json::Value& patient, Json::Value& study, onis::aresult& res);  void
 get_online_and_conflicted_studies( const onis::astring& partition_seq, const
 onis::astring& conflict_study_seq, std::uint32_t patient_flags, std::uint32_t
 study_flags, std::int32_t for_client_online, std::int32_t for_client_conflict,
-std::int32_t lock_mode, Json::Value& online_study, Json::Value& conflict_study,
-onis::aresult& res); bool study_has_conflicted_studies(const onis::astring&
-online_study_seq, onis::aresult& res); void create_study( const onis::astring&
-partition_seq, const Json::Value* conflict_study, const onis::astring&
-patient_seq, const onis::core::date_time& dt, const onis::astring& study_uid,
-const onis::dicom_base_ptr& dataset, const onis::astring& origin_id, const
-onis::astring& origin_name, const onis::astring& origin_ip, Json::Value& study,
-onis::aresult& res); void create_study( const onis::astring& partition_seq,
-const onis::astring& patient_seq, const onis::core::date_time& dt, const
-onis::astring& charset, const onis::astring& study_uid, const onis::astring&
-study_id, const onis::astring& accnum, const onis::astring& description, const
-onis::astring& institution, const onis::astring& study_date, const
-onis::astring& study_time, std::int32_t series_count, std::int32_t image_count,
-    const onis::astring& origin_id, const onis::astring& origin_name,
-    const onis::astring& origin_ip, Json::Value& study, onis::aresult& res);
-onis::astring create_study_insertion_string(
-    const Json::Value* conflict_study, const onis::astring& partition_seq,
-    const onis::astring& patient_seq, const onis::astring& uid,
-    const onis::core::date_time& dt, const onis::dicom_base_ptr& dataset,
-    const onis::astring& origin_id, const onis::astring& origin_name,
-    const onis::astring& origin_ip, Json::Value& study);
-onis::astring create_study_insertion_string(
-    const onis::astring& partition_seq, const onis::astring& patient_seq,
-    const onis::core::date_time& dt, const onis::astring& charset,
-    const onis::astring& study_uid, const onis::astring& study_id,
-    const onis::astring& accnum, const onis::astring& description,
-    const onis::astring& institution, const onis::astring& age,
-    const onis::astring& study_date, const onis::astring& study_time,
-    const onis::astring& modalities, const onis::astring& bodyparts,
-    const onis::astring& stations, std::int32_t series_count, std::int32_t
-image_count, const onis::astring& origin_id, const onis::astring& origin_name,
-    const onis::astring& origin_ip, const Json::Value* conflict_study,
-    Json::Value& study);
-bool update_study_modalities_bodyparts_and_station_names(
-    Json::Value& study, const onis::astring& ignore_series_seq,
-    onis::aresult& res);
-void modify_study(const Json::Value& study, std::uint32_t flags, onis::aresult&
-res); void modify_study_uid(const onis::astring& seq, const onis::astring& uid,
+std::int32_t lock_mode, Json::Value& online_study, Json::Value&
+conflict_study, onis::aresult& res); bool study_has_conflicted_studies(const
+onis::astring& online_study_seq, onis::aresult& res);  void create_study(
+const onis::astring& partition_seq, const onis::astring& patient_seq, const
+onis::core::date_time& dt, const onis::astring& charset, const onis::astring&
+study_uid, const onis::astring& study_id, const onis::astring& accnum, const
+onis::astring& description, const onis::astring& institution, const
+onis::astring& study_date, const onis::astring& study_time, std::int32_t
+series_count, std::int32_t image_count, const onis::astring& origin_id, const
+onis::astring& origin_name, const onis::astring& origin_ip, Json::Value&
+study, onis::aresult& res);
+
+ void modify_study_uid(const onis::astring& seq, const onis::astring& uid,
                       onis::aresult& res);
 onis::astring construct_study_filter_clause(const Json::Value& filters,
                                             bool with_patient,
@@ -424,29 +832,29 @@ remove_studies_not_satisfying_the_modalities_bodyparts_and_station_filters(
 // study links:
 void find_partition_study_link_by_seq(const onis::astring& study_link_seq,
                                       std::int32_t lock_mode, Json::Value&
-output, onis::aresult& res); void add_partition_study_link(const onis::astring&
-patient_link_seq, const onis::astring& study_seq, bool all_series, const
-onis::astring& modalities, const onis::astring& bodyparts, const onis::astring&
-stations, std::int32_t series_count, std::int32_t image_count, std::int32_t
-report_count, Json::Value& output, onis::aresult& res); bool
-get_partition_study_link(const onis::astring& patient_link_seq, const
-onis::astring& study_seq, std::int32_t lock_mode, Json::Value& output,
+output, onis::aresult& res); void add_partition_study_link(const
+onis::astring& patient_link_seq, const onis::astring& study_seq, bool
+all_series, const onis::astring& modalities, const onis::astring& bodyparts,
+const onis::astring& stations, std::int32_t series_count, std::int32_t
+image_count, std::int32_t report_count, Json::Value& output, onis::aresult&
+res); bool get_partition_study_link(const onis::astring& patient_link_seq,
+const onis::astring& study_seq, std::int32_t lock_mode, Json::Value& output,
 onis::aresult& res); bool get_partition_study_link_from_study_seq_in_album(
 const onis::astring& album_seq, const onis::astring& study_seq, std::int32_t
 lock_mode, Json::Value& output, onis::aresult& res); bool
-get_partition_study_from_link(const onis::astring& study_link_seq, std::uint32_t
-flags, std::int32_t lock_mode, Json::Value& output, onis::astring*
-study_patient_seq, onis::aresult& res); void
-get_partition_studies_from_patient_link( const onis::astring& patient_link_seq,
-bool reject_empty_request, const Json::Value& filters, std::uint32_t flags, bool
-for_client, std::int32_t lock_mode, Json::Value& output, onis::aresult& res);
-void get_partition_study_links(const onis::astring& study_seq, std::int32_t
-lock_mode, Json::Value& output, onis::aresult& res); void
-get_partition_study_links_from_patient_link( const onis::astring&
-patient_link_seq, std::int32_t lock_mode, Json::Value& output, onis::aresult&
-res); void create_partition_study_link_item(onis::odb_record& rec, Json::Value&
-link, onis::aresult& res); void update_partition_study_link(const Json::Value&
-link, onis::aresult& res); bool
+get_partition_study_from_link(const onis::astring& study_link_seq,
+std::uint32_t flags, std::int32_t lock_mode, Json::Value& output,
+onis::astring* study_patient_seq, onis::aresult& res); void
+get_partition_studies_from_patient_link( const onis::astring&
+patient_link_seq, bool reject_empty_request, const Json::Value& filters,
+std::uint32_t flags, bool for_client, std::int32_t lock_mode, Json::Value&
+output, onis::aresult& res); void get_partition_study_links(const
+onis::astring& study_seq, std::int32_t lock_mode, Json::Value& output,
+onis::aresult& res); void get_partition_study_links_from_patient_link( const
+onis::astring& patient_link_seq, std::int32_t lock_mode, Json::Value& output,
+onis::aresult& res); void create_partition_study_link_item(onis::odb_record&
+rec, Json::Value& link, onis::aresult& res); void
+update_partition_study_link(const Json::Value& link, onis::aresult& res); bool
 update_partition_study_link_modalities_bodyparts_and_stations( Json::Value&
 link, Json::Value* add_series /*, const Json::Value &remove_series*//*,
     onis::aresult& res);

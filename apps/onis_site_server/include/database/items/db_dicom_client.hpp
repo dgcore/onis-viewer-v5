@@ -29,16 +29,16 @@ const std::int32_t type_client = 2;
 const std::int32_t type_client_and_server = 3;
 const std::int32_t type_modality = 4;
 
-const std::int32_t info_dicom_client_ae = 2;
-const std::int32_t info_dicom_client_name = 4;
-const std::int32_t info_dicom_client_ip = 8;
-const std::int32_t info_dicom_client_port = 16;
-const std::int32_t info_dicom_client_permissions = 32;
-const std::int32_t info_dicom_client_type = 64;
-const std::int32_t info_dicom_client_comment = 128;
-const std::int32_t info_dicom_client_target = 256;
-const std::int32_t info_dicom_client_conversion = 512;
-const std::int32_t info_dicom_client_status = 1024;
+const std::uint32_t info_dicom_client_ae = 2;
+const std::uint32_t info_dicom_client_name = 4;
+const std::uint32_t info_dicom_client_ip = 8;
+const std::uint32_t info_dicom_client_port = 16;
+const std::uint32_t info_dicom_client_permissions = 32;
+const std::uint32_t info_dicom_client_type = 64;
+const std::uint32_t info_dicom_client_comment = 128;
+const std::uint32_t info_dicom_client_target = 256;
+const std::uint32_t info_dicom_client_conversion = 512;
+const std::uint32_t info_dicom_client_status = 1024;
 
 struct dicom_client {
   static void create(json& client, std::uint32_t flags) {

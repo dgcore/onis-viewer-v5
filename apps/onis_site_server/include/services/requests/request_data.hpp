@@ -5,6 +5,8 @@
 #include <memory>
 #include <mutex>
 
+#include "./sessions/request_session.hpp"
+
 using json = Json::Value;
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -61,6 +63,8 @@ public:
     std::lock_guard<std::mutex> lock(output_mutex_);
     func(output_json_);
   }
+
+  request_session_ptr session;
 
 private:
   request_type type_;

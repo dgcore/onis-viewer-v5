@@ -20,15 +20,15 @@ using json = Json::Value;
 
 namespace onis::database {
 
-const std::int32_t info_report_status = 2;
-const std::int32_t info_report_reading_doctor = 4;
-const std::int32_t info_report_verify_doctor = 8;
-const std::int32_t info_report_study = 16;
-const std::int32_t info_report_media = 32;
-const std::int32_t info_report_template = 64;
-const std::int32_t info_report_date = 128;
-const std::int32_t info_report_creation = 256;
-const std::int32_t info_report_update = 512;
+const std::uint32_t info_report_status = 2;
+const std::uint32_t info_report_reading_doctor = 4;
+const std::uint32_t info_report_verify_doctor = 8;
+const std::uint32_t info_report_study = 16;
+const std::uint32_t info_report_media = 32;
+const std::uint32_t info_report_template = 64;
+const std::uint32_t info_report_date = 128;
+const std::uint32_t info_report_creation = 256;
+const std::uint32_t info_report_update = 512;
 
 struct report {
   static void create(json& item, std::uint32_t flags) {

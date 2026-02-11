@@ -157,15 +157,40 @@ std::string postgresql_query::convert_placeholders(
 }
 
 bool postgresql_query::bind_parameter(int index, const std::string& value) {
-  // Store parameter for later use
-  if (index > 0 && index <= static_cast<int>(parameters_.size()) + 1) {
+  // Validate index first (before any other operations)
+  if (index <= 0) {
+    set_last_error("Parameter index must be greater than 0");
+    return false;
+  }
+
+  // Validate connection
+  if (!connection_) {
+    set_last_error("Database connection is null");
+    return false;
+  }
+
+  try {
+    // Store parameter for later use
+    // Resize vector to accommodate the index if needed
     while (static_cast<int>(parameters_.size()) < index) {
       parameters_.push_back("");
     }
-    parameters_[index - 1] = value;
-    return true;
+
+    // Now safely assign the parameter
+    if (index - 1 < static_cast<int>(parameters_.size())) {
+      parameters_[index - 1] = value;
+      return true;
+    } else {
+      set_last_error("Parameter index out of bounds after resize");
+      return false;
+    }
+  } catch (const std::exception& e) {
+    set_last_error("Exception in bind_parameter: " + std::string(e.what()));
+    return false;
+  } catch (...) {
+    set_last_error("Unknown exception in bind_parameter");
+    return false;
   }
-  return false;
 }
 
 bool postgresql_query::bind_parameter(int index, int value) {

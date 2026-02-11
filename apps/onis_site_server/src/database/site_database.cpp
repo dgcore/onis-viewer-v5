@@ -2,6 +2,7 @@
 #include <iostream>
 #include <sstream>
 #include "../../include/database/sql_builder.hpp"
+#include "onis_kit/include/core/exception.hpp"
 
 using onis::database::lock_mode;
 
@@ -55,8 +56,11 @@ site_database::create_and_prepare_query(const std::string& columns,
   std::string sql =
       sql_builder_->build_select_query(columns, from, where, "", limit, lock);
   auto query = connection_->create_query();
+  if (!query) {
+    throw onis::exception(EOS_DB_QUERY, "Failed to create query");
+  }
   if (!query->prepare(sql)) {
-    return nullptr;
+    throw onis::exception(EOS_DB_QUERY, "Failed to prepare the query");
   }
   return query;
 }
@@ -71,7 +75,7 @@ site_database::prepare_query(const std::string& sql,
       error_msg += " for " + context;
     }
     error_msg += ": " + sql;
-    std::throw_with_nested(std::runtime_error(error_msg));
+    throw onis::exception(EOS_DB_QUERY, error_msg);
   }
   return query;
 }
@@ -80,7 +84,7 @@ std::unique_ptr<onis_kit::database::database_result>
 site_database::execute_query(
     std::unique_ptr<onis_kit::database::database_query>& query) const {
   if (!query) {
-    throw std::runtime_error("Query is null");
+    throw onis::exception(EOS_DB_QUERY, "Query is null");
   }
   return query->execute();
 }
@@ -92,6 +96,51 @@ void site_database::execute_and_check_affected(
 
   // Check if any rows were affected
   if (result->get_affected_rows() == 0) {
-    throw std::runtime_error(message);
+    throw onis::exception(EOS_DB_QUERY, message);
+  }
+}
+
+//------------------------------------------------------------------------------
+// Transaction management
+//------------------------------------------------------------------------------
+
+void site_database::begin_transaction() {
+  if (!connection_->begin_transaction()) {
+    throw onis::exception(EOS_DB_TRANSACTION, "Failed to begin transaction");
+  }
+}
+
+void site_database::commit() {
+  if (!connection_->commit()) {
+    throw onis::exception(EOS_DB_TRANSACTION_COMMIT,
+                          "Failed to commit transaction");
+  }
+}
+
+void site_database::rollback() {
+  if (!connection_->rollback()) {
+    throw onis::exception(EOS_DB_TRANSACTION_ROLLBACK,
+                          "Failed to commit transaction");
+  }
+}
+
+bool site_database::in_transaction() const {
+  return connection_->in_transaction();
+}
+
+void site_database::commit_or_rollback_transaction() {
+  if (in_transaction()) {
+    try {
+      commit();
+    } catch (const onis::exception& e) {
+      rollback();
+      throw e;
+    } catch (...) {
+      rollback();
+      throw;
+    }
+  } else {
+    throw onis::exception(EOS_DB_TRANSACTION_COMMIT,
+                          "No transaction in progress");
   }
 }

@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 #include "../request_database.hpp"
+#include "onis_kit/include/dicom/dicom.hpp"
 
 class request_service;
 typedef std::shared_ptr<request_service> request_service_ptr;
@@ -32,13 +33,27 @@ public:
             std::int32_t media, const std::string& media_folder);
   void set_origin(const std::string& id, const std::string& name,
                   const std::string& ip);
-  void import_file(request_database* db, const std::string& partition_seq,
+  void import_file(const request_database& db, const std::string& partition_seq,
                    Json::Value* output, std::uint32_t* output_flags);
   void cleanup();
 
+  // Dicom file saving:
+  static void save_dicom_file(const onis::dicom_file_ptr& dcm,
+                              const std::string& folder,
+                              const std::string& partition_id,
+                              std::string study_date, std::string modality,
+                              std::string series_uid, std::string sop,
+                              std::string* file_path,
+                              std::string* relative_path);
+
+  static std::string get_dicom_file_path_saving_directory(
+      const onis::dicom_file_ptr& dcm, const std::string& folder,
+      const std::string& partition_id, std::string study_date,
+      std::string modality, std::string series_uid, std::string sop);
+
 private:
   request_service_ptr service_;
-  // onis::dicom_file_ptr _dcm;
+  onis::dicom_file_ptr dcm_{nullptr};
   std::int32_t media_{0};
   std::string media_folder_;
   std::vector<std::string> created_files_;
@@ -77,20 +92,18 @@ private:
   std::string study_desc_;
 
   // other:
-  // onis::core::date_time _current_time;
+  onis::core::date_time current_time_;
 
   // utilities:
-  /*void _set_error_status(std::int32_t status, std::int32_t reason,
-  onis::aresult& res); void _check_study_date_format(); Json::Value*
-  _find_matching_patient(Json::Value& patients); Json::Value*
-  _find_online_study(Json::Value& items, bool allow_none, onis::aresult& res);
-  Json::Value* _find_conflict_study(Json::Value& items, onis::aresult& res);
-  bool _study_is_in_conflict(const Json::Value* item, onis::aresult& res);
+  static void check_study_date_format(std::string& study_date);
+  Json::Value* find_matching_patient(Json::Value& patients);
+  static Json::Value* find_online_study(Json::Value& items, bool allow_none);
+  Json::Value* find_conflict_study(Json::Value& items);
+  bool study_is_in_conflict(const Json::Value* item);
 
   // process:
-  void _add_new_image_to_partition(const sdb_access_ptr& db,
-                                   const Json::Value* conflict_study,
-                                   Json::Value* existing_items[4],
-                                   Json::Value* created_items,
-                                   onis::aresult& res);*/
+  void add_new_image_to_partition(const request_database& db,
+                                  const Json::Value* conflict_study,
+                                  Json::Value* existing_items[4],
+                                  Json::Value* created_items);
 };
