@@ -901,6 +901,54 @@ onis::astring& origin_ip, Json::Value& patient, onis::aresult& res);*/
     index++;
   }
 
+  // Specialization for nullptr
+  void bind_parameter(
+      std::unique_ptr<onis_kit::database::database_query>& query, int& index,
+      std::nullptr_t, const std::string& param_name) {
+    if (!query) {
+      throw std::runtime_error("Query is null when binding " + param_name +
+                               " parameter");
+    }
+    try {
+      if (!query->bind_parameter(index, nullptr)) {
+        throw std::runtime_error("Failed to bind " + param_name +
+                                 " parameter (index " + std::to_string(index) +
+                                 ")");
+      }
+    } catch (const std::exception& e) {
+      std::throw_with_nested(
+          std::runtime_error("Exception while binding " + param_name +
+                             " parameter: " + std::string(e.what())));
+    } catch (...) {
+      throw std::runtime_error("Unknown exception while binding " + param_name +
+                               " parameter");
+    }
+    index++;
+  }
+
+  // Overload for nullable string pointer (binds NULL if pointer is null or
+  // string is empty)
+  void bind_parameter(
+      std::unique_ptr<onis_kit::database::database_query>& query, int& index,
+      const std::string* value, const std::string& param_name) {
+    if (!value || value->empty()) {
+      bind_parameter(query, index, nullptr, param_name);
+    } else {
+      bind_parameter(query, index, *value, param_name);
+    }
+  }
+
+  // Overload for string that binds NULL if empty
+  void bind_parameter_optional(
+      std::unique_ptr<onis_kit::database::database_query>& query, int& index,
+      const std::string& value, const std::string& param_name) {
+    if (value.empty()) {
+      bind_parameter(query, index, nullptr, param_name);
+    } else {
+      bind_parameter(query, index, value, param_name);
+    }
+  }
+
   // Transaction management
   void begin_transaction();
   void commit();

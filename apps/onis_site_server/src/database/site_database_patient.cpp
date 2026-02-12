@@ -228,6 +228,7 @@ site_database::create_patient_insertion_query(
       "STATUS, CRDATE, OID, ONAME, OIP) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, "
       "?, ?, ?, ?, ?, ?, ?, ?)";
 
+  std::string online_status = ONLINE_STATUS;
   auto query = prepare_query(sql, "create_patient_insertion_query");
 
   int index = 1;
@@ -245,7 +246,7 @@ site_database::create_patient_insertion_query(
   bind_parameter(query, index, study_count, "study_count");
   bind_parameter(query, index, series_count, "series_count");
   bind_parameter(query, index, image_count, "image_count");
-  bind_parameter(query, index, ONLINE_STATUS, "status");
+  bind_parameter(query, index, online_status, "status");
   bind_parameter(query, index, crdate, "crdate");
   bind_parameter(query, index, origin_id, "origin_id");
   bind_parameter(query, index, origin_name, "origin_name");

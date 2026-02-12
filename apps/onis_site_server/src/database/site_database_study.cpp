@@ -350,14 +350,12 @@ void site_database::find_online_and_conflicted_studies(
       "(pacs_studies.status=? or pacs_studies.conflict_id is not null)";
   auto query = create_and_prepare_query(columns, from, clause, lock, 0);
 
-  if (!query->bind_parameter(1, partition_seq)) {
-    std::throw_with_nested(
-        std::runtime_error("Failed to bind partition_id parameter"));
-  }
-  if (!query->bind_parameter(2, ONLINE_STATUS)) {
-    std::throw_with_nested(
-        std::runtime_error("Failed to bind partition_id parameter"));
-  }
+  std::string online_status = ONLINE_STATUS;
+
+  std::int32_t index = 1;
+  bind_parameter(query, index, partition_seq, "partition_seq");
+  bind_parameter(query, index, study_uid, "study_uid");
+  bind_parameter(query, index, online_status, "status");
 
   auto result = execute_query(query);
   if (result->has_rows()) {
@@ -487,9 +485,9 @@ site_database::create_study_insertion_query(
       "STUDYDATE, STUDYTIME, MODALITIES, BODYPARTS, ACCNUM, STUDYID, "
       "DESCRIPTION, AGE, INSTITUTION, COMMENT, STATIONS, SRCNT, IMCNT, RPTCNT, "
       "STATUS, CONFLICT_ID, CRDATE, OID, ONAME, OIP) VALUES (?, ?, ?, ?, ?, ?, "
-      "?, ?, ?, ?, "
-      "?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+      "?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
+  std::string online_status = ONLINE_STATUS;
   auto query = prepare_query(sql, "create_study_insertion_query");
 
   int index = 1;
@@ -514,7 +512,7 @@ site_database::create_study_insertion_query(
   bind_parameter(query, index, image_count, "imcnt");
   bind_parameter(query, index, 0, "rptcnt");
   if (conflict_study == nullptr) {
-    bind_parameter(query, index, ONLINE_STATUS, "status");
+    bind_parameter(query, index, online_status, "status");
     bind_parameter(query, index, nullptr, "conflict_id");
   } else {
     bind_parameter(query, index, seq, "status");

@@ -61,7 +61,9 @@ class dicom_dcmtk_base : public virtual onis::dicom_base {
 public:
   // constructor:
   dicom_dcmtk_base(const onis::dicom_manager_ptr& manager)
-      : onis::dicom_base() {}
+      : onis::dicom_base() {
+    weak_manager_ = manager;
+  }
 
   // destructor:
   virtual ~dicom_dcmtk_base() = default;
@@ -283,7 +285,7 @@ public:
   // dicom objects:
   onis::dicom_file_ptr create_dicom_file() const;
   onis::dicom_dataset_ptr create_dicom_dataset() const;
-  onis::dicom_dir_ptr create_dicom_dir() const;
+  // onis::dicom_dir_ptr create_dicom_dir() const;
 
   // character sets:
   const onis::dicom_charset* find_character_set_by_code(

@@ -198,9 +198,10 @@ bool site_database::check_if_sop_already_exist_under_online_or_conflicted_study(
   auto query = prepare_query(
       sql, "check_if_sop_already_exist_under_online_or_conflicted_study");
   int index = 1;
+  std::string online_status = ONLINE_STATUS;
   bind_parameter(query, index, sop, "sop");
-  bind_parameter(query, index, ONLINE_STATUS, "status");
-  bind_parameter(query, index, ONLINE_STATUS, "series_status");
+  bind_parameter(query, index, online_status, "status");
+  bind_parameter(query, index, online_status, "series_status");
 
   auto result = execute_query(query);
   if (result->has_rows()) {
@@ -253,6 +254,7 @@ site_database::create_image_insertion_query(
       "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
   std::string seq = onis::util::uuid::generate_random_uuid();
+  std::string online_status = ONLINE_STATUS;
 
   auto query = prepare_query(sql, "create_image_insertion_query");
 
@@ -261,19 +263,19 @@ site_database::create_image_insertion_query(
   bind_parameter(query, index, series_seq, "series_id");
   bind_parameter(query, index, sop, "uid");
   bind_parameter(query, index, charset, "charset");
-  bind_parameter(query, index, instance_num, "instnum");
+  bind_parameter_optional(query, index, instance_num, "instnum");
   bind_parameter(query, index, sop_class, "sopclass");
-  bind_parameter(query, index, acqnum, "acqnum");
+  bind_parameter_optional(query, index, acqnum, "acqnum");
   bind_parameter(query, index, image_media, "imgmedia");
   bind_parameter(query, index, image_path, "imgpath");
   bind_parameter(query, index, create_stream ? -2 : -1, "streammedia");
   bind_parameter(query, index, create_icon ? -2 : -1, "iconmedia");
-  bind_parameter(query, index, width, "width");
-  bind_parameter(query, index, height, "height");
-  bind_parameter(query, index, depth, "depth");
+  bind_parameter_optional(query, index, width, "width");
+  bind_parameter_optional(query, index, height, "height");
+  bind_parameter_optional(query, index, depth, "depth");
   bind_parameter(query, index, compression_status, "cstatus");
   bind_parameter(query, index, compression_update, "cupd");
-  bind_parameter(query, index, ONLINE_STATUS, "status");
+  bind_parameter(query, index, online_status, "status");
   bind_parameter(query, index, crdate, "crdate");
   bind_parameter(query, index, origin_id, "oid");
   bind_parameter(query, index, origin_name, "oname");

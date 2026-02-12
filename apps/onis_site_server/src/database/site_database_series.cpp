@@ -200,7 +200,7 @@ void site_database::find_online_series(const std::string& study_seq,
 
   int index = 1;
   bind_parameter(query, index, study_seq, "study_id");
-  bind_parameter(query, index, ONLINE_STATUS, "status");
+  bind_parameter(query, index, std::string(ONLINE_STATUS), "status");
 
   auto result = execute_query(query);
   if (result->has_rows()) {
@@ -302,6 +302,7 @@ site_database::create_series_insertion_query(
       "ICONMEDIA, PROPMEDIA, IMCNT, STATUS, CRDATE, OID, ONAME, OIP) VALUES "
       "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
+  std::string online_status = ONLINE_STATUS;
   auto query = prepare_query(sql, "create_series_insertion_query");
 
   int index = 1;
@@ -316,12 +317,12 @@ site_database::create_series_insertion_query(
   bind_parameter(query, index, bodypart, "bodypart");
   bind_parameter(query, index, srnum, "srnum");
   bind_parameter(query, index, description, "description");
-  bind_parameter(query, index, "", "comment");
+  bind_parameter(query, index, std::string(""), "comment");
   bind_parameter(query, index, station, "station");
   bind_parameter(query, index, create_icon ? -2 : -1, "iconmedia");
   bind_parameter(query, index, -1, "propmedia");
   bind_parameter(query, index, 0, "imcnt");
-  bind_parameter(query, index, ONLINE_STATUS, "status");
+  bind_parameter(query, index, online_status, "status");
   bind_parameter(query, index, crdate, "crdate");
   bind_parameter(query, index, origin_id, "oid");
   bind_parameter(query, index, origin_name, "oname");

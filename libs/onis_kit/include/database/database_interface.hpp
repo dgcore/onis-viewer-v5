@@ -123,6 +123,7 @@ public:
   virtual bool bind_parameter(int index, int value) = 0;
   virtual bool bind_parameter(int index, double value) = 0;
   virtual bool bind_parameter(int index, bool value) = 0;
+  virtual bool bind_parameter(int index, std::nullptr_t) = 0;
 
   /// Clear bound parameters
   virtual void clear_parameters() = 0;

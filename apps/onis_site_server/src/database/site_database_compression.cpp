@@ -48,8 +48,6 @@ void site_database::create_compression_item(
   } else {
     (*target_index)++;
   }
-  output[BASE_UID_KEY] = rec.get_string(*target_index, false, false);
-
   if (flags & onis::database::info_compression_enable) {
     output[CP_ENABLE_KEY] = rec.get_int(*target_index, false);
   }
@@ -91,10 +89,8 @@ void site_database::get_partition_compressions(const std::string& partition_seq,
   auto where = "partition_id = ?";
   auto query =
       create_and_prepare_query(columns, "pacs_compressions", where, lock);
-  if (!query->bind_parameter(1, partition_seq)) {
-    std::throw_with_nested(
-        std::runtime_error("Failed to bind partition_id parameter"));
-  }
+  std::int32_t index = 1;
+  bind_parameter(query, index, partition_seq, "partition_seq");
   auto result = execute_query(query);
   if (result->has_rows()) {
     while (auto row = result->get_next_row()) {

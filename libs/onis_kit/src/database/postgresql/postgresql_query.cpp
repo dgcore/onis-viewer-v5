@@ -3,6 +3,8 @@
 #include <iostream>
 #include <sstream>
 #include "database/postgresql/postgresql_result.hpp"
+#include "onis_kit/include/core/exception.hpp"
+#include "onis_kit/include/core/result.hpp"
 
 namespace onis_kit {
 namespace database {
@@ -22,7 +24,11 @@ std::unique_ptr<database_result> postgresql_query::execute() {
   if (!parameters_.empty()) {
     std::vector<const char*> param_ptrs;
     for (const auto& param : parameters_) {
-      param_ptrs.push_back(param.c_str());
+      if (param.has_value()) {
+        param_ptrs.push_back(param.value().c_str());
+      } else {
+        param_ptrs.push_back(nullptr);  // NULL parameter
+      }
     }
 
     PGresult* result =
@@ -34,7 +40,7 @@ std::unique_ptr<database_result> postgresql_query::execute() {
       set_last_error("Query execution failed: " +
                      std::string(PQresultErrorMessage(result)));
       PQclear(result);
-      throw std::runtime_error(last_error_);
+      throw onis::exception(EOS_DB_QUERY, last_error_);
     }
 
     auto db_result = std::make_unique<postgresql_result>(result);
@@ -173,7 +179,7 @@ bool postgresql_query::bind_parameter(int index, const std::string& value) {
     // Store parameter for later use
     // Resize vector to accommodate the index if needed
     while (static_cast<int>(parameters_.size()) < index) {
-      parameters_.push_back("");
+      parameters_.push_back(std::nullopt);
     }
 
     // Now safely assign the parameter
@@ -203,6 +209,43 @@ bool postgresql_query::bind_parameter(int index, double value) {
 
 bool postgresql_query::bind_parameter(int index, bool value) {
   return bind_parameter(index, value ? "true" : "false");
+}
+
+bool postgresql_query::bind_parameter(int index, std::nullptr_t) {
+  // Validate index first (before any other operations)
+  if (index <= 0) {
+    set_last_error("Parameter index must be greater than 0");
+    return false;
+  }
+
+  // Validate connection
+  if (!connection_) {
+    set_last_error("Database connection is null");
+    return false;
+  }
+
+  try {
+    // Store NULL parameter for later use
+    // Resize vector to accommodate the index if needed
+    while (static_cast<int>(parameters_.size()) < index) {
+      parameters_.push_back(std::nullopt);
+    }
+
+    // Now safely assign the NULL parameter
+    if (index - 1 < static_cast<int>(parameters_.size())) {
+      parameters_[index - 1] = std::nullopt;
+      return true;
+    } else {
+      set_last_error("Parameter index out of bounds after resize");
+      return false;
+    }
+  } catch (const std::exception& e) {
+    set_last_error("Exception in bind_parameter: " + std::string(e.what()));
+    return false;
+  } catch (...) {
+    set_last_error("Unknown exception in bind_parameter");
+    return false;
+  }
 }
 
 void postgresql_query::clear_parameters() {

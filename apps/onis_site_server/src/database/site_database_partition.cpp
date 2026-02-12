@@ -216,7 +216,7 @@ void site_database::modify_partition(const Json::Value& partition,
     if (flags & onis::database::info_partition_volume) {
       auto volume_seq = partition[PT_VOLUME_KEY].asString();
       if (volume_seq.empty())
-        query->bind_parameter(index, nullptr);
+        bind_parameter(query, index, nullptr, "volume_id");
       else
         query->bind_parameter(index, volume_seq);
     }

@@ -27,6 +27,7 @@ public:
   virtual bool bind_parameter(int index, int value) override;
   virtual bool bind_parameter(int index, double value) override;
   virtual bool bind_parameter(int index, bool value) override;
+  virtual bool bind_parameter(int index, std::nullptr_t) override;
   virtual void clear_parameters() override;
 
 private:
