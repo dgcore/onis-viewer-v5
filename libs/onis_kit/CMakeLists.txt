@@ -40,6 +40,7 @@ set(ONIS_KIT_SOURCES
     src/utilities/string.cpp
     src/utilities/dicom.cpp
     src/utilities/filesystem.cpp
+    src/utilities/date_time.cpp
 )
 
 # Header files

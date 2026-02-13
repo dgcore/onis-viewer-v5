@@ -22,6 +22,7 @@ public:
                                  bool allow_empty) const override;
   virtual int get_int(int& column_index, bool allow_null) const override;
   virtual double get_double(int& column_index, bool allow_null) const override;
+  virtual double get_float(int& column_index, bool allow_null) const override;
   virtual bool get_bool(int& column_index, bool allow_null) const override;
 
   virtual std::string get_uuid(const std::string& column_name, bool allow_null,
@@ -33,6 +34,8 @@ public:
                       bool allow_null) const override;
   virtual double get_double(const std::string& column_name,
                             bool allow_null) const override;
+  virtual double get_float(const std::string& column_name,
+                           bool allow_null) const override;
   virtual bool get_bool(const std::string& column_name,
                         bool allow_null) const override;
 

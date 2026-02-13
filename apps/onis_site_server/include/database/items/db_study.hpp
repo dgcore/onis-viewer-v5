@@ -145,8 +145,8 @@ struct study {
     }
 
     if (flags & info_study_creation) {
-      onis::database::item::verify_string_value(input, ST_CRDATE_KEY, true,
-                                                true, 64);
+      onis::database::item::verify_string_value(input, ST_CRDATE_KEY, false,
+                                                false, 64);
       onis::database::item::verify_string_value(input, ST_ORIGIN_ID_KEY, true,
                                                 true, 64);
       onis::database::item::verify_string_value(input, ST_ORIGIN_NAME_KEY, true,

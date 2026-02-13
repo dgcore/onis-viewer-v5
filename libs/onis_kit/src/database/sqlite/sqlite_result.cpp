@@ -81,6 +81,23 @@ double sqlite_row::get_double(int& column_index, bool allow_null) const {
   return sqlite3_column_double(stmt_, column_index);
 }
 
+double sqlite_row::get_float(int& column_index, bool allow_null) const {
+  if (column_index < 0 || column_index >= get_column_count()) {
+    throw std::out_of_range("Column index out of range");
+  }
+
+  if (sqlite3_column_type(stmt_, column_index) == SQLITE_NULL) {
+    if (!allow_null) {
+      throw std::invalid_argument("Null value not allowed");
+    }
+    column_index++;
+    return 0.0;
+  }
+
+  column_index++;
+  return (float)sqlite3_column_double(stmt_, column_index);
+}
+
 bool sqlite_row::get_bool(int& column_index, bool allow_null) const {
   if (column_index < 0 || column_index >= get_column_count()) {
     throw std::out_of_range("Column index out of range");
@@ -118,6 +135,12 @@ double sqlite_row::get_double(const std::string& column_name,
                               bool allow_null) const {
   int column_index = get_column_index(column_name);
   return get_double(column_index, allow_null);
+}
+
+double sqlite_row::get_float(const std::string& column_name,
+                             bool allow_null) const {
+  int column_index = get_column_index(column_name);
+  return get_float(column_index, allow_null);
 }
 
 bool sqlite_row::get_bool(const std::string& column_name,

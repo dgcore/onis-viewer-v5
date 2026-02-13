@@ -43,30 +43,30 @@ using json = Json::Value;
 
 namespace onis::database {
 
-const std::int32_t info_auto_routing_rule_active = 2;
-const std::int32_t info_auto_routing_rule_name = 4;
-const std::int32_t info_auto_routing_rule_type = 8;
-const std::int32_t info_auto_routing_rule_from = 16;
-const std::int32_t info_auto_routing_rule_destination = 32;
-const std::int32_t info_auto_routing_rule_filters = 64;
+const std::uint32_t info_auto_routing_rule_active = 2;
+const std::uint32_t info_auto_routing_rule_name = 4;
+const std::uint32_t info_auto_routing_rule_type = 8;
+const std::uint32_t info_auto_routing_rule_from = 16;
+const std::uint32_t info_auto_routing_rule_destination = 32;
+const std::uint32_t info_auto_routing_rule_filters = 64;
 
-const std::int32_t info_auto_routing_enable = 2;
-const std::int32_t info_auto_routing_failure_management = 4;
-const std::int32_t info_auto_routing_update = 8;
-const std::int32_t info_auto_routing_rules = 16;
-const std::int32_t info_auto_routing_statistics = 32;
+const std::uint32_t info_auto_routing_enable = 2;
+const std::uint32_t info_auto_routing_failure_management = 4;
+const std::uint32_t info_auto_routing_update = 8;
+const std::uint32_t info_auto_routing_rules = 16;
+const std::uint32_t info_auto_routing_statistics = 32;
 
-const std::int32_t info_auto_routing_line_source = 2;
-const std::int32_t info_auto_routing_line_image = 4;
-const std::int32_t info_auto_routing_line_series = 8;
-const std::int32_t info_auto_routing_line_destination = 16;
-const std::int32_t info_auto_routing_line_status = 32;
-const std::int32_t info_auto_routing_line_first_try = 64;
-const std::int32_t info_auto_routing_line_next_try = 128;
-const std::int32_t info_auto_routing_line_crdate = 256;
+const std::uint32_t info_auto_routing_line_source = 2;
+const std::uint32_t info_auto_routing_line_image = 4;
+const std::uint32_t info_auto_routing_line_series = 8;
+const std::uint32_t info_auto_routing_line_destination = 16;
+const std::uint32_t info_auto_routing_line_status = 32;
+const std::uint32_t info_auto_routing_line_first_try = 64;
+const std::uint32_t info_auto_routing_line_next_try = 128;
+const std::uint32_t info_auto_routing_line_crdate = 256;
 
-const std::int32_t type_standard = 0;
-const std::int32_t type_backup = 1;
+const std::uint32_t type_standard = 0;
+const std::uint32_t type_backup = 1;
 
 struct routing_rule {
   static void create(json& item, std::uint32_t flags) {

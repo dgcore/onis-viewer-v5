@@ -13,10 +13,10 @@ using json = Json::Value;
 
 namespace onis::database {
 
-const std::int32_t info_compression_enable = 2;
-const std::int32_t info_compression_mode = 4;
-const std::int32_t info_compression_transfer = 8;
-const std::int32_t info_compression_update = 16;
+const std::uint32_t info_compression_enable = 2;
+const std::uint32_t info_compression_mode = 4;
+const std::uint32_t info_compression_transfer = 8;
+const std::uint32_t info_compression_update = 16;
 
 struct compression {
   static void create(json& compression, std::uint32_t flags) {

@@ -33,20 +33,20 @@ using json = Json::Value;
 
 namespace onis::database {
 
-const std::int32_t info_user_login = 2;
-const std::int32_t info_user_password = 4;
-const std::int32_t info_user_active = 8;
-const std::int32_t info_user_identity = 32;
-const std::int32_t info_user_organization = 64;
-const std::int32_t info_user_address = 128;
-const std::int32_t info_user_contact = 256;
-const std::int32_t info_user_superuser = 512;
-const std::int32_t info_user_inherit = 1024;
-const std::int32_t info_user_permissions = 2048;
-const std::int32_t info_user_membership = 4096;
-const std::int32_t info_user_partition_access = 8192;
-const std::int32_t info_user_dicom_access = 16384;
-const std::int32_t info_user_pref_set = 32768;
+const std::uint32_t info_user_login = 2;
+const std::uint32_t info_user_password = 4;
+const std::uint32_t info_user_active = 8;
+const std::uint32_t info_user_identity = 32;
+const std::uint32_t info_user_organization = 64;
+const std::uint32_t info_user_address = 128;
+const std::uint32_t info_user_contact = 256;
+const std::uint32_t info_user_superuser = 512;
+const std::uint32_t info_user_inherit = 1024;
+const std::uint32_t info_user_permissions = 2048;
+const std::uint32_t info_user_membership = 4096;
+const std::uint32_t info_user_partition_access = 8192;
+const std::uint32_t info_user_dicom_access = 16384;
+const std::uint32_t info_user_pref_set = 32768;
 
 struct user {
   static void create(json& item, std::uint32_t flags) {

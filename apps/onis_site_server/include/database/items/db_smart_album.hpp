@@ -11,10 +11,10 @@ using json = Json::Value;
 
 namespace onis::database {
 
-const std::int32_t info_smart_album_name = 2;
-const std::int32_t info_smart_album_description = 4;
-const std::int32_t info_smart_album_status = 8;
-const std::int32_t info_smart_album_criteria = 16;
+const std::uint32_t info_smart_album_name = 2;
+const std::uint32_t info_smart_album_description = 4;
+const std::uint32_t info_smart_album_status = 8;
+const std::uint32_t info_smart_album_criteria = 16;
 
 struct smart_album {
   const std::int32_t criteria_modality = 0;

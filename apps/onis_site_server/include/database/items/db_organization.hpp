@@ -11,7 +11,7 @@ namespace onis::database {
 using std::int32_t;
 using std::uint32_t;
 
-const std::int32_t info_organization_name = 1;
+const std::uint32_t info_organization_name = 1;
 
 struct organization {
   static void create(json& organization, std::uint32_t flags) {

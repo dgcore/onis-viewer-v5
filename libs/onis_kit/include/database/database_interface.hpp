@@ -11,7 +11,6 @@ namespace database {
 class database_connection;
 class database_query;
 class database_result;
-class database_transaction;
 
 /// Database connection parameters
 struct database_config {
@@ -45,6 +44,7 @@ public:
   virtual std::string get_string(int& column_index, bool allow_null,
                                  bool allow_empty) const = 0;
   virtual int get_int(int& column_index, bool allow_null) const = 0;
+  virtual double get_float(int& column_index, bool allow_null) const = 0;
   virtual double get_double(int& column_index, bool allow_null) const = 0;
   virtual bool get_bool(int& column_index, bool allow_null) const = 0;
 
@@ -55,6 +55,8 @@ public:
                                  bool allow_null, bool allow_empty) const = 0;
   virtual int get_int(const std::string& column_name,
                       bool allow_null) const = 0;
+  virtual double get_float(const std::string& column_name,
+                           bool allow_null) const = 0;
   virtual double get_double(const std::string& column_name,
                             bool allow_null) const = 0;
   virtual bool get_bool(const std::string& column_name,
@@ -121,6 +123,7 @@ public:
   virtual bool bind_parameter(int index, int value) = 0;
   virtual bool bind_parameter(int index, double value) = 0;
   virtual bool bind_parameter(int index, bool value) = 0;
+  virtual bool bind_parameter(int index, std::nullptr_t) = 0;
 
   /// Clear bound parameters
   virtual void clear_parameters() = 0;
@@ -162,6 +165,19 @@ public:
 
   /// Get last error
   virtual std::string get_last_error() const = 0;
+
+  /// Transaction management
+  /// Begin a transaction
+  virtual bool begin_transaction() = 0;
+
+  /// Commit the current transaction
+  virtual bool commit() = 0;
+
+  /// Rollback the current transaction
+  virtual bool rollback() = 0;
+
+  /// Check if currently in a transaction
+  virtual bool in_transaction() const = 0;
 };
 
 }  // namespace database

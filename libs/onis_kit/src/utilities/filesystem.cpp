@@ -135,6 +135,12 @@ std::string create_directory(const std::string& dir, const std::string& base,
 bool create_multi_directories(const std::string& dir) {
   try {
     std::filesystem::path dir_path(dir);
+    // Return true if directory already exists
+    if (std::filesystem::exists(dir_path) &&
+        std::filesystem::is_directory(dir_path)) {
+      return true;
+    }
+    // Otherwise, try to create it
     return std::filesystem::create_directories(dir_path);
   } catch (...) {
     return false;

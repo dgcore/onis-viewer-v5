@@ -1,3 +1,4 @@
+#include <filesystem>
 #include <iostream>
 #include <sstream>
 #include "../../include/database/items/db_media.hpp"
@@ -15,8 +16,8 @@ std::string site_database::get_media_columns(std::uint32_t flags,
   std::string prefix = add_table_name ? "pacs_media." : "";
   std::string columns =
       prefix + "id, " + prefix + "site_id, " + prefix + "volume_id";
-  if (flags == onis::database::info_media_data ||
-      flags == onis::database::info_media_statistics) {
+  if ((flags & onis::database::info_media_data) ||
+      (flags & onis::database::info_media_statistics)) {
     columns += ", " + prefix + "type, " + prefix + "num, " + prefix + "path, " +
                prefix + "maxfill, " + prefix + "status";
   }
@@ -28,27 +29,33 @@ void site_database::read_media_record(onis_kit::database::database_row& rec,
                                       std::string* site_seq,
                                       std::string* volume_seq, json& output) {
   onis::database::media::create(output, flags);
-  output[BASE_SEQ_KEY] = rec.get_string("id");
+  std::int32_t index = 0;
+  output[BASE_SEQ_KEY] = rec.get_uuid(index, false, false);
   if (site_seq) {
-    *site_seq = rec.get_string("site_id");
+    *site_seq = rec.get_uuid(index, false, false);
+  } else {
+    index++;
   }
   if (volume_seq) {
-    *volume_seq = rec.get_string("volume_id");
+    *volume_seq = rec.get_uuid(index, false, false);
+  } else {
+    index++;
   }
+
   std::string folder;
   double ratio = 0.0;
+  bool use_output = (flags & onis::database::info_media_data) != 0 ||
+                    (flags & onis::database::info_media_statistics) != 0;
+  json tmp = Json::Value(Json::objectValue);
+  json* target = use_output ? &output : &tmp;
   if (flags & onis::database::info_media_data) {
-    output[ME_TYPE_KEY] = rec.get_int(ME_TYPE_KEY);
-    output[ME_NUM_KEY] = rec.get_int(ME_NUM_KEY);
-    output[ME_PATH_KEY] = rec.get_string(ME_PATH_KEY);
-    output[ME_RATIO_KEY] = rec.get_double(ME_RATIO_KEY);
-    output[ME_STATUS_KEY] = rec.get_int(ME_STATUS_KEY);
-    folder = output[ME_PATH_KEY].asString();
-    ratio = output[ME_RATIO_KEY].asDouble();
-  } else if (flags & onis::database::info_media_statistics) {
-    json tmp(Json::Value(Json::objectValue));
-    folder = rec.get_string(ME_PATH_KEY);
-    ratio = rec.get_double(ME_RATIO_KEY);
+    (*target)[ME_TYPE_KEY] = rec.get_int(index, false);
+    (*target)[ME_NUM_KEY] = rec.get_int(index, false);
+    (*target)[ME_PATH_KEY] = rec.get_string(index, false, false);
+    (*target)[ME_RATIO_KEY] = rec.get_double(index, false);
+    (*target)[ME_STATUS_KEY] = rec.get_int(index, false);
+    folder = (*target)[ME_PATH_KEY].asString();
+    ratio = (*target)[ME_RATIO_KEY].asDouble();
   }
   if (folder.empty() && flags & onis::database::info_media_statistics) {
     throw std::runtime_error("Media path is empty");
@@ -61,25 +68,26 @@ void site_database::read_media_record(onis_kit::database::database_row& rec,
         throw std::runtime_error("Failed to get disk space: " + ec.message());
       }
       std::uintmax_t total_space = space.capacity;
-      std::uintmax_t free_space = space.free;
+      // std::uintmax_t free_space = space.free;
       std::uintmax_t available_space = space.available;
-      output[ME_TOTAL_BYTES_KEY] = total_space;
-      output[ME_FREE_BYTES_KEY] = available_space;
+      output[ME_TOTAL_BYTES_KEY] = static_cast<Json::UInt64>(total_space);
+      output[ME_FREE_BYTES_KEY] = static_cast<Json::UInt64>(available_space);
       if (flags & onis::database::info_media_data) {
-        if (info.total_space > 0) {
-          float tmp = (float)available_space / (float)total_space;
-          if ((1.0 - tmp) * 100.0 > ratio)
-            output[ME_STATUS_KEY] = onis::server::media_full;
+        if (total_space > 0) {
+          float tmp = static_cast<float>(available_space) /
+                      static_cast<float>(total_space);
+          if ((1.0f - tmp) * 100.0f > ratio)
+            output[ME_STATUS_KEY] = onis::database::media_full;
           else
-            output[ME_STATUS_KEY] = onis::server::media_available;
+            output[ME_STATUS_KEY] = onis::database::media_available;
         } else
-          output[ME_STATUS_KEY] = onis::server::media_full;
+          output[ME_STATUS_KEY] = onis::database::media_full;
       }
     } catch (const std::runtime_error& e) {
       output[ME_TOTAL_BYTES_KEY] = 0;
       output[ME_FREE_BYTES_KEY] = 0;
       if (flags & onis::database::info_media_data) {
-        output[ME_STATUS_KEY] = onis::server::media_full;
+        output[ME_STATUS_KEY] = onis::database::media_full;
       }
     }
   }

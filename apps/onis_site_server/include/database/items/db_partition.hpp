@@ -41,14 +41,14 @@ using json = Json::Value;
 
 namespace onis::database {
 
-const std::int32_t info_partition_name = 2;
-const std::int32_t info_partition_description = 4;
-const std::int32_t info_partition_status = 8;
-const std::int32_t info_partition_parameters = 16;
-const std::int32_t info_partition_volume = 32;
-const std::int32_t info_partition_conflict = 64;
-const std::int32_t info_partition_albums = 128;
-const std::int32_t info_partition_smart_albums = 256;
+const std::uint32_t info_partition_name = 2;
+const std::uint32_t info_partition_description = 4;
+const std::uint32_t info_partition_status = 8;
+const std::uint32_t info_partition_parameters = 16;
+const std::uint32_t info_partition_volume = 32;
+const std::uint32_t info_partition_conflict = 64;
+const std::uint32_t info_partition_albums = 128;
+const std::uint32_t info_partition_smart_albums = 256;
 
 ///////////////////////////////////////////////////////////////////////
 // partition_access_mode

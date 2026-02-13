@@ -3656,10 +3656,10 @@ onis::dicom_dataset_ptr dicom_dcmtk_manager::create_dicom_dataset() const {
       std::const_pointer_cast<onis::dicom_manager>(shared_from_this()));
 }
 
-onis::dicom_dir_ptr dicom_dcmtk_manager::create_dicom_dir() const {
-  // DICOM directory creation not yet implemented
-  return nullptr;
-}
+// onis::dicom_dir_ptr dicom_dcmtk_manager::create_dicom_dir() const {
+//  DICOM directory creation not yet implemented
+//  return nullptr;
+//}
 
 //-----------------------------------------------------------------------
 // character sets

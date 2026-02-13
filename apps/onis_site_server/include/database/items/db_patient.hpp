@@ -117,8 +117,8 @@ struct patient {
     }
 
     if (flags & info_patient_creation) {
-      onis::database::item::verify_string_value(input, PA_CRDATE_KEY, true,
-                                                true, 64);
+      onis::database::item::verify_string_value(input, PA_CRDATE_KEY, false,
+                                                false, 64);
       onis::database::item::verify_string_value(input, PA_ORIGIN_ID_KEY, true,
                                                 true, 64);
       onis::database::item::verify_string_value(input, PA_ORIGIN_NAME_KEY, true,

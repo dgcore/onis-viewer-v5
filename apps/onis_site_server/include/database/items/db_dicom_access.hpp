@@ -12,8 +12,8 @@ using json = Json::Value;
 namespace onis::database {
 
 struct dicom_access {
-  static const std::int32_t all_clients = 1;
-  static const std::int32_t limited_access = 256;
+  static const std::uint32_t all_clients = 1;
+  static const std::uint32_t limited_access = 256;
 
   static void create(json& access) {
     if (!access.isObject()) {

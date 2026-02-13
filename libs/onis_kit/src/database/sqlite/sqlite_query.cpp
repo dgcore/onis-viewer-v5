@@ -193,6 +193,22 @@ bool sqlite_query::bind_parameter(int index, bool value) {
   return true;
 }
 
+bool sqlite_query::bind_parameter(int index, std::nullptr_t) {
+  if (!prepared_ || !stmt_) {
+    set_last_error("Query not prepared");
+    return false;
+  }
+
+  int result = sqlite3_bind_null(stmt_, index);
+  if (result != SQLITE_OK) {
+    set_last_error("Parameter binding failed: " +
+                   std::string(sqlite3_errmsg(db_)));
+    return false;
+  }
+
+  return true;
+}
+
 void sqlite_query::clear_parameters() {
   if (stmt_) {
     sqlite3_clear_bindings(stmt_);

@@ -4,6 +4,7 @@
 #include "onis_kit/include/utilities/regex.hpp"
 
 #include <json/json.h>
+#include <cstdint>
 #include <limits>
 #include <memory>
 #include <regex>

@@ -8,7 +8,7 @@ using json = Json::Value;
 
 namespace onis::database {
 
-const std::int32_t info_site_name = 1;
+const std::uint32_t info_site_name = 1;
 
 struct site {
   static void create(json& site, std::uint32_t flags) {

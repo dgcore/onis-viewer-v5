@@ -18,15 +18,15 @@ using json = Json::Value;
 
 namespace onis::database {
 
-const std::int32_t info_role_name = 2;
-const std::int32_t info_role_description = 4;
-const std::int32_t info_role_permissions = 8;
-const std::int32_t info_role_active = 16;
-const std::int32_t info_role_inherit = 32;
-const std::int32_t info_role_membership = 64;
-const std::int32_t info_role_partition_access = 128;
-const std::int32_t info_role_dicom_access = 256;
-const std::int32_t info_role_pref_set = 512;
+const std::uint32_t info_role_name = 2;
+const std::uint32_t info_role_description = 4;
+const std::uint32_t info_role_permissions = 8;
+const std::uint32_t info_role_active = 16;
+const std::uint32_t info_role_inherit = 32;
+const std::uint32_t info_role_membership = 64;
+const std::uint32_t info_role_partition_access = 128;
+const std::uint32_t info_role_dicom_access = 256;
+const std::uint32_t info_role_pref_set = 512;
 
 struct role {
   static void create(json& item, std::uint32_t flags) {

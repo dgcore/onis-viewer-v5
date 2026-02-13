@@ -2776,7 +2776,7 @@ public:
   // dicom objects:
   virtual dicom_file_ptr create_dicom_file() const = 0;
   virtual dicom_dataset_ptr create_dicom_dataset() const = 0;
-  virtual dicom_dir_ptr create_dicom_dir() const = 0;
+  // virtual dicom_dir_ptr create_dicom_dir() const = 0;
 
   // character sets:
   virtual const dicom_charset* find_character_set_by_code(

@@ -175,3 +175,11 @@ config_service_ptr site_api::get_config_service() const {
 drogon_http_server_ptr site_api::get_http_server() const {
   return http_server_;
 }
+
+//------------------------------------------------------------------------------
+// DICOM manager access
+//------------------------------------------------------------------------------
+
+onis::dicom_manager_ptr site_api::get_dicom_manager() const {
+  return dicom_manager_;
+}

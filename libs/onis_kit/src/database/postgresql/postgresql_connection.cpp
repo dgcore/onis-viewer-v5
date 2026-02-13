@@ -9,7 +9,7 @@ namespace onis_kit {
 namespace database {
 
 postgresql_connection::postgresql_connection()
-    : connection_(nullptr), connected_(false) {}
+    : connection_(nullptr), connected_(false), in_transaction_(false) {}
 
 postgresql_connection::~postgresql_connection() {
   disconnect();
@@ -57,6 +57,11 @@ bool postgresql_connection::connect(const database_config& config) {
 
 void postgresql_connection::disconnect() {
   if (connection_) {
+    // Rollback any pending transaction before disconnecting
+    if (in_transaction_) {
+      PQexec(connection_, "ROLLBACK");
+      in_transaction_ = false;
+    }
     PQfinish(connection_);
     connection_ = nullptr;
   }
@@ -211,6 +216,85 @@ void postgresql_connection::set_last_error(const std::string& error) {
 
 void postgresql_connection::clear_last_error() {
   last_error_.clear();
+}
+
+bool postgresql_connection::begin_transaction() {
+  if (!is_connected()) {
+    set_last_error("Not connected to database");
+    return false;
+  }
+
+  if (in_transaction_) {
+    set_last_error("Transaction already in progress");
+    return false;
+  }
+
+  PGresult* result = PQexec(connection_, "BEGIN");
+  if (PQresultStatus(result) != PGRES_COMMAND_OK) {
+    set_last_error("Failed to begin transaction: " +
+                   std::string(PQresultErrorMessage(result)));
+    PQclear(result);
+    return false;
+  }
+
+  PQclear(result);
+  in_transaction_ = true;
+  clear_last_error();
+  return true;
+}
+
+bool postgresql_connection::commit() {
+  if (!is_connected()) {
+    set_last_error("Not connected to database");
+    return false;
+  }
+
+  if (!in_transaction_) {
+    set_last_error("No transaction in progress");
+    return false;
+  }
+
+  PGresult* result = PQexec(connection_, "COMMIT");
+  if (PQresultStatus(result) != PGRES_COMMAND_OK) {
+    set_last_error("Failed to commit transaction: " +
+                   std::string(PQresultErrorMessage(result)));
+    PQclear(result);
+    return false;
+  }
+
+  PQclear(result);
+  in_transaction_ = false;
+  clear_last_error();
+  return true;
+}
+
+bool postgresql_connection::rollback() {
+  if (!is_connected()) {
+    set_last_error("Not connected to database");
+    return false;
+  }
+
+  if (!in_transaction_) {
+    set_last_error("No transaction in progress");
+    return false;
+  }
+
+  PGresult* result = PQexec(connection_, "ROLLBACK");
+  if (PQresultStatus(result) != PGRES_COMMAND_OK) {
+    set_last_error("Failed to rollback transaction: " +
+                   std::string(PQresultErrorMessage(result)));
+    PQclear(result);
+    return false;
+  }
+
+  PQclear(result);
+  in_transaction_ = false;
+  clear_last_error();
+  return true;
+}
+
+bool postgresql_connection::in_transaction() const {
+  return in_transaction_;
 }
 
 }  // namespace database

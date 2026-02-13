@@ -2,6 +2,7 @@
 
 #include <libpq-fe.h>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 #include "../database_interface.hpp"
@@ -27,6 +28,7 @@ public:
   virtual bool bind_parameter(int index, int value) override;
   virtual bool bind_parameter(int index, double value) override;
   virtual bool bind_parameter(int index, bool value) override;
+  virtual bool bind_parameter(int index, std::nullptr_t) override;
   virtual void clear_parameters() override;
 
   std::string convert_placeholders(const std::string& sql) const;
@@ -34,7 +36,7 @@ public:
 private:
   PGconn* connection_;
   std::string sql_;
-  std::vector<std::string> parameters_;
+  std::vector<std::optional<std::string>> parameters_;
   std::string last_error_;
   bool prepared_;
 

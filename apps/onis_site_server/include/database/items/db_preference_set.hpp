@@ -11,10 +11,10 @@ using json = Json::Value;
 
 namespace onis::database {
 
-const std::int32_t info_pref_set_name = 2;
-const std::int32_t info_pref_set_description = 4;
-const std::int32_t info_pref_set_active = 8;
-const std::int32_t info_pref_set_items = 16;
+const std::uint32_t info_pref_set_name = 2;
+const std::uint32_t info_pref_set_description = 4;
+const std::uint32_t info_pref_set_active = 8;
+const std::uint32_t info_pref_set_items = 16;
 
 struct preference_set {
   static void create(json& item, std::uint32_t flags) {

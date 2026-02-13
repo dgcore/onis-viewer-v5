@@ -6,6 +6,7 @@
 #include <memory>
 #include <mutex>
 #include <set>
+#include <unordered_map>
 #include "../../database/site_database_pool.hpp"
 
 #include "./request_data.hpp"
@@ -21,11 +22,32 @@
 class request_service;
 typedef std::shared_ptr<request_service> request_service_ptr;
 
+///////////////////////////////////////////////////////////////////////
+// media_info
+///////////////////////////////////////////////////////////////////////
+class media_info;
+typedef std::shared_ptr<media_info> media_info_ptr;
+class media_info {
+public:
+  static media_info_ptr create(std::int32_t num, const std::string& folder,
+                               double ratio) {
+    return std::make_shared<media_info>(num, folder, ratio);
+  }
+  media_info(std::int32_t num, const std::string& folder, double ratio) {
+    this->num = num;
+    this->folder = folder;
+    this->ratio = ratio;
+  }
+  std::int32_t num;
+  std::string folder;
+  double ratio;
+};
+
 ////////////////////////////////////////////////////////////////////////////////
 // request_service class
 ////////////////////////////////////////////////////////////////////////////////
 
-class request_service {
+class request_service : public std::enable_shared_from_this<request_service> {
 public:
   // static constructor:
   static request_service_ptr create();
@@ -76,7 +98,6 @@ private:
   void create_configuration_source_nodes(const request_database& db,
                                          const request_session_ptr& session,
                                          Json::Value& sources) const;
-
   void analyze_partition_access(
       const request_session_ptr& session, const Json::Value& user,
       const std::unordered_map<std::string, const Json::Value&>& roles,
@@ -85,6 +106,29 @@ private:
       const request_session_ptr& session, const std::string& role_id,
       const std::unordered_map<std::string, const Json::Value&>& roles,
       std::set<std::string>& circular_loop, const request_database& db) const;
+
+  // permissions:
+  void verify_partition_access_permission(const request_database& db,
+                                          const request_session_ptr& session,
+                                          const std::string& partition_seq,
+                                          Json::Value* output,
+                                          std::uint32_t flags,
+                                          onis::database::lock_mode lock);
+
+  // media:
+  std::recursive_mutex _media_mutex;
+  std::unordered_map<std::string, media_info_ptr> _media;  // current media
+  std::unordered_map<std::string, std::vector<media_info_ptr>>
+      _media_list;  // all media
+  void check_media();
+  std::string get_current_media_folder(std::int32_t target,
+                                       const std::string& volume_seq,
+                                       std::int32_t* media,
+                                       const request_database& db);
+  std::string get_media_folder(std::int32_t target,
+                               const std::string& volume_seq,
+                               std::int32_t media, const request_database& db);
+
   /*void get_session_permissions(bool only_privileges,
                                search_access_result& result,
                                const request_database& db,
