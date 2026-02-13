@@ -174,7 +174,7 @@ bool site_database::get_online_series(const std::string& study_seq,
   int index = 1;
   bind_parameter(query, index, study_seq, "study_id");
   bind_parameter(query, index, series_uid, "uid");
-  bind_parameter(query, index, ONLINE_STATUS, "status");
+  bind_parameter(query, index, std::string(ONLINE_STATUS), "status");
 
   auto result = execute_query(query);
   if (result->has_rows()) {

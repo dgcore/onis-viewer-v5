@@ -128,7 +128,7 @@ void site_database::create_study_item(onis_kit::database::database_row& rec,
     study[ST_INSTITUTION_KEY] = rec.get_string(*target_index, true, true);
   }
   if (flags & onis::database::info_study_comment) {
-    study[ST_COMMENT_KEY] = rec.get_string(*target_index, true, false);
+    study[ST_COMMENT_KEY] = rec.get_string(*target_index, true, true);
   }
   if (flags & onis::database::info_study_stations) {
     study[ST_STATIONS_KEY] = rec.get_string(*target_index, true, true);

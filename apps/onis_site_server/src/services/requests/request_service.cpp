@@ -1,5 +1,6 @@
 #include "../../../include/services/requests/request_service.hpp"
 #include <filesystem>
+#include <iostream>
 #include <vector>
 #include "../../../include/database/items/db_media.hpp"
 #include "../../../include/exceptions/site_server_exceptions.hpp"
@@ -157,6 +158,8 @@ void request_service::process_request(const request_data_ptr& req) {
       output.clear();
       output["status"] = e.get_code();
       output["message"] = e.what();
+      std::string error_message = e.what();
+      std::cout << "Error: " << error_message << std::endl;
     });
   } catch (const std::exception& e) {
     req->write_output([&](json& output) {

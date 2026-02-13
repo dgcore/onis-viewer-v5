@@ -34,6 +34,29 @@ local_store_request::~local_store_request() {}
 // init
 //------------------------------------------------------------------------------
 
+void local_store_request::import_file_to_partition(
+    const request_database& db, std::string& partition_seq,
+    const std::string& partition_parameters, std::int32_t media,
+    const std::string& media_folder, const std::string& dicom_file_path,
+    bool do_commit, Json::Value* output, std::uint32_t* output_flags) {
+  try {
+    init(partition_parameters, dicom_file_path, media, media_folder);
+    import_file(db, partition_seq, output, output_flags);
+    if (do_commit) {
+      db->commit();
+    }
+    created_files_.clear();
+    cleanup();
+  } catch (const onis::exception& e) {
+    cleanup();
+    throw e;
+  } catch (...) {
+    cleanup();
+    throw;
+    cleanup();
+  }
+}
+
 void local_store_request::init(const std::string& parameters,
                                const std::string& path, std::int32_t media,
                                const std::string& media_folder) {
@@ -174,11 +197,9 @@ void local_store_request::import_file(const request_database& db,
 
   // if the patient id is empty, try to get one from the study uid.
   /*if (patient_id_.empty() && res.status == OSRSP_FAILURE) {
-    const Json::Value* online_study = _find_online_study(studies, OSTRUE, res);
-    if (online_study != NULL)
-      _patient_id = ((*online_study)["patient"])[PA_UID_KEY].asString();
-    else
-      _patient_id =
+    const Json::Value* online_study = _find_online_study(studies, OSTRUE,
+  res); if (online_study != NULL) _patient_id =
+  ((*online_study)["patient"])[PA_UID_KEY].asString(); else _patient_id =
           _default_pid + "_" +
           boost::uuids::to_string(db->application()->generate_random_uuid());
 
@@ -248,8 +269,8 @@ void local_store_request::import_file(const request_database& db,
           } else {
             // we didn't find a study where to attach the incoming image.
             // we will need to create a new study
-            // however, we might be able to attach this new study to an existing
-            // patient
+            // however, we might be able to attach this new study to an
+            // existing patient
             existing_items[0] = find_matching_patient(patients);
           }
         }
@@ -257,7 +278,8 @@ void local_store_request::import_file(const request_database& db,
 
       if (existing_items[0] != nullptr && existing_items[1] != nullptr) {
         // we will attach the image to an existing patient and study in the
-        // database maybe we also have a series to which we can attach the image
+        // database maybe we also have a series to which we can attach the
+        // image
         // !
         if (db->get_online_series((*existing_items[1])[ST_SEQ_KEY].asString(),
                                   series_uid_, onis::database::info_all, false,
@@ -314,6 +336,37 @@ void local_store_request::import_file(const request_database& db,
 //------------------------------------------------------------------------------
 
 void local_store_request::cleanup() {
+  dcm_.reset();
+  media_folder_.clear();
+  origin_id_.clear();
+  origin_name_.clear();
+  origin_ip_.clear();
+  partition_seq_.clear();
+  reject_no_pid_ = false;
+  conflict_mode_ = 0;
+  conflict_criterias_ = 0;
+  overwrite_mode_ = 0;
+  default_pid_.clear();
+  create_image_icon_ = false;
+  create_series_icon_ = false;
+  create_stream_file_ = false;
+  charset_.clear();
+  patient_id_.clear();
+  name_.clear();
+  ideogram_.clear();
+  phonetic_.clear();
+  birthdate_.clear();
+  birthtime_.clear();
+  sex_.clear();
+  study_uid_.clear();
+  series_uid_.clear();
+  sop_.clear();
+  modality_.clear();
+  study_date_.clear();
+  acc_num_.clear();
+  study_id_.clear();
+  study_desc_.clear();
+  current_time_.init_current_time();
   for (auto& file : created_files_) {
     onis::util::filesystem::delete_file(file);
   }
@@ -580,12 +633,12 @@ void local_store_request::save_dicom_file(
   if (!full_path.empty()) {
     // we need to save the file into our directory
     std::string id = onis::util::uuid::generate_random_uuid();
-    std::string file_name = "IM_" + id + ".dcm";
-    if (file_name.empty()) {
+    if (id.empty()) {
       throw onis::exception(
           EOS_FILE_WRITE,
           "Failed to create a unique file name for storing dicom file.");
     }
+    std::string file_name = "IM_" + id + ".dcm";
     onis::util::filesystem::concat(full_path, file_name);
     if (!dcm->save_file(full_path)) {
       throw onis::exception(EOS_FILE_WRITE, "Failed to store the dicom file.");

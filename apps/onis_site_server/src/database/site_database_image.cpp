@@ -4,6 +4,7 @@
 #include <sstream>
 #include "../../include/database/items/db_image.hpp"
 #include "../../include/database/items/db_patient.hpp"
+#include "../../include/database/items/db_study.hpp"
 #include "../../include/database/site_database.hpp"
 #include "onis_kit/include/core/exception.hpp"
 #include "onis_kit/include/utilities/string.hpp"
@@ -202,6 +203,10 @@ bool site_database::check_if_sop_already_exist_under_online_or_conflicted_study(
   bind_parameter(query, index, sop, "sop");
   bind_parameter(query, index, online_status, "status");
   bind_parameter(query, index, online_status, "series_status");
+  for (Json::ArrayIndex i = 0; i < studies.size(); i++) {
+    bind_parameter(query, index, studies[i]["study"][ST_SEQ_KEY].asString(),
+                   "series_status");
+  }
 
   auto result = execute_query(query);
   if (result->has_rows()) {

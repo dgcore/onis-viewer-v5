@@ -29,13 +29,14 @@ public:
   local_store_request& operator=(local_store_request&&) = delete;
 
   // operations:
-  void init(const std::string& parameters, const std::string& path,
-            std::int32_t media, const std::string& media_folder);
   void set_origin(const std::string& id, const std::string& name,
                   const std::string& ip);
-  void import_file(const request_database& db, const std::string& partition_seq,
-                   Json::Value* output, std::uint32_t* output_flags);
-  void cleanup();
+
+  void import_file_to_partition(
+      const request_database& db, std::string& partition_seq,
+      const std::string& partition_parameters, std::int32_t media,
+      const std::string& media_folder, const std::string& dicom_file_path,
+      bool do_commit, Json::Value* output, std::uint32_t* output_flags);
 
   // Dicom file saving:
   static void save_dicom_file(const onis::dicom_file_ptr& dcm,
@@ -102,8 +103,13 @@ private:
   bool study_is_in_conflict(const Json::Value* item);
 
   // process:
+  void init(const std::string& parameters, const std::string& path,
+            std::int32_t media, const std::string& media_folder);
+  void import_file(const request_database& db, const std::string& partition_seq,
+                   Json::Value* output, std::uint32_t* output_flags);
   void add_new_image_to_partition(const request_database& db,
                                   const Json::Value* conflict_study,
                                   Json::Value* existing_items[4],
                                   Json::Value* created_items);
+  void cleanup();
 };
