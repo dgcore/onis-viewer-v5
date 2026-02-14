@@ -1,9 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:onis_viewer/api/core/ov_api_core.dart';
+import 'package:onis_viewer/plugins/viewer/public/layout_controller_interface.dart';
+import 'package:onis_viewer/plugins/viewer/public/viewer_api.dart';
+import 'package:onis_viewer/plugins/viewer/toolbar/viewer_toolbar.dart';
+import 'package:onis_viewer/plugins/viewer/view_area/view_area.dart';
 
 import '../../../core/constants.dart';
 import '../../../pages/base/base_page.dart';
+import '../history_bar/viewer_history_bar.dart';
+import '../info_box/viewer_info_box.dart';
 import '../viewer_plugin.dart';
-import 'viewer_controller.dart';
 
 /// Medical image viewer page
 class ViewerPage extends BasePage {
@@ -19,111 +25,87 @@ class ViewerPage extends BasePage {
 }
 
 class _ViewerPageState extends BasePageState<ViewerPage> {
-  late ViewerController _controller;
+  ViewerApi? _viewerApi;
+  //late ViewerController _controller;
 
   @override
   Future<void> initializePage() async {
-    _controller = ViewerController();
-    await _controller.initialize();
+    _viewerApi = OVApi().plugins.getPublicApi<ViewerApi>('onis_viewer_plugin');
   }
 
   @override
-  Future<void> disposePage() async {
-    await _controller.dispose();
-  }
+  Future<void> disposePage() async {}
 
   @override
   Widget buildPageContent() {
-    return _buildContent();
+    final layoutController = _viewerApi?.layoutController;
+    return AnimatedBuilder(
+      animation: layoutController as Listenable,
+      builder: (context, child) {
+        return _buildContent(layoutController!);
+      },
+    );
   }
 
   @override
   Widget? buildPageHeader() {
-    // Return the viewer toolbar as the custom page header
-    return _buildToolbar();
+    // No header - toolbar is part of the content layout
+    return ViewerToolbar(
+      //controller: _controller,
+      height: 50.0,
+    );
   }
 
-  /// Build the viewer toolbar
-  Widget _buildToolbar() {
+  /// Build the main content area
+  Widget _buildContent(ILayoutController layoutController) {
     return Container(
-      height: 50,
-      color: OnisViewerConstants.surfaceColor,
-      padding: const EdgeInsets.symmetric(
-        horizontal: OnisViewerConstants.paddingMedium,
-      ),
-      child: Row(
+      color: OnisViewerConstants.backgroundColor,
+      child: Column(
         children: [
-          // Open image button
-          ElevatedButton.icon(
-            onPressed: _controller.openImage,
-            icon: const Icon(Icons.folder_open),
-            label: const Text('Open Image'),
-          ),
-          const SizedBox(width: OnisViewerConstants.marginMedium),
+          // Toolbar at the top - fixed height, full width
+          /*ViewerToolbar(
+            controller: _controller,
+            height: 50.0,
+          ),*/
+          // Main content area with history bar, image viewer, and info box
+          Expanded(
+            child: Row(
+              children: [
+                // History bar on the left - fixed width, remaining height
+                ViewerHistoryBar(
+                  width: 250.0,
+                  historyItems: _getHistoryItems(),
+                ),
 
-          // Save button
-          ElevatedButton.icon(
-            onPressed: _controller.saveImage,
-            icon: const Icon(Icons.save),
-            label: const Text('Save'),
-          ),
-          const SizedBox(width: OnisViewerConstants.marginMedium),
+                // Image viewer in the center - takes remaining space
+                Expanded(child: ViewArea(layoutController: layoutController)),
 
-          // Zoom controls
-          IconButton(
-            onPressed: _controller.zoomIn,
-            icon: const Icon(Icons.zoom_in),
-            tooltip: 'Zoom In',
-          ),
-          IconButton(
-            onPressed: _controller.zoomOut,
-            icon: const Icon(Icons.zoom_out),
-            tooltip: 'Zoom Out',
-          ),
-          IconButton(
-            onPressed: _controller.resetZoom,
-            icon: const Icon(Icons.zoom_out_map),
-            tooltip: 'Reset Zoom',
-          ),
-
-          const Spacer(),
-
-          // Image info
-          if (_controller.currentImage != null) ...[
-            Text(
-              '${_controller.currentImage!.width} × ${_controller.currentImage!.height}',
-              style: const TextStyle(
-                color: OnisViewerConstants.textSecondaryColor,
-                fontSize: 12,
-              ),
+                // Info box on the right - resizable, remaining height
+                ViewerInfoBox(
+                  initialWidth: 300.0,
+                  minWidth: 200.0,
+                  maxWidth: 600.0,
+                  infoItems: {},
+                ),
+              ],
             ),
-            const SizedBox(width: OnisViewerConstants.marginMedium),
-            Text(
-              'Zoom: ${(_controller.zoomLevel * 100).toInt()}%',
-              style: const TextStyle(
-                color: OnisViewerConstants.textSecondaryColor,
-                fontSize: 12,
-              ),
-            ),
-          ],
+          ),
         ],
       ),
     );
   }
 
-  /// Build the main content area
-  Widget _buildContent() {
-    return Container(
-      color: OnisViewerConstants.backgroundColor,
-      child: _controller.currentImage != null
-          ? _buildImageViewer()
-          : _buildNoImageWidget(),
-    );
+  /// Get history items for the history bar
+  List<String> _getHistoryItems() {
+    // TODO: Implement history tracking
+    // For now, return empty list or sample data
+    return [];
   }
 
   /// Build the image viewer
   Widget _buildImageViewer() {
-    return Center(
+    return SizedBox();
+    /*return Center(
       child: InteractiveViewer(
         minScale: 0.1,
         maxScale: 5.0,
@@ -133,11 +115,11 @@ class _ViewerPageState extends BasePageState<ViewerPage> {
           fit: BoxFit.contain,
         ),
       ),
-    );
+    );*/
   }
 
   /// Build widget when no image is loaded
-  Widget _buildNoImageWidget() {
+  /*Widget _buildNoImageWidget() {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -173,9 +155,9 @@ class _ViewerPageState extends BasePageState<ViewerPage> {
         ],
       ),
     );
-  }
+  }*/
 
-  @override
+  /*@override
   List<Widget> buildToolbarItems() {
     return [
       // Viewer-specific toolbar items
@@ -200,12 +182,13 @@ class _ViewerPageState extends BasePageState<ViewerPage> {
           ),
         ),
     ];
-  }
+  }*/
 
   @override
   String getPageStatus() {
-    return _controller.currentImage != null
+    /*return _controller.currentImage != null
         ? 'Viewing: ${_controller.currentImage!.name}'
-        : 'No image loaded';
+        : 'No image loaded';*/
+    return 'Viewer';
   }
 }

@@ -35,7 +35,7 @@ class OnisViewerConstants {
 
   // Spacing
   static const double paddingSmall = 8.0;
-  static const double paddingMedium = 16.0;
+  static const double paddingMedium = 10.0;
   static const double paddingLarge = 24.0;
   static const double marginSmall = 4.0;
   static const double marginMedium = 8.0;
