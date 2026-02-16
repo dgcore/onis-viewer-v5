@@ -1,4 +1,4 @@
-import 'dart:typed_data';
+/* 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 
@@ -102,3 +102,4 @@ class ViewerController {
     debugPrint('Loaded sample image');
   }
 }
+*/

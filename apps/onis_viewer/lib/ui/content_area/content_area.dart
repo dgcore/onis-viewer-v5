@@ -18,27 +18,71 @@ class _ContentAreaState extends State<ContentArea>
     implements PageManagerObserver {
   final OVApi _api = OVApi();
   PageType? _currentPage;
+  // Cache of page widgets to preserve them when switching tabs
+  final Map<String, Widget> _pageCache = {};
 
   @override
   void initState() {
     super.initState();
     _api.pages.addObserver(this);
     _currentPage = _api.pages.currentPage;
+    // Pre-cache available pages
+    _cacheAvailablePages();
   }
 
   @override
   void dispose() {
     _api.pages.removeObserver(this);
+    _pageCache.clear();
     super.dispose();
+  }
+
+  /// Cache all available pages
+  void _cacheAvailablePages() {
+    for (final pageType in _api.pages.availablePages) {
+      if (!_pageCache.containsKey(pageType.id)) {
+        _pageCache[pageType.id] = PageContainer(
+          pageType: pageType,
+          api: _api,
+          key: ValueKey(pageType.id),
+        );
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Container(
       color: OnisViewerConstants.backgroundColor,
-      child: _currentPage != null
-          ? PageContainer(pageType: _currentPage!, api: _api)
-          : _buildNoPageWidget(),
+      child: _buildPageContent(),
+    );
+  }
+
+  /// Build the page content using IndexedStack to preserve pages
+  Widget _buildPageContent() {
+    if (_api.pages.availablePages.isEmpty) {
+      return _buildNoPageWidget();
+    }
+
+    // Ensure all pages are cached
+    _cacheAvailablePages();
+
+    // Find the index of the current page
+    final currentIndex = _currentPage != null
+        ? _api.pages.availablePages
+            .indexWhere((page) => page.id == _currentPage!.id)
+        : 0;
+
+    if (currentIndex < 0 || currentIndex >= _api.pages.availablePages.length) {
+      return _buildNoPageWidget();
+    }
+
+    // Use IndexedStack to preserve all pages (only the current one is visible)
+    return IndexedStack(
+      index: currentIndex,
+      children: _api.pages.availablePages.map((pageType) {
+        return _pageCache[pageType.id] ?? _buildNoPageWidget();
+      }).toList(),
     );
   }
 
@@ -85,6 +129,14 @@ class _ContentAreaState extends State<ContentArea>
     if (mounted) {
       setState(() {
         _currentPage = newPage;
+        // Ensure the new page is cached
+        if (!_pageCache.containsKey(newPage.id)) {
+          _pageCache[newPage.id] = PageContainer(
+            pageType: newPage,
+            api: _api,
+            key: ValueKey(newPage.id),
+          );
+        }
       });
     }
   }
@@ -93,12 +145,26 @@ class _ContentAreaState extends State<ContentArea>
   void onPageAdded(PageType pageType) {
     // Handle page added event
     debugPrint('Page added in ContentArea: ${pageType.name}');
+    // Cache the new page
+    if (mounted && !_pageCache.containsKey(pageType.id)) {
+      _pageCache[pageType.id] = PageContainer(
+        pageType: pageType,
+        api: _api,
+        key: ValueKey(pageType.id),
+      );
+      setState(() {});
+    }
   }
 
   @override
   void onPageRemoved(PageType pageType) {
     // Handle page removed event
     debugPrint('Page removed in ContentArea: ${pageType.name}');
+    // Remove from cache
+    _pageCache.remove(pageType.id);
+    if (mounted) {
+      setState(() {});
+    }
   }
 
   @override

@@ -32,10 +32,11 @@ class OnisViewerConstants {
   static const Color tabButtonActiveColor = Color(0xFF2196F3);
   static const Color textColor = Color(0xFFFFFFFF);
   static const Color textSecondaryColor = Color(0xFFB0B0B0);
+  static const Color viewAreaBackgroundColor = Color(0x00000000);
 
   // Spacing
   static const double paddingSmall = 8.0;
-  static const double paddingMedium = 16.0;
+  static const double paddingMedium = 10.0;
   static const double paddingLarge = 24.0;
   static const double marginSmall = 4.0;
   static const double marginMedium = 8.0;
