@@ -4,6 +4,6 @@ class ViewLayout {
   late ViewLayoutNode rootNode;
 
   ViewLayout() {
-    rootNode = ViewLayoutNode(this);
+    rootNode = ViewLayoutNode(this, null);
   }
 }
