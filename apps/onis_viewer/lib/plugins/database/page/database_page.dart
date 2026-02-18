@@ -109,7 +109,11 @@ class _DatabasePageState extends BasePageState<DatabasePage> {
           },
           onExport: () => {},
           onTransfer: () => {},
-          onOpen: () => {},
+          onOpen: () {
+            if (selected != null && mounted) {
+              sourceController.openSelectedStudies(selected.uid, this.context);
+            }
+          },
           selectedLocation: 'Local computer',
           onSearch: () async {
             if (selected != null) {

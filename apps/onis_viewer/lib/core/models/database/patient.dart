@@ -11,7 +11,6 @@ class Patient {
 
   /// Flags indicating which fields are valid/present
   int flags;
-
   String sourceUid;
   String id;
   String pid;

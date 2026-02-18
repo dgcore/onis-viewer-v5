@@ -20,8 +20,6 @@ class Study {
 
   /// Flags indicating which fields are valid/present
   int flags;
-
-  String sourceUid;
   String id; // seq
   String uid;
   String charset;
@@ -48,7 +46,6 @@ class Study {
 
   Study({
     this.flags = 0,
-    this.sourceUid = '',
     this.id = '',
     this.uid = '',
     this.charset = '',
@@ -151,7 +148,6 @@ class Study {
 
     return Study(
       flags: flags,
-      sourceUid: sourceUid ?? json['sourceUid'] as String? ?? '',
       id: json['seq'] as String? ?? json['id'] as String? ?? '',
       uid: json['uid'] as String? ?? '',
       charset: (flags & infoStudyCharacterSet) != 0

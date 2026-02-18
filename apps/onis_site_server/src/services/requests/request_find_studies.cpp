@@ -22,7 +22,7 @@ namespace {
 bool is_test_mode_enabled() {
   // const char* test_mode = std::getenv("ONIS_TEST_MODE");
   // return test_mode != nullptr && std::string(test_mode) == "1";
-  return true;
+  return false;
 }
 
 // Get test data count from environment variable (default: 1000)

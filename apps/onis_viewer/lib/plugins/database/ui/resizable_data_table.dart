@@ -804,9 +804,7 @@ class _ResizableDataTableState extends State<ResizableDataTable>
                 case 'source':
                   cellData = study.patient.sourceUid.isNotEmpty
                       ? study.patient.sourceUid
-                      : study.study.sourceUid.isNotEmpty
-                          ? study.study.sourceUid
-                          : 'N/A';
+                      : 'N/A';
                   break;
                 case 'patientId':
                   cellData = study.patient.pid.isNotEmpty

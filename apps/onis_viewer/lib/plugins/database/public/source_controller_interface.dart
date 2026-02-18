@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:onis_viewer/core/database_source.dart';
+import 'package:onis_viewer/core/models/database/filter.dart';
 import 'package:onis_viewer/core/models/database/patient.dart' as database;
 import 'package:onis_viewer/core/models/database/study.dart' as database;
 import 'package:onis_viewer/core/responses/find_study_response.dart';
@@ -22,13 +23,15 @@ abstract class ISourceController extends ChangeNotifier {
   bool canTransfer(String sourceUid);
   Future<Map<String, dynamic>?> importDicomFile(
       String sourceUid, String filePath);
-  Future<FindPatientStudyResponse> findStudies(String sourceUid);
+  Future<FindPatientStudyResponse> findStudies(String sourceUid,
+      {DBFilters? filters, bool withSeries = false});
   void setStudies(FindPatientStudyResponse response);
   void clearStudies(String sourceUid);
   List<({database.Patient patient, database.Study study})> getStudiesForSource(
       String sourceUid);
   List<({database.Patient patient, database.Study study})>
       getSelectedStudiesForSource(String sourceUid);
+  void openSelectedStudies(String sourceUid, BuildContext context);
   ({double horizontal, double vertical}) getScrollPositionsForSource(
       String sourceUid);
   void saveScrollPositionsForSource(
