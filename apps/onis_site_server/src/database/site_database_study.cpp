@@ -265,11 +265,11 @@ void site_database::find_studies(const std::string& partition_seq,
                                  lock_mode lock, Json::Value& output) {
   // create the filter clause:
   bool have_criteria = false;
-  std::string filter_clause;  // =
-                              // construct_study_filter_clause(filters, true,
-                              // have_criteria);
-  if (reject_empty_request && !have_criteria)
+  std::string filter_clause =
+      construct_study_filter_clause(filters, true, have_criteria);
+  if (reject_empty_request && !have_criteria) {
     return;
+  }
 
   // construct the sql command:
   const auto study_columns = get_study_columns(study_flags, true);
@@ -282,10 +282,9 @@ void site_database::find_studies(const std::string& partition_seq,
                       " order by pacs_studies.studydate desc";
   auto query = create_and_prepare_query(columns, from, clause, lock, limit);
 
-  if (!query->bind_parameter(1, partition_seq)) {
-    std::throw_with_nested(
-        std::runtime_error("Failed to bind partition_id parameter"));
-  }
+  std::int32_t index = 1;
+  bind_parameter(query, index, partition_seq, "partition_seq");
+  bind_parameters_for_study_filter_clause(query, index, filters, true);
 
   auto result = execute_query(query);
   if (result->has_rows()) {
@@ -864,3 +863,387 @@ void remove_partition_study_links(const onis::astring& study_seq,
                                   onis::aresult& res);
 std::uint64_t count_series_links_related_with_study_link(
     const onis::astring study_link_seq, onis::aresult& res);*/
+
+//------------------------------------------------------------------------------
+// Study filter clause
+//------------------------------------------------------------------------------
+
+std::string site_database::construct_study_filter_clause(
+    const Json::Value& filters, bool with_patient, bool& have_criteria) {
+  bool study_root = true;
+  std::string filter_clause;
+  have_criteria = false;
+  if (with_patient) {
+    have_criteria |= compose_filter_clause(filters, "pid", "PACS_PATIENTS.PID",
+                                           filter_clause);
+    have_criteria |= compose_name_filter_clause(
+        filters, "name", "PACS_PATIENTS.NAME", "PACS_PATIENTS.IDEOGRAM",
+        "PACS_PATIENTS.PHONETIC", filter_clause);
+    have_criteria |= compose_filter_clause(filters, "sex", "PACS_PATIENTS.SEX",
+                                           filter_clause);
+  }
+  have_criteria |= compose_filter_clause(filters, "accnum",
+                                         "PACS_STUDIES.ACCNUM", filter_clause);
+  have_criteria |= compose_filter_clause(
+      filters, "institution", "PACS_STUDIES.INSTITUTION", filter_clause);
+  have_criteria |= compose_filter_clause(filters, "comment",
+                                         "PACS_STUDIES.COMMENT", filter_clause);
+  have_criteria |= compose_filter_clause(
+      filters, "desc", "PACS_STUDIES.DESCRIPTION", filter_clause);
+  have_criteria |= compose_filter_clause(filters, "studyid",
+                                         "PACS_STUDIES.STUDYID", filter_clause);
+  have_criteria |= compose_date_range_filter_clause(
+      filters, "startStudyDate", "endStudyDate", "PACS_STUDIES.STUDYDATE",
+      filter_clause);
+  have_criteria |= compose_filter_clause(
+      filters, "modalities", "PACS_STUDIES.MODALITIES", "|", filter_clause);
+  have_criteria |= compose_filter_clause(
+      filters, "parts", "PACS_STUDIES.BODYPARTS", "|", filter_clause);
+  have_criteria |= compose_filter_clause(
+      filters, "stations", "PACS_STUDIES.STATIONS", "|", filter_clause);
+
+  // status filter:
+  std::int32_t status = -2;
+  if (filters.isMember("status") && filters["status"].isMember("value"))
+    status = filters["status"]["value"].asInt();
+
+  if (!study_root)
+    return filter_clause;  // nothing to do
+
+  auto online_patients =
+      " AND PACS_PATIENTS.STATUS='" + std::string(ONLINE_STATUS) + "'";
+  auto online_studies =
+      " AND PACS_STUDIES.STATUS='" + std::string(ONLINE_STATUS) + "'";
+
+  if (with_patient) {
+    if (status == -1) {
+      filter_clause += online_patients;
+    } else if (status == 1 || status == 2) {
+      filter_clause += online_patients +
+                       " AND PACS_STUDIES.STATUS=PACS_STUDIES.ID AND "
+                       "PACS_STUDIES.CONFLICT_ID IS " +
+                       (status == 1 ? "NULL" : "NOT NULL");
+      have_criteria = true;
+    } else {
+      filter_clause += online_patients + online_studies;
+    }
+  } else {
+    if (status == 1 || status == 2) {
+      filter_clause +=
+          " AND PACS_STUDIES.STATUS=PACS_STUDIES.ID AND "
+          "PACS_STUDIES.CONFLICT_ID IS " +
+          std::string(status == 1 ? "NULL" : "NOT NULL");
+      have_criteria = true;
+    } else if (status != -1) {
+      filter_clause += online_studies;
+    }
+    // if status == -1, do nothing
+  }
+  return filter_clause;
+}
+
+bool site_database::compose_filter_clause(const Json::Value& filters,
+                                          const std::string& key,
+                                          const std::string& column,
+                                          std::string& filter_clause) {
+  bool have_filter = false;
+  if (filters.isMember(key) && filters[key].isMember("value") &&
+      filters[key]["value"].isString()) {
+    std::string value = filters[key]["value"].asString();
+    if (!value.empty()) {
+      filter_clause += " AND " + column;
+      std::int32_t match_type =
+          filters[key].isMember("type") && filters[key]["type"].isInt()
+              ? filters[key]["type"].asInt()
+              : 0;
+      switch (match_type) {
+        case 0:  // perfect match
+          have_filter = true;
+          filter_clause += "=?";
+          break;
+        case 1:  // like
+          have_filter = true;
+          filter_clause += " LIKE ?";
+          break;
+        case 2:  // use wildcards
+          value = prepare_for_like(value);
+          if (!value.empty()) {
+            have_filter = true;
+            filter_clause += " LIKE ?";
+          }
+          break;
+        default:  // perfect match
+          have_filter = true;
+          filter_clause += "=?";
+          break;
+      };
+    }
+  }
+  return have_filter;
+}
+
+bool site_database::compose_filter_clause(const Json::Value& filters,
+                                          const std::string& key,
+                                          const std::string& column,
+                                          const std::string& separator,
+                                          std::string& filter_clause) {
+  bool have_filter = false;
+  if (filters.isMember(key) && filters[key].isMember("value") &&
+      filters[key]["value"].isString()) {
+    std::string value = filters[key]["value"].asString();
+    if (!value.empty()) {
+      std::int32_t match_type = 0;  // perfect match
+      if (filters[key].isMember("type"))
+        match_type = filters[key]["type"].asInt();
+      std::vector<std::string> list;
+      if (separator.empty())
+        list.push_back(value);
+      else
+        onis::util::string::split(value, list, separator);
+
+      std::string total;
+      std::int32_t elements = 0;
+      for (auto& item : list) {
+        if (item.empty())
+          continue;
+        if (!total.empty())
+          total += " OR ";
+        switch (match_type) {
+          case 0:  // perfect match
+            have_filter = true;
+            total += column + "=?";
+            break;
+          case 1:  // like
+            have_filter = true;
+            total += column + " LIKE ?";
+            break;
+          case 2:  // wildcards
+            item = prepare_for_like(item);
+            if (!item.empty()) {
+              have_filter = true;
+              filter_clause += " LIKE ?";
+            }
+            break;
+          default:
+            have_filter = true;
+            total += column + "=?";
+            break;
+        };
+        elements++;
+      }
+      if (elements == 1)
+        filter_clause += " AND " + total;
+      else if (elements > 1)
+        filter_clause += " AND (" + total + ")";
+    }
+  }
+  return have_filter;
+}
+
+bool site_database::compose_date_range_filter_clause(
+    const Json::Value& filters, const std::string& key1,
+    const std::string& key2, const std::string& column,
+    std::string& filter_clause) {
+  bool have_filter = false;
+
+  std::string from;
+  if (filters.isMember(key1) && filters[key1].isMember("value") &&
+      filters[key1]["value"].isString()) {
+    from = filters[key1]["value"].asString();
+  }
+  std::string to;
+  if (filters.isMember(key2) && filters[key2].isMember("value") &&
+      filters[key2]["value"].isString()) {
+    to = filters[key2]["value"].asString();
+  }
+  if (from.length() == 10 && to.length() == 10) {
+    have_filter = true;
+    if (from == to)
+      filter_clause += " AND " + column + "=?";
+    else
+      filter_clause += " AND " + column + ">=? AND " + column + "<=?";
+  } else if (from.length() == 10) {
+    have_filter = true;
+    filter_clause += " AND " + column + ">=?";
+  } else if (to.length() == 10) {
+    have_filter = true;
+    filter_clause += " AND " + column + "<=?";
+  }
+  return have_filter;
+}
+
+bool site_database::compose_name_filter_clause(const Json::Value& filters,
+                                               const std::string& key,
+                                               const std::string& column1,
+                                               const std::string& column2,
+                                               const std::string& column3,
+                                               std::string& filter_clause) {
+  if (!filters.isMember(key) || !filters[key].isMember("value") ||
+      !filters[key]["value"].isString()) {
+    return false;
+  }
+
+  std::string value = filters[key]["value"].asString();
+  if (value.empty()) {
+    return false;
+  }
+
+  std::int32_t match_type =
+      filters[key].isMember("type") && filters[key]["type"].isInt()
+          ? filters[key]["type"].asInt()
+          : 0;
+
+  // Perfect match case
+  if (match_type != 1 && match_type != 2) {
+    filter_clause +=
+        " AND (" + column1 + "=? OR " + column2 + "=? OR " + column3 + "=?)";
+    return true;
+  }
+
+  // LIKE or wildcards case
+  std::vector<std::string> words;
+  onis::util::string::split(value, words, " ");
+
+  // Build LIKE clauses for each column
+  std::array<std::string, 3> column_clauses;
+  std::array<const std::string*, 3> columns = {&column1, &column2, &column3};
+
+  for (std::size_t i = 0; i < 3; ++i) {
+    std::vector<std::string> column_parts;
+    for (auto& word : words) {
+      if (match_type == 2) {
+        word = prepare_for_like(word);
+      }
+      if (!word.empty()) {
+        column_parts.push_back(*columns[i] + " LIKE ?");
+      }
+    }
+    if (!column_parts.empty()) {
+      column_clauses[i] = column_parts[0];
+      for (std::size_t j = 1; j < column_parts.size(); ++j) {
+        column_clauses[i] += " AND " + column_parts[j];
+      }
+    }
+  }
+
+  // Collect non-empty column clauses
+  std::vector<std::string> active_clauses;
+  for (const auto& clause : column_clauses) {
+    if (!clause.empty()) {
+      active_clauses.push_back(clause);
+    }
+  }
+
+  if (active_clauses.empty()) {
+    return false;
+  }
+
+  // Build final clause: wrap multi-word clauses in parentheses, join with OR
+  filter_clause += " AND (";
+  bool first = true;
+  for (const auto& clause : active_clauses) {
+    if (!first) {
+      filter_clause += " OR ";
+    }
+    // Check if clause needs parentheses (contains AND)
+    if (clause.find(" AND ") != std::string::npos) {
+      filter_clause += "(" + clause + ")";
+    } else {
+      filter_clause += clause;
+    }
+    first = false;
+  }
+  filter_clause += ")";
+
+  return true;
+}
+
+std::string site_database::prepare_for_like(const std::string& value) {
+  if (value.empty())
+    return {};
+
+  // Find first and last non-'*' character
+  auto first = value.find_first_not_of('*');
+  auto last = value.find_last_not_of('*');
+  if (first == std::string::npos)  // string is all '*'
+    return "%";
+
+  std::string res;
+  if (first != 0)
+    res += '%';
+  res += value.substr(first, last - first + 1);
+  if (last != value.length() - 1)
+    res += '%';
+
+  // Replace '?' with '_'
+  for (auto& ch : res)
+    if (ch == '?')
+      ch = '_';
+
+  return res;
+}
+
+void site_database::bind_parameters_for_study_filter_clause(
+    std::unique_ptr<onis_kit::database::database_query>& query,
+    std::int32_t& index, const Json::Value& filters, bool with_patient) {
+  if (with_patient) {
+    bind_parameter_for_study_filter_clause(query, index, filters, "pid");
+    /*have_criteria |= compose_name_filter_clause(
+        filters, "name", "PACS_PATIENTS.NAME", "PACS_PATIENTS.IDEOGRAM",
+        "PACS_PATIENTS.PHONETIC", filter_clause);
+    have_criteria |= compose_filter_clause(filters, "sex", "PACS_PATIENTS.SEX",
+                                           filter_clause);*/
+  }
+
+  /*have_criteria |= compose_filter_clause(filters, "accnum",
+                                         "PACS_STUDIES.ACCNUM", filter_clause);
+  have_criteria |= compose_filter_clause(
+      filters, "institution", "PACS_STUDIES.INSTITUTION", filter_clause);
+  have_criteria |= compose_filter_clause(filters, "comment",
+                                         "PACS_STUDIES.COMMENT", filter_clause);
+  have_criteria |= compose_filter_clause(
+      filters, "desc", "PACS_STUDIES.DESCRIPTION", filter_clause);
+  have_criteria |= compose_filter_clause(filters, "studyid",
+                                         "PACS_STUDIES.STUDYID", filter_clause);
+  have_criteria |= compose_date_range_filter_clause(
+      filters, "startStudyDate", "endStudyDate", "PACS_STUDIES.STUDYDATE",
+      filter_clause);
+  have_criteria |= compose_filter_clause(
+      filters, "modalities", "PACS_STUDIES.MODALITIES", "|", filter_clause);
+  have_criteria |= compose_filter_clause(
+      filters, "parts", "PACS_STUDIES.BODYPARTS", "|", filter_clause);
+  have_criteria |= compose_filter_clause(
+      filters, "stations", "PACS_STUDIES.STATIONS", "|", filter_clause);*/
+}
+
+void site_database::bind_parameter_for_study_filter_clause(
+    std::unique_ptr<onis_kit::database::database_query>& query,
+    std::int32_t& index, const Json::Value& filters, const std::string& key) {
+  if (filters.isMember(key) && filters[key].isMember("value") &&
+      filters[key]["value"].isString()) {
+    std::string value = filters[key]["value"].asString();
+    if (!value.empty()) {
+      std::int32_t match_type =
+          filters[key].isMember("type") && filters[key]["type"].isInt()
+              ? filters[key]["type"].asInt()
+              : 0;
+      switch (match_type) {
+        case 0:  // perfect match
+          bind_parameter(query, index, value, key);
+          break;
+        case 1:  // like
+          bind_parameter(query, index, "%" + value + "%", key);
+          break;
+        case 2:  // use wildcards
+          value = prepare_for_like(value);
+          if (!value.empty()) {
+            bind_parameter(query, index, value, key);
+          }
+          break;
+        default:  // perfect match
+          bind_parameter(query, index, value, key);
+          break;
+      };
+    }
+  }
+}

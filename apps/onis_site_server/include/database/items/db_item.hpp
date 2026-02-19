@@ -212,6 +212,12 @@ public:
     }
   }
 
+  static inline void verify_object_value(const json& input, const char* key,
+                                         bool allow_null) {
+    if (pre_verify(input, key, Json::objectValue, allow_null))
+      return;
+  }
+
   static inline void verify_seq_version_flags(const json& input,
                                               bool with_seq) {
     if (with_seq) {

@@ -143,7 +143,7 @@ class _RetrieveSeriesDialogState extends State<RetrieveSeriesDialog> {
     } else {
       final patient = widget.patients[_currentIndex];
       DBFilters filters = DBFilters();
-      filters.pid.value = patient.id;
+      filters.pid.value = patient.pid;
       filters.pid.type = 0;
       filters.studyDateMode.value = DBFilters.any;
       final response = await sourceController.findStudies(patient.sourceUid,

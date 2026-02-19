@@ -176,6 +176,9 @@ void request_service::process_find_studies_request(
   onis::database::item::verify_integer_value(req->input_json, SO_TYPE_KEY,
                                              false);
   onis::database::item::verify_integer_value(req->input_json, "limit", true);
+  if (req->input_json.isMember("filters")) {
+    onis::database::item::verify_object_value(req->input_json, "filters", true);
+  }
 
   // Build target sources:
   std::string source_id = req->input_json["source"].asString();
@@ -231,7 +234,7 @@ void request_service::process_find_studies_request(
           } else {
             // Use real database
             request_database db(this);
-            Json::Value filters(Json::objectValue);
+            const Json::Value& filters = req->input_json["filters"];
             db->find_studies(source.seq, source.reject_empty_request,
                              source.limit, filters, onis::database::info_all,
                              onis::database::info_all, true,
