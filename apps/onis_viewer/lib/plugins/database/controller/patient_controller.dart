@@ -9,6 +9,9 @@ class PatientController extends IPatientController {
   final List<entities.Patient> _patients = [];
 
   @override
+  List<entities.Patient> get patients => List.unmodifiable(_patients);
+
+  @override
   entities.Patient? findPatient(database.Patient patient) {
     for (final item in _patients) {
       if (item.databaseInfo == null) continue;

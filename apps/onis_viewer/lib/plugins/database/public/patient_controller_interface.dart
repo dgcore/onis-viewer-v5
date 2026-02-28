@@ -5,6 +5,7 @@ import 'package:onis_viewer/core/responses/find_study_response.dart';
 
 /// Interface for IPatientController functionality
 abstract class IPatientController extends ChangeNotifier {
+  List<entities.Patient> get patients;
   entities.Patient? findPatient(database.Patient patient);
   void registerPatient(entities.Patient patient, bool notify);
   Future<void> openPatients(List<database.Patient> patients,
