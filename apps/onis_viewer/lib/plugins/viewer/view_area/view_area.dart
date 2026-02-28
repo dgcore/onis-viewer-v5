@@ -1,13 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:onis_viewer/core/constants.dart';
+import 'package:onis_viewer/core/models/entities/patient.dart' as entities;
 import 'package:onis_viewer/plugins/viewer/core/layout/view_layout_node.dart';
 import 'package:onis_viewer/plugins/viewer/public/layout_controller_interface.dart';
 
 /// View area widget that builds widgets following the layout tree structure
 class ViewArea extends StatefulWidget {
   final ILayoutController layoutController;
+
+  /// Called when a series is dropped from the history bar onto a view cell.
+  /// [node] is the layout node (view cell) that received the drop.
+  final void Function(ViewLayoutNode node, entities.Series series)?
+      onSeriesDropped;
+
   const ViewArea({
     required this.layoutController,
+    this.onSeriesDropped,
     super.key,
   });
 
@@ -58,12 +66,12 @@ class _ViewAreaState extends State<ViewArea> {
     );
   }
 
-  /// Build a leaf widget (single view)
+  /// Build a leaf widget (single view); wraps content in DragTarget for series drop
   Widget _buildLeafWidget(ViewLayoutNode node) {
     final leafWidget = node.leafWidget;
+    Widget content;
     if (leafWidget == null) {
-      // Empty leaf - show placeholder
-      return Container(
+      content = Container(
         color: OnisViewerConstants.backgroundColor,
         child: Center(
           child: Text(
@@ -75,21 +83,42 @@ class _ViewAreaState extends State<ViewArea> {
           ),
         ),
       );
-    }
-
-    // TODO: Build actual widget from ViewLayoutNodeWidget
-    // For now, return a placeholder
-    return Container(
-      color: Colors.black, //OnisViewerConstants.viewAreaBackgroundColor,
-      child: Center(
-        child: Text(
-          'View Widget',
-          style: TextStyle(
-            color: OnisViewerConstants.textColor,
-            fontSize: 14,
+    } else {
+      // TODO: Build actual widget from ViewLayoutNodeWidget
+      content = Container(
+        color: Colors.black,
+        child: Center(
+          child: Text(
+            'View Widget',
+            style: TextStyle(
+              color: OnisViewerConstants.textColor,
+              fontSize: 14,
+            ),
           ),
         ),
-      ),
+      );
+    }
+
+    return DragTarget<entities.Series>(
+      onWillAcceptWithDetails: (details) => true,
+      onAcceptWithDetails: (details) {
+        widget.onSeriesDropped?.call(node, details.data);
+      },
+      builder: (context, candidateData, rejectedData) {
+        final isHighlighted = candidateData.isNotEmpty;
+        return AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          decoration: BoxDecoration(
+            border: isHighlighted
+                ? Border.all(
+                    color: OnisViewerConstants.primaryColor,
+                    width: 3,
+                  )
+                : null,
+          ),
+          child: content,
+        );
+      },
     );
   }
 
