@@ -362,7 +362,7 @@ class _StudySection extends StatelessWidget {
   }
 }
 
-/// Square tile for one series: image + image count badge top-left
+/// Square tile for one series: image + image count badge top-left. Draggable.
 class _SeriesTile extends StatelessWidget {
   static const double _tileSize = 72;
 
@@ -378,7 +378,7 @@ class _SeriesTile extends StatelessWidget {
     final showAsUrl =
         iconPath.startsWith('http://') || iconPath.startsWith('https://');
 
-    return SizedBox(
+    final tileContent = SizedBox(
       width: _tileSize,
       height: _tileSize,
       child: Stack(
@@ -397,7 +397,7 @@ class _SeriesTile extends StatelessWidget {
                   : _placeholder(),
             ),
           ),
-          // Image count at top-left, above the image (inside the tile)
+          // Image count at top-left
           Positioned(
             left: 4,
             top: 4,
@@ -419,6 +419,23 @@ class _SeriesTile extends StatelessWidget {
           ),
         ],
       ),
+    );
+
+    return Draggable<entities.Series>(
+      data: series,
+      feedback: Material(
+        elevation: 4,
+        borderRadius: BorderRadius.circular(4),
+        child: Opacity(
+          opacity: 0.9,
+          child: tileContent,
+        ),
+      ),
+      childWhenDragging: Opacity(
+        opacity: 0.4,
+        child: tileContent,
+      ),
+      child: tileContent,
     );
   }
 

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:onis_viewer/api/core/ov_api_core.dart';
+import 'package:onis_viewer/core/models/entities/patient.dart' as entities;
+import 'package:onis_viewer/plugins/viewer/core/layout/view_layout_node.dart';
 import 'package:onis_viewer/plugins/viewer/public/layout_controller_interface.dart';
 import 'package:onis_viewer/plugins/viewer/public/viewer_api.dart';
 import 'package:onis_viewer/plugins/viewer/toolbar/viewer_toolbar.dart';
@@ -78,7 +80,12 @@ class _ViewerPageState extends BasePageState<ViewerPage> {
                 ),
 
                 // Image viewer in the center - takes remaining space
-                Expanded(child: ViewArea(layoutController: layoutController)),
+                Expanded(
+                  child: ViewArea(
+                    layoutController: layoutController,
+                    onSeriesDropped: _onSeriesDroppedOnView,
+                  ),
+                ),
 
                 // Info box on the right - resizable, remaining height
                 ViewerInfoBox(
@@ -91,6 +98,23 @@ class _ViewerPageState extends BasePageState<ViewerPage> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  /// Called when a series is dropped from the history bar onto a view cell
+  void _onSeriesDroppedOnView(
+      ViewLayoutNode layoutNode, entities.Series series) {
+    // TODO: Load series in the target view (e.g. display images)
+    final modality = series.databaseInfo?.modality ?? '';
+    final desc = series.databaseInfo?.description ?? '';
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          'Series dropped: ${modality.isNotEmpty ? modality : "—"} '
+          '${desc.isNotEmpty ? "($desc)" : ""}',
+        ),
+        duration: const Duration(seconds: 2),
       ),
     );
   }
