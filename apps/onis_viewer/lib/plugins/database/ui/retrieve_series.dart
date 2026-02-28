@@ -1,36 +1,29 @@
 import 'package:flutter/material.dart';
 import 'package:onis_viewer/api/ov_api.dart';
 import 'package:onis_viewer/core/models/database/filter.dart';
+import 'package:onis_viewer/core/responses/find_study_response.dart';
 import 'package:onis_viewer/plugins/database/public/database_api.dart';
 
 import '../../../core/constants.dart';
 import '../../../core/models/database/patient.dart' as database;
-import '../../../core/models/database/study.dart' as database;
 
 /// Dialog for retrieving series with progress indication
 class RetrieveSeriesDialog extends StatefulWidget {
   final List<database.Patient> patients;
-  final ({database.Patient patient, database.Study study})? primary;
 
-  const RetrieveSeriesDialog({
-    super.key,
-    required this.patients,
-    this.primary,
-  });
+  const RetrieveSeriesDialog({super.key, required this.patients});
 
   /// Show the retrieve series dialog
-  static Future<bool?> show(
+  static Future<List<FindPatientStudyItem>?> show(
     BuildContext context, {
     required List<database.Patient> patients,
-    ({database.Patient patient, database.Study study})? primary,
   }) {
-    return showDialog<bool>(
+    return showDialog<List<FindPatientStudyItem>?>(
       context: context,
       barrierDismissible: false, // Prevent dismissing by tapping outside
       builder: (BuildContext dialogContext) {
         return RetrieveSeriesDialog(
           patients: patients,
-          primary: primary,
         );
       },
     );
@@ -44,6 +37,7 @@ class _RetrieveSeriesDialogState extends State<RetrieveSeriesDialog> {
   double _progress = 0.0;
   bool _isCancelled = false;
   int _currentIndex = 0;
+  final List<FindPatientStudyItem> _items = [];
 
   @override
   void initState() {
@@ -55,7 +49,7 @@ class _RetrieveSeriesDialogState extends State<RetrieveSeriesDialog> {
     setState(() {
       _isCancelled = true;
     });
-    Navigator.of(context).pop(false); // Return false to indicate cancellation
+    Navigator.of(context).pop(null);
   }
 
   @override
@@ -136,10 +130,11 @@ class _RetrieveSeriesDialogState extends State<RetrieveSeriesDialog> {
     if (_isCancelled ||
         _currentIndex == widget.patients.length ||
         sourceController == null) {
-      Navigator.of(context).pop(false);
-      /*if (this.canceled) this._cleanup();
-      if (this.request.error.length == 0) this.complete.emit(this._output);
-      this._cleanup();*/
+      if (_isCancelled) {
+        Navigator.of(context).pop(null);
+      } else {
+        Navigator.of(context).pop(_items);
+      }
     } else {
       final patient = widget.patients[_currentIndex];
       DBFilters filters = DBFilters();
@@ -148,6 +143,11 @@ class _RetrieveSeriesDialogState extends State<RetrieveSeriesDialog> {
       filters.studyDateMode.value = DBFilters.any;
       final response = await sourceController.findStudies(patient.sourceUid,
           filters: filters, withSeries: true);
+      if (response.status == 0) {
+        for (final sourceResponse in response.sources) {
+          _items.addAll(sourceResponse.studies);
+        }
+      }
       setState(() {
         _progress = _currentIndex / widget.patients.length;
       });

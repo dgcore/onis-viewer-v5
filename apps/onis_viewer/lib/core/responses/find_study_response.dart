@@ -1,14 +1,27 @@
 import 'package:onis_viewer/core/database_source.dart';
 import 'package:onis_viewer/core/error_codes.dart';
 import 'package:onis_viewer/core/models/database/patient.dart' as database;
+import 'package:onis_viewer/core/models/database/series.dart' as database;
 import 'package:onis_viewer/core/models/database/study.dart' as database;
 import 'package:onis_viewer/core/onis_exception.dart';
+
+class FindPatientStudyItem {
+  final database.Patient patient;
+  final database.Study study;
+  final List<database.Series> series;
+
+  FindPatientStudyItem({
+    required this.patient,
+    required this.study,
+    required this.series,
+  });
+}
 
 class FindPatientStudySourceResponse {
   final DatabaseSource source;
   final int status;
   final bool haveConflicts;
-  final List<({database.Patient patient, database.Study study})> studies;
+  final List<FindPatientStudyItem> studies;
 
   FindPatientStudySourceResponse({
     required this.source,
@@ -22,13 +35,20 @@ class FindPatientStudySourceResponse {
     try {
       int status = json['status'] as int;
       bool haveConflicts = false; //json['haveConflicts'] as bool;
-      List<({database.Patient patient, database.Study study})> studies = [];
+      List<FindPatientStudyItem> studies = [];
       if (status == OnisErrorCodes.none) {
         json['studies'].forEach((item) {
           database.Patient patient = database.Patient.fromJson(item["patient"]);
           database.Study study = database.Study.fromJson(item["study"]);
+          List<database.Series> series = [];
+          if (item.containsKey("series")) {
+            item["series"].forEach((seriesItem) {
+              series.add(database.Series.fromJson(seriesItem));
+            });
+          }
           patient.sourceUid = source.uid;
-          studies.add((patient: patient, study: study));
+          studies.add(FindPatientStudyItem(
+              patient: patient, study: study, series: series));
         });
       }
       return FindPatientStudySourceResponse(

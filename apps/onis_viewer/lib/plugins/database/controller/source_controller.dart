@@ -1,23 +1,23 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:onis_viewer/api/core/ov_api_core.dart';
 import 'package:onis_viewer/api/request/async_request.dart';
 import 'package:onis_viewer/core/database_source.dart';
 import 'package:onis_viewer/core/error_codes.dart';
 import 'package:onis_viewer/core/models/database/filter.dart';
 import 'package:onis_viewer/core/models/database/patient.dart' as database;
-import 'package:onis_viewer/core/models/database/study.dart' as database;
 import 'package:onis_viewer/core/onis_exception.dart';
 import 'package:onis_viewer/core/responses/find_study_response.dart';
+import 'package:onis_viewer/plugins/database/public/database_api.dart';
 import 'package:onis_viewer/plugins/database/public/source_controller_interface.dart';
 import 'package:onis_viewer/plugins/database/ui/database_source_bar.dart';
-import 'package:onis_viewer/plugins/database/ui/retrieve_series.dart';
 
 class SourceState {
   SourceState();
   List<({String sourceUid, int status})> sourceStatuses = [];
-  List<({database.Patient patient, database.Study study})> studies = [];
-  List<({database.Patient patient, database.Study study})> selectedStudies = [];
+  List<FindPatientStudyItem> studies = [];
+  List<FindPatientStudyItem> selectedStudies = [];
   double horizontalScrollPosition = 0.0;
   double verticalScrollPosition = 0.0;
   void reset() {
@@ -91,6 +91,8 @@ class SourceController extends ISourceController {
     // Cancel stream subscriptions (these are synchronous operations)
     _sourceRegisteredSubscription?.cancel();
     _sourceUnregisteredSubscription?.cancel();
+    _sourceConnectionSubscription?.cancel();
+    _sourceDisconnectionSubscription?.cancel();
     super.dispose();
   }
 
@@ -215,8 +217,10 @@ class SourceController extends ISourceController {
       {DBFilters? filters, bool withSeries = false}) async {
     final source = _databaseSourceManager.findSourceByUid(sourceUid);
     if (source == null) {
-      return FindPatientStudyResponse(
-          source: source!, status: OnisErrorCodes.logicError, sources: []);
+      throw OnisException(
+        OnisErrorCodes.logicError,
+        'Source not found: $sourceUid',
+      );
     }
     Map<String, dynamic> data = {};
     if (filters != null) {
@@ -322,24 +326,13 @@ class SourceController extends ISourceController {
 
   @override
   void openSelectedStudies(String sourceUid, BuildContext context) {
-    ({
-      List<database.Patient> patients,
-      ({database.Patient patient, database.Study study})? primary
-    }) items = _getItemsToOpen(sourceUid);
-
-    if (items.patients.isNotEmpty) {
-      // Show retrieve series dialog with patients and primary study
-      RetrieveSeriesDialog.show(
-        context,
-        patients: items.patients,
-        primary: items.primary,
-      ).then((cancelled) {
-        // Dialog closed - proceed with opening patients if not cancelled
-        if (cancelled != true) {
-          //openPatients(items.patients, items.primary, null, null);
-        }
-      });
-    }
+    ({List<database.Patient> patients, FindPatientStudyItem? primary}) items =
+        _getItemsToOpen(sourceUid);
+    OVApi()
+        .plugins
+        .getPublicApi<DatabaseApi>('onis_database_plugin')
+        ?.patientController
+        .openPatients(items.patients, items.primary, context);
   }
 
   @override
@@ -350,14 +343,12 @@ class SourceController extends ISourceController {
   }
 
   @override
-  List<({database.Patient patient, database.Study study})> getStudiesForSource(
-          String sourceUid) =>
+  List<FindPatientStudyItem> getStudiesForSource(String sourceUid) =>
       _sourceStates[sourceUid]?.studies ?? [];
 
   @override
-  List<({database.Patient patient, database.Study study})>
-      getSelectedStudiesForSource(String sourceUid) =>
-          _sourceStates[sourceUid]?.selectedStudies ?? [];
+  List<FindPatientStudyItem> getSelectedStudiesForSource(String sourceUid) =>
+      _sourceStates[sourceUid]?.selectedStudies ?? [];
 
   @override
   ({double horizontal, double vertical}) getScrollPositionsForSource(
@@ -373,16 +364,13 @@ class SourceController extends ISourceController {
   void saveScrollPositionsForSource(
       String sourceUid, double horizontalPosition, double verticalPosition) {
     SourceState? sourceState = _sourceStates[sourceUid];
-    if (sourceState != null) {
-      sourceState.horizontalScrollPosition = horizontalPosition;
-      sourceState.verticalScrollPosition = verticalPosition;
-    }
+    if (sourceState == null) return;
+    sourceState.horizontalScrollPosition = horizontalPosition;
+    sourceState.verticalScrollPosition = verticalPosition;
   }
 
-  ({
-    List<database.Patient> patients,
-    ({database.Patient patient, database.Study study})? primary
-  }) _getItemsToOpen(String sourceUid) {
+  ({List<database.Patient> patients, FindPatientStudyItem? primary})
+      _getItemsToOpen(String sourceUid) {
     final selectedStudies = getSelectedStudiesForSource(sourceUid);
     if (selectedStudies.isEmpty) {
       return (patients: [], primary: null);

@@ -239,6 +239,22 @@ void request_service::process_find_studies_request(
                              source.limit, filters, onis::database::info_all,
                              onis::database::info_all, true,
                              onis::database::lock_mode::NO_LOCK, studies);
+
+            if (req->input_json.isMember("with-series")) {
+              onis::database::item::verify_boolean_value(req->input_json,
+                                                         "with-series", false);
+              bool with_series = req->input_json["with-series"].asBool();
+              if (with_series) {
+                for (auto& study : studies) {
+                  Json::Value& series = study["series"] =
+                      Json::Value(Json::arrayValue);
+                  db->find_series(study["study"][BASE_SEQ_KEY].asString(),
+                                  onis::database::info_all, true,
+                                  onis::database::lock_mode::NO_LOCK, series);
+                }
+              }
+            }
+
             source_output["status"] = 0;
           }
         } catch (request_exception& e) {

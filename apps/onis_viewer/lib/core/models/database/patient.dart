@@ -1,3 +1,5 @@
+import '../../../utils/date.dart';
+
 class Patient {
   // Flag constants matching C++ implementation
   static const int infoPatientCharset = 1;
@@ -79,22 +81,13 @@ class Patient {
     // Read flags from JSON (default to 0 if not present)
     final flags = (json['flags'] as num?)?.toInt() ?? 0;
 
-    // Parse birthdate (format: YYYYMMDD) - may be null if not defined
+    // Parse birthdate using DICOM format (YYYYMMDD and optional HHMMSS.XXX)
     DateTime? birthDate;
     if ((flags & infoPatientBirthdate) != 0) {
       final birthdateStr = json['birthdate'] as String?;
-      if (birthdateStr != null &&
-          birthdateStr.isNotEmpty &&
-          birthdateStr.length >= 8) {
-        try {
-          final year = int.parse(birthdateStr.substring(0, 4));
-          final month = int.parse(birthdateStr.substring(4, 6));
-          final day = int.parse(birthdateStr.substring(6, 8));
-          birthDate = DateTime(year, month, day);
-        } catch (e) {
-          // If parsing fails, leave birthDate as null
-          birthDate = null;
-        }
+      final birthtimeStr = json['birthtime'] as String?;
+      if (birthdateStr != null && birthdateStr.isNotEmpty) {
+        birthDate = createDateTimeFromDicom(birthdateStr, birthtimeStr);
       }
     }
 

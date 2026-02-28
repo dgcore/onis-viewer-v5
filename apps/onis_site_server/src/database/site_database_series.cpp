@@ -189,6 +189,26 @@ bool site_database::get_online_series(const std::string& study_seq,
 // Find operations
 //------------------------------------------------------------------------------
 
+void site_database::find_series(const std::string& study_seq,
+                                std::uint32_t flags, bool for_client,
+                                lock_mode lock, Json::Value& output) {
+  const auto columns = get_series_columns(flags, false);
+  const std::string from = "pacs_series";
+  const auto clause = "study_id=?";
+  auto query = create_and_prepare_query(columns, from, clause, lock);
+
+  int index = 1;
+  bind_parameter(query, index, study_seq, "study_id");
+
+  auto result = execute_query(query);
+  if (result->has_rows()) {
+    while (auto row = result->get_next_row()) {
+      Json::Value& series = output.append(Json::objectValue);
+      create_series_item(*row, flags, for_client, nullptr, nullptr, series);
+    }
+  }
+}
+
 void site_database::find_online_series(const std::string& study_seq,
                                        std::uint32_t flags, bool for_client,
                                        lock_mode lock, Json::Value& output) {

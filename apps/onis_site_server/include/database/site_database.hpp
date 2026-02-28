@@ -612,13 +612,9 @@ onis::astring& origin_ip, Json::Value& patient, onis::aresult& res);*/
   bool get_online_series(const std::string& study_seq,
                          const std::string& series_uid, std::uint32_t flags,
                          bool for_client, lock_mode lock, Json::Value& output);
-
-  /*void find_series(const onis::astring& clause, u32 flags, b32 for_client,
-                   s32 lock_mode, Json::Value& list, onis::astring* study_seq,
-                   onis::aresult& res);
-  void find_series(const onis::astring& study_seq, u32 flags, b32 for_client,
-                   s32 lock_mode, Json::Value& output, onis::aresult& res);
-  void find_series(const onis::astring& partition_seq,
+  void find_series(const std::string& study_seq, std::uint32_t flags,
+                   bool for_client, lock_mode lock, Json::Value& output);
+  /*void find_series(const onis::astring& partition_seq,
                    const onis::dicom_file_ptr& dataset,
                    const onis::astring& code_page, b32 patient_root, u32 flags,
                    b32 for_client, s32 lock_mode, Json::Value& output,
