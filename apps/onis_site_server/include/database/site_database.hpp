@@ -488,8 +488,39 @@ onis::astring& origin_ip, Json::Value& patient, onis::aresult& res);*/
   bool update_study_modalities_bodyparts_and_station_names(
       Json::Value& study, const std::string& ignore_series_seq);
   void modify_study(const Json::Value& study, std::uint32_t flags);
+
+  std::string construct_study_filter_clause(const Json::Value& filters,
+                                            bool with_patient,
+                                            bool& have_criteria);
+  bool compose_filter_clause(const Json::Value& filters, const std::string& key,
+                             const std::string& column,
+                             std::string& filter_clause);
+  bool compose_filter_clause(const Json::Value& filters, const std::string& key,
+                             const std::string& column,
+                             const std::string& separator,
+                             std::string& filter_clause);
+  bool compose_date_range_filter_clause(const Json::Value& filters,
+                                        const std::string& key1,
+                                        const std::string& key2,
+                                        const std::string& column,
+                                        std::string& filter_clause);
+  bool compose_name_filter_clause(const Json::Value& filters,
+                                  const std::string& key,
+                                  const std::string& column1,
+                                  const std::string& column2,
+                                  const std::string& column3,
+                                  std::string& filter_clause);
+  std::string prepare_for_like(const std::string& value);
+  void bind_parameters_for_study_filter_clause(
+      std::unique_ptr<onis_kit::database::database_query>& query,
+      std::int32_t& index, const Json::Value& filters, bool with_patient);
+  void bind_parameter_for_study_filter_clause(
+      std::unique_ptr<onis_kit::database::database_query>& query,
+      std::int32_t& index, const Json::Value& filters, const std::string& key);
+
   /*void modify_study_uid(const onis::astring& seq, const onis::astring& uid,
                         onis::aresult& res);
+
 
   onis::astring
   construct_study_filter_clause(const Json::Value& filters, bool with_patient,
@@ -581,13 +612,9 @@ onis::astring& origin_ip, Json::Value& patient, onis::aresult& res);*/
   bool get_online_series(const std::string& study_seq,
                          const std::string& series_uid, std::uint32_t flags,
                          bool for_client, lock_mode lock, Json::Value& output);
-
-  /*void find_series(const onis::astring& clause, u32 flags, b32 for_client,
-                   s32 lock_mode, Json::Value& list, onis::astring* study_seq,
-                   onis::aresult& res);
-  void find_series(const onis::astring& study_seq, u32 flags, b32 for_client,
-                   s32 lock_mode, Json::Value& output, onis::aresult& res);
-  void find_series(const onis::astring& partition_seq,
+  void find_series(const std::string& study_seq, std::uint32_t flags,
+                   bool for_client, lock_mode lock, Json::Value& output);
+  /*void find_series(const onis::astring& partition_seq,
                    const onis::dicom_file_ptr& dataset,
                    const onis::astring& code_page, b32 patient_root, u32 flags,
                    b32 for_client, s32 lock_mode, Json::Value& output,

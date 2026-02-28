@@ -50,6 +50,8 @@ abstract class DatabaseSource extends ChangeNotifier {
   /// Unique identifier for this source
   final String uid;
 
+  final String sourceId;
+
   /// Human-readable name for this source
   String _name;
 
@@ -58,6 +60,9 @@ abstract class DatabaseSource extends ChangeNotifier {
 
   /// Weak reference to the source manager
   WeakReference<DatabaseSourceManager>? _managerRef;
+
+  /// Weak reference to the owner source (null if not owned)
+  late final WeakReference<DatabaseSource>? _ownerRef;
 
   /// List of sub-sources
   final List<DatabaseSource> _subSources = [];
@@ -157,6 +162,7 @@ abstract class DatabaseSource extends ChangeNotifier {
   /// Parent relationships should be managed by DatabaseSourceManager
   DatabaseSource({
     required this.uid,
+    required this.sourceId,
     required String name,
     Map<String, dynamic>? metadata,
   })  : _name = name,
@@ -171,6 +177,18 @@ abstract class DatabaseSource extends ChangeNotifier {
 
   /// Get the name of this source
   String get name => _name;
+
+  /// Get the owner source:
+  DatabaseSource? get owner => _ownerRef?.target;
+
+  /// Set the owner source:
+  void setOwner(DatabaseSource? owner) {
+    if (owner == null) {
+      _ownerRef = null;
+    } else {
+      _ownerRef = WeakReference(owner);
+    }
+  }
 
   /// Set the name of this source
   set name(String value) {
@@ -269,7 +287,7 @@ abstract class DatabaseSource extends ChangeNotifier {
   /// Create an AsyncRequest for the specified request type
   /// Should be overridden by subclasses to provide specific request implementations
   /// Default implementation returns null
-  /// 
+  ///
   /// [requestType] - The type of request to create
   /// [data] - Optional JSON data for the request
   /// [files] - Optional map of file paths to field names for file uploads (multipart/form-data)

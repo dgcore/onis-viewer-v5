@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:onis_viewer/core/models/database/patient.dart' as database;
 import 'package:onis_viewer/core/models/database/study.dart' as database;
+import 'package:onis_viewer/core/responses/find_study_response.dart';
 
 import '../../../core/constants.dart';
 import '../../../core/ui/column_configuration.dart';
@@ -10,9 +11,8 @@ import 'database_table_column_config.dart';
 
 /// A resizable data table that allows column width adjustment
 class ResizableDataTable extends StatefulWidget {
-  final List<({database.Patient patient, database.Study study})> studies;
-  final List<({database.Patient patient, database.Study study})>
-      selectedStudies;
+  final List<FindPatientStudyItem> studies;
+  final List<FindPatientStudyItem> selectedStudies;
   final VoidCallback? onStudySelectionChanged;
   /*final ValueChanged<({database.Patient patient, database.Study study})>?
       onStudySelected;
@@ -69,10 +69,8 @@ class _ResizableDataTableState extends State<ResizableDataTable>
   late List<TextEditingController> _filterControllers;
 
   // Selection state
-  ({
-    database.Patient patient,
-    database.Study study
-  })? _lastSelectedStudy; // Track last selected study for range selection
+  FindPatientStudyItem?
+      _lastSelectedStudy; // Track last selected study for range selection
   late ScrollController _scrollController;
   late ScrollController _verticalScrollController;
 
@@ -768,7 +766,7 @@ class _ResizableDataTableState extends State<ResizableDataTable>
   }
 
   /// Build a data row
-  Widget _buildDataRow(({database.Patient patient, database.Study study}) study,
+  Widget _buildDataRow(FindPatientStudyItem study,
       {bool shouldFillSpace = false}) {
     final isSelected = widget.selectedStudies.contains(study);
 
@@ -804,9 +802,7 @@ class _ResizableDataTableState extends State<ResizableDataTable>
                 case 'source':
                   cellData = study.patient.sourceUid.isNotEmpty
                       ? study.patient.sourceUid
-                      : study.study.sourceUid.isNotEmpty
-                          ? study.study.sourceUid
-                          : 'N/A';
+                      : 'N/A';
                   break;
                 case 'patientId':
                   cellData = study.patient.pid.isNotEmpty
@@ -944,8 +940,7 @@ class _ResizableDataTableState extends State<ResizableDataTable>
   }
 
   /// Handle row selection with keyboard modifiers
-  void _handleRowSelection(
-      ({database.Patient patient, database.Study study}) study) {
+  void _handleRowSelection(FindPatientStudyItem study) {
     final isCurrentlySelected = widget.selectedStudies.contains(study);
 
     if (isShiftPressed && _lastSelectedStudy != null) {

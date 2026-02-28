@@ -22,7 +22,7 @@ namespace {
 bool is_test_mode_enabled() {
   // const char* test_mode = std::getenv("ONIS_TEST_MODE");
   // return test_mode != nullptr && std::string(test_mode) == "1";
-  return true;
+  return false;
 }
 
 // Get test data count from environment variable (default: 1000)
@@ -176,6 +176,9 @@ void request_service::process_find_studies_request(
   onis::database::item::verify_integer_value(req->input_json, SO_TYPE_KEY,
                                              false);
   onis::database::item::verify_integer_value(req->input_json, "limit", true);
+  if (req->input_json.isMember("filters")) {
+    onis::database::item::verify_object_value(req->input_json, "filters", true);
+  }
 
   // Build target sources:
   std::string source_id = req->input_json["source"].asString();
@@ -231,11 +234,27 @@ void request_service::process_find_studies_request(
           } else {
             // Use real database
             request_database db(this);
-            Json::Value filters(Json::objectValue);
+            const Json::Value& filters = req->input_json["filters"];
             db->find_studies(source.seq, source.reject_empty_request,
                              source.limit, filters, onis::database::info_all,
                              onis::database::info_all, true,
                              onis::database::lock_mode::NO_LOCK, studies);
+
+            if (req->input_json.isMember("with-series")) {
+              onis::database::item::verify_boolean_value(req->input_json,
+                                                         "with-series", false);
+              bool with_series = req->input_json["with-series"].asBool();
+              if (with_series) {
+                for (auto& study : studies) {
+                  Json::Value& series = study["series"] =
+                      Json::Value(Json::arrayValue);
+                  db->find_series(study["study"][BASE_SEQ_KEY].asString(),
+                                  onis::database::info_all, true,
+                                  onis::database::lock_mode::NO_LOCK, series);
+                }
+              }
+            }
+
             source_output["status"] = 0;
           }
         } catch (request_exception& e) {

@@ -33,7 +33,7 @@ enum SiteChildSourceType {
 /// A child source under a site source (partition, album, or DICOM PACS)
 class SiteChildSource extends DatabaseSource {
   final SiteChildSourceType type;
-  WeakReference<SiteSource>? _parentSiteRef;
+  //WeakReference<SiteSource>? _parentSiteRef;
   final DatabaseSourceLoginState _loginState = SiteSourceLoginState();
 
   static SiteChildSource createFromJson(Map<String, dynamic> data) {
@@ -48,6 +48,7 @@ class SiteChildSource extends DatabaseSource {
 
     SiteChildSource source = SiteChildSource(
       uid: UUIDv4().toString(),
+      sourceId: data["source_id"] as String,
       name: data["name"] as String,
       type: type,
     );
@@ -56,6 +57,7 @@ class SiteChildSource extends DatabaseSource {
 
   SiteChildSource({
     required super.uid,
+    required super.sourceId,
     required super.name,
     required this.type,
     super.metadata,
@@ -65,12 +67,12 @@ class SiteChildSource extends DatabaseSource {
   }
 
   /// Set the parent site source reference
-  void setParentSite(SiteSource parentSite) {
+  /*void setParentSite(SiteSource parentSite) {
     _parentSiteRef = WeakReference(parentSite);
   }
 
   /// Get the parent site source (if available)
-  SiteSource? get parentSite => _parentSiteRef?.target;
+  SiteSource? get parentSite => _parentSiteRef?.target;*/
 
   /// Get the login state from the parent site source
   @override
@@ -142,7 +144,7 @@ class SiteChildSource extends DatabaseSource {
     if (data != null) {
       switch (requestType) {
         case RequestType.findStudies:
-          data["source"] = uid;
+          data["source"] = sourceId;
           data["type"] = type.value;
           data["limit"] = 100;
           break;
@@ -161,8 +163,7 @@ class SiteChildSource extends DatabaseSource {
 
   @override
   Future<void> disconnect() async {
-    final parentSite = this.parentSite;
-    return parentSite?.disconnect();
+    return owner?.disconnect();
   }
 
   Future<void> _disconnectBase() async {
@@ -173,7 +174,11 @@ class SiteChildSource extends DatabaseSource {
 class SiteSource extends DatabaseSource {
   /// Public constructor for a site source (without parent)
   /// Parent relationships should be managed by DatabaseSourceManager
-  SiteSource({required super.uid, required super.name, super.metadata})
+  SiteSource(
+      {required super.uid,
+      required super.sourceId,
+      required super.name,
+      super.metadata})
       : super();
 
   /// Map to store SiteAsyncRequest instances
@@ -478,7 +483,7 @@ class SiteSource extends DatabaseSource {
   void createAndRegisterChildSource(
       Map<String, dynamic> childData, DatabaseSource parent) {
     final childSource = SiteChildSource.createFromJson(childData);
-    childSource.setParentSite(this);
+    childSource.setOwner(this);
     (childSource.loginState as SiteSourceLoginState).credentials =
         (loginState as SiteSourceLoginState).credentials;
     manager?.registerSource(childSource, parentUid: parent.uid);

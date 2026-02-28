@@ -1,15 +1,13 @@
 import 'package:flutter/material.dart';
-import 'package:onis_viewer/core/models/database/patient.dart' as database;
-import 'package:onis_viewer/core/models/database/study.dart' as database;
+import 'package:onis_viewer/core/responses/find_study_response.dart';
 import 'package:onis_viewer/plugins/database/ui/resizable_data_table.dart';
 
 import '../../../core/constants.dart';
 
 /// Study list view using resizable data table
 class StudyListView extends StatefulWidget {
-  final List<({database.Patient patient, database.Study study})> studies;
-  final List<({database.Patient patient, database.Study study})>
-      selectedStudies;
+  final List<FindPatientStudyItem> studies;
+  final List<FindPatientStudyItem> selectedStudies;
 
   final VoidCallback? onStudySelectionChanged;
   //final ValueChanged<({database.Patient patient, database.Study study})>?
@@ -194,8 +192,7 @@ class _StudyListViewState extends State<StudyListView> {
   /// Build the study table
   Widget _buildStudyTable() {
     final sortedStudies =
-        List<({database.Patient patient, database.Study study})>.from(
-            widget.studies);
+        List<FindPatientStudyItem>.from(widget.studies);
 
     /*if (_sortColumnIndex != null) {
       sortedStudies.sort((a, b) {

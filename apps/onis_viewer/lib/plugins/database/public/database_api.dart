@@ -1,8 +1,10 @@
+import 'package:onis_viewer/plugins/database/public/patient_controller_interface.dart';
 import 'package:onis_viewer/plugins/database/public/source_controller_interface.dart';
 
 /// Public API exposed by the database plugin
 abstract class DatabaseApi {
   ISourceController get sourceController;
+  IPatientController get patientController;
 
   /// Select a source by UID
   //void selectSourceByUid(String uid);
