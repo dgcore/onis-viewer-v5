@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:onis_viewer/api/core/ov_api_core.dart';
+import 'package:onis_viewer/core/layout/view_layout_node.dart';
 import 'package:onis_viewer/core/models/entities/patient.dart' as entities;
-import 'package:onis_viewer/plugins/viewer/core/layout/view_layout_node.dart';
 import 'package:onis_viewer/plugins/viewer/public/layout_controller_interface.dart';
 import 'package:onis_viewer/plugins/viewer/public/viewer_api.dart';
 import 'package:onis_viewer/plugins/viewer/toolbar/viewer_toolbar.dart';

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../core/layout/view_layout_node.dart';
+import '../../../core/layout/view_layout_node.dart';
 
 /// Interface for LayoutController functionality
 abstract class ILayoutController extends ChangeNotifier {

@@ -1,10 +1,9 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-
-//import '../../core/database_source.dart';
-import 'page_manager.dart';
-import 'plugin_manager.dart';
+import 'package:onis_viewer/api/core/page_manager.dart';
+import 'package:onis_viewer/api/core/plugin_manager.dart';
+import 'package:onis_viewer/api/view_type/view_type_manager.dart';
 
 /// Core OVApi singleton that coordinates all API modules
 class OVApi {
@@ -15,22 +14,23 @@ class OVApi {
   // API modules
   late final PageManager _pageManager;
   late final PluginManager _pluginManager;
-  //late final DatabaseSourceManager _databaseSourceManager;
+  late final ViewTypeManager _viewTypeManager;
 
   // Getters for API modules
   PageManager get pages => _pageManager;
   PluginManager get plugins => _pluginManager;
-  //DatabaseSourceManager get sources => _databaseSourceManager;
+  ViewTypeManager get viewTypes => _viewTypeManager;
 
   /// Initialize the API with all modules
   Future<void> initialize() async {
     try {
       // Initialize modules
+      _viewTypeManager = ViewTypeManager();
       _pageManager = PageManager();
       _pluginManager = PluginManager();
-      //_databaseSourceManager = DatabaseSourceManager();
 
       // Initialize modules
+      _viewTypeManager.initialize();
       await _pageManager.initialize();
       await _pluginManager.initialize();
 
@@ -47,6 +47,7 @@ class OVApi {
   Future<void> dispose() async {
     await _pageManager.dispose();
     await _pluginManager.dispose();
+    _viewTypeManager.dispose();
     debugPrint('OVApi disposed');
   }
 
@@ -54,12 +55,5 @@ class OVApi {
   /// This should be called during application shutdown
   Future<void> cleanExit() async {
     await _pluginManager.dispose();
-
-    /*try {
-      await _databaseSourceManager.cleanExit();
-      debugPrint('OVApi clean exit completed');
-    } catch (e) {
-      debugPrint('Error during OVApi clean exit: $e');
-    }*/
   }
 }
