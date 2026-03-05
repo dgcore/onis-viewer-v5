@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:onis_viewer/core/constants.dart';
+import 'package:onis_viewer/core/layout/view_layout.dart';
 import 'package:onis_viewer/core/layout/view_layout_node.dart';
 import 'package:onis_viewer/core/models/entities/patient.dart' as entities;
-import 'package:onis_viewer/plugins/viewer/public/layout_controller_interface.dart';
 
 /// Border widths for view area leaf widgets (in logical pixels).
 class ViewAreaBorderWidth {
@@ -24,7 +24,7 @@ class ViewAreaBorderWidth {
 
 /// View area widget that builds widgets following the layout tree structure
 class ViewArea extends StatefulWidget {
-  final ILayoutController layoutController;
+  final ViewLayout layout;
 
   /// Called when a series is dropped from the history bar onto a view cell.
   /// [node] is the layout node (view cell) that received the drop.
@@ -35,7 +35,7 @@ class ViewArea extends StatefulWidget {
   final ViewAreaBorderWidth borderWidth;
 
   const ViewArea({
-    required this.layoutController,
+    required this.layout,
     this.onSeriesDropped,
     this.borderWidth = const ViewAreaBorderWidth(),
     super.key,
@@ -50,12 +50,12 @@ class _ViewAreaState extends State<ViewArea> {
   void initState() {
     super.initState();
     // Listen to layout changes
-    widget.layoutController.addListener(_onLayoutChanged);
+    widget.layout.addListener(_onLayoutChanged);
   }
 
   @override
   void dispose() {
-    widget.layoutController.removeListener(_onLayoutChanged);
+    widget.layout.removeListener(_onLayoutChanged);
     super.dispose();
   }
 
@@ -67,7 +67,7 @@ class _ViewAreaState extends State<ViewArea> {
 
   @override
   Widget build(BuildContext context) {
-    return _buildNodeWidget(widget.layoutController.rootNode);
+    return _buildNodeWidget(widget.layout.rootNode);
   }
 
   /// Recursively build widget from a layout node

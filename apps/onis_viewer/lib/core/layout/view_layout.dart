@@ -1,9 +1,10 @@
+import 'package:flutter/material.dart';
 import 'package:onis_viewer/api/core/ov_api_core.dart';
 import 'package:onis_viewer/core/layout/view_layout_node.dart';
 import 'package:onis_viewer/core/layout/view_layout_node_wnd.dart';
 import 'package:onis_viewer/core/layout/view_type.dart';
 
-class ViewLayout {
+class ViewLayout extends ChangeNotifier {
   late ViewLayoutNode _rootNode;
   WeakReference<ViewLayoutNode>? _wzoomedNode;
   WeakReference<ViewLayoutNode>? _wactiveNode;
@@ -15,6 +16,10 @@ class ViewLayout {
 
   ViewLayout() {
     _rootNode = ViewLayoutNode(this, null);
+  }
+
+  void notifyLayoutChanged() {
+    super.notifyListeners();
   }
 
   //----------------------------------------------------------
