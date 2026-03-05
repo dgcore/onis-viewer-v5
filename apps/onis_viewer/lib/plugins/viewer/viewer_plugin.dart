@@ -29,7 +29,7 @@ class _ViewerApiImpl implements ViewerApi {
   ILayoutController get layoutController => _layoutController;
 
   Future<void> initialize() async {
-    await _layoutController.initialize();
+    _layoutController.initialize();
   }
 
   Future<void> dispose() async {
@@ -63,11 +63,12 @@ class ViewerPlugin implements OnisViewerPlugin {
 
   @override
   Future<void> initialize() async {
-    // Register the page type (includes page creator)
-    PageType.register(viewerPageType);
     // Create public API implementation
     _api = _ViewerApiImpl();
     await _api!.initialize();
+
+    // Register the page type (includes page creator)
+    PageType.register(viewerPageType);
   }
 
   @override

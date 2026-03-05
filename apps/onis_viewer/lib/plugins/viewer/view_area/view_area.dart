@@ -1,8 +1,26 @@
 import 'package:flutter/material.dart';
 import 'package:onis_viewer/core/constants.dart';
+import 'package:onis_viewer/core/layout/view_layout_node.dart';
 import 'package:onis_viewer/core/models/entities/patient.dart' as entities;
-import 'package:onis_viewer/plugins/viewer/core/layout/view_layout_node.dart';
 import 'package:onis_viewer/plugins/viewer/public/layout_controller_interface.dart';
+
+/// Border widths for view area leaf widgets (in logical pixels).
+class ViewAreaBorderWidth {
+  const ViewAreaBorderWidth({
+    this.separator = 1.0,
+    this.active = 3.0,
+    this.dragHighlight = 3.0,
+  });
+
+  /// Border width for the separator between leaf widgets.
+  final double separator;
+
+  /// Border width for the active leaf widget (blue border).
+  final double active;
+
+  /// Border width when a drag is over the leaf (drop target highlight).
+  final double dragHighlight;
+}
 
 /// View area widget that builds widgets following the layout tree structure
 class ViewArea extends StatefulWidget {
@@ -13,9 +31,13 @@ class ViewArea extends StatefulWidget {
   final void Function(ViewLayoutNode node, entities.Series series)?
       onSeriesDropped;
 
+  /// Border widths for leaf widgets. Omit to use defaults.
+  final ViewAreaBorderWidth borderWidth;
+
   const ViewArea({
     required this.layoutController,
     this.onSeriesDropped,
+    this.borderWidth = const ViewAreaBorderWidth(),
     super.key,
   });
 
@@ -69,35 +91,19 @@ class _ViewAreaState extends State<ViewArea> {
   /// Build a leaf widget (single view); wraps content in DragTarget for series drop
   Widget _buildLeafWidget(ViewLayoutNode node) {
     final leafWidget = node.leafWidget;
-    Widget content;
-    if (leafWidget == null) {
-      content = Container(
-        color: OnisViewerConstants.backgroundColor,
-        child: Center(
-          child: Text(
-            'Empty View',
-            style: TextStyle(
-              color: OnisViewerConstants.textSecondaryColor,
-              fontSize: 14,
-            ),
+    Widget? content = leafWidget?.currentViewWindow?.widget;
+    content ??= Container(
+      color: Colors.black,
+      child: Center(
+        child: Text(
+          'View Widget',
+          style: TextStyle(
+            color: OnisViewerConstants.textColor,
+            fontSize: 14,
           ),
         ),
-      );
-    } else {
-      // TODO: Build actual widget from ViewLayoutNodeWidget
-      content = Container(
-        color: Colors.black,
-        child: Center(
-          child: Text(
-            'View Widget',
-            style: TextStyle(
-              color: OnisViewerConstants.textColor,
-              fontSize: 14,
-            ),
-          ),
-        ),
-      );
-    }
+      ),
+    );
 
     return DragTarget<entities.Series>(
       onWillAcceptWithDetails: (details) => true,
@@ -106,17 +112,27 @@ class _ViewAreaState extends State<ViewArea> {
       },
       builder: (context, candidateData, rejectedData) {
         final isHighlighted = candidateData.isNotEmpty;
+        final isActive = node.isActive;
+        // Separator border for all leaves; blue border when active or when drag-over
+        final double width;
+        final Color color;
+        if (isHighlighted) {
+          width = widget.borderWidth.dragHighlight;
+          color = OnisViewerConstants.primaryColor;
+        } else if (isActive) {
+          width = widget.borderWidth.active;
+          color = OnisViewerConstants.primaryColor;
+        } else {
+          width = widget.borderWidth.separator;
+          color = OnisViewerConstants.tabButtonColor;
+        }
+        final border = Border.all(color: color, width: width);
         return AnimatedContainer(
           duration: const Duration(milliseconds: 150),
           decoration: BoxDecoration(
-            border: isHighlighted
-                ? Border.all(
-                    color: OnisViewerConstants.primaryColor,
-                    width: 3,
-                  )
-                : null,
+            border: border,
           ),
-          child: content,
+          child: content!,
         );
       },
     );
