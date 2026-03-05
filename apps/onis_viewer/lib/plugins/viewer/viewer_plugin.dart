@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:onis_viewer/plugins/viewer/controller/layout_controller.dart';
-import 'package:onis_viewer/plugins/viewer/public/layout_controller_interface.dart';
+import 'package:onis_viewer/core/layout/view_layout.dart';
 import 'package:onis_viewer/plugins/viewer/public/viewer_api.dart';
 
 import '../../core/page_type.dart';
@@ -23,17 +22,22 @@ Widget _createViewerPage(PageType pageType) {
 }
 
 class _ViewerApiImpl implements ViewerApi {
-  final _layoutController = LayoutController();
+  //final _layoutController = LayoutController();
+  final _layout = ViewLayout();
 
   @override
-  ILayoutController get layoutController => _layoutController;
+  ViewLayout get layout => _layout;
+
+  //@override
+  //ILayoutController get layoutController => _layoutController;
 
   Future<void> initialize() async {
-    _layoutController.initialize();
+    _layout.setTiling(2, 2);
+    //_layoutController.initialize();
   }
 
   Future<void> dispose() async {
-    _layoutController.dispose();
+    //_layoutController.dispose();
   }
 }
 

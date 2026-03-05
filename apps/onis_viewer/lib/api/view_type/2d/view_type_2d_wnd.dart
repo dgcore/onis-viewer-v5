@@ -9,6 +9,14 @@ class ViewType2DWnd extends ViewWnd {
   Widget? get widget {
     return ViewType2dWidget(viewType2DWnd: this);
   }
+
+  /// Called when the user taps or clicks in the 2D view container.
+  /// [localPosition] is the position relative to the widget.
+  void onTap(Offset localPosition) {
+    layout?.activeNode = parent?.layoutNode;
+    layout?.notifyLayoutChanged();
+    // Override in subclasses or add logic (e.g. set active, show menu).
+  }
   //public _imageContainer:OsContainerWnd|null = null;
   //private _rectTimeout:any = null;
 

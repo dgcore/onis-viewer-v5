@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:onis_viewer/api/core/ov_api_core.dart';
+import 'package:onis_viewer/core/layout/view_layout.dart';
 import 'package:onis_viewer/core/layout/view_layout_node.dart';
 import 'package:onis_viewer/core/models/entities/patient.dart' as entities;
-import 'package:onis_viewer/plugins/viewer/public/layout_controller_interface.dart';
 import 'package:onis_viewer/plugins/viewer/public/viewer_api.dart';
 import 'package:onis_viewer/plugins/viewer/toolbar/viewer_toolbar.dart';
 import 'package:onis_viewer/plugins/viewer/view_area/view_area.dart';
@@ -40,11 +40,12 @@ class _ViewerPageState extends BasePageState<ViewerPage> {
 
   @override
   Widget buildPageContent() {
-    final layoutController = _viewerApi?.layoutController;
+    //final layoutController = _viewerApi?.layoutController;
+    final layout = _viewerApi?.layout;
     return AnimatedBuilder(
-      animation: layoutController as Listenable,
+      animation: layout as Listenable,
       builder: (context, child) {
-        return _buildContent(layoutController!);
+        return _buildContent(layout!);
       },
     );
   }
@@ -59,7 +60,7 @@ class _ViewerPageState extends BasePageState<ViewerPage> {
   }
 
   /// Build the main content area
-  Widget _buildContent(ILayoutController layoutController) {
+  Widget _buildContent(ViewLayout layout) {
     return Container(
       color: OnisViewerConstants.backgroundColor,
       child: Column(
@@ -82,7 +83,7 @@ class _ViewerPageState extends BasePageState<ViewerPage> {
                 // Image viewer in the center - takes remaining space
                 Expanded(
                   child: ViewArea(
-                    layoutController: layoutController,
+                    layout: layout,
                     onSeriesDropped: _onSeriesDroppedOnView,
                   ),
                 ),
