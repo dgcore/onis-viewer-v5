@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:onis_viewer/api/core/ov_api_core.dart';
+import 'package:onis_viewer/plugins/viewer/public/viewer_api.dart';
 
 import '../../../core/constants.dart';
 
@@ -16,13 +18,32 @@ class ViewerToolbar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-        height: height,
-        width: double.infinity,
-        color: OnisViewerConstants.surfaceColor,
-        padding: const EdgeInsets.symmetric(
-          horizontal: OnisViewerConstants.paddingMedium,
-        ),
-        child: SizedBox());
+    final toolbar =
+        OVApi().plugins.getPublicApi<ViewerApi>('onis_viewer_plugin')?.toolbar;
+    if (toolbar == null) {
+      return Container(
+          height: height,
+          width: double.infinity,
+          color: OnisViewerConstants.surfaceColor,
+          padding: const EdgeInsets.symmetric(
+            horizontal: OnisViewerConstants.paddingMedium,
+          ),
+          child: SizedBox());
+    }
+
+    return AnimatedBuilder(
+        animation: toolbar,
+        builder: (context, child) {
+          return Container(
+              height: height,
+              width: double.infinity,
+              color: OnisViewerConstants.surfaceColor,
+              padding: const EdgeInsets.symmetric(
+                horizontal: OnisViewerConstants.paddingMedium,
+              ),
+              child: Row(
+                children: toolbar.items.map((item) => item.widget).toList(),
+              ));
+        });
   }
 }
