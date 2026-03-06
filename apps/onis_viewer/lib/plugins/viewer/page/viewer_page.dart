@@ -76,7 +76,7 @@ class _ViewerPageState extends BasePageState<ViewerPage> {
               children: [
                 // History bar on the left - fixed width, remaining height
                 ViewerHistoryBar(
-                  width: 250.0,
+                  width: 200.0,
                   historyItems: _getHistoryItems(),
                 ),
 

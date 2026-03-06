@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:onis_viewer/core/layout/view_layout.dart';
+import 'package:onis_viewer/core/toolbar/toolbar_item.dart';
 import 'package:onis_viewer/plugins/viewer/public/viewer_api.dart';
+import 'package:onis_viewer/plugins/viewer/toolbar_items/layout_toolbar_item.dart';
 
 import '../../core/page_type.dart';
 import '../../core/plugin_interface.dart';
@@ -24,16 +26,20 @@ Widget _createViewerPage(PageType pageType) {
 class _ViewerApiImpl implements ViewerApi {
   //final _layoutController = LayoutController();
   final _layout = ViewLayout();
+  final _toolbar = OsToolbar('layout_toolbar');
 
   @override
   ViewLayout get layout => _layout;
+
+  @override
+  OsToolbar get toolbar => _toolbar;
 
   //@override
   //ILayoutController get layoutController => _layoutController;
 
   Future<void> initialize() async {
+    _toolbar.addItem(OsLayoutToolbarItem('layout_toolbar_item', 'Layout'));
     _layout.setTiling(2, 2);
-    //_layoutController.initialize();
   }
 
   Future<void> dispose() async {

@@ -50,23 +50,27 @@ class _ViewAreaState extends State<ViewArea> {
   void initState() {
     super.initState();
     // Listen to layout changes
-    widget.layout.addListener(_onLayoutChanged);
+    //widget.layout.addListener(_onLayoutChanged);
   }
 
   @override
   void dispose() {
-    widget.layout.removeListener(_onLayoutChanged);
+    //widget.layout.removeListener(_onLayoutChanged);
     super.dispose();
   }
 
-  void _onLayoutChanged() {
-    if (mounted) {
-      setState(() {});
-    }
-  }
+  //void _onLayoutChanged() {
+  //if (mounted) {
+  //setState(() {});
+  //}
+  //}
 
   @override
   Widget build(BuildContext context) {
+    ViewLayoutNode? zoomedNode = widget.layout.zoomedNode;
+    if (zoomedNode != null) {
+      return _buildNodeWidget(zoomedNode);
+    }
     return _buildNodeWidget(widget.layout.rootNode);
   }
 
