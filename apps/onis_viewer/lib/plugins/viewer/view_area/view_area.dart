@@ -95,6 +95,9 @@ class _ViewAreaState extends State<ViewArea> {
   /// Build a leaf widget (single view); wraps content in DragTarget for series drop
   Widget _buildLeafWidget(ViewLayoutNode node) {
     final leafWidget = node.leafWidget;
+    //final viewWnd = leafWidget?.currentViewWindow;
+    //final container = viewWnd?.activeContainer;
+
     Widget? content = leafWidget?.currentViewWindow?.widget;
     content ??= Container(
       color: Colors.black,

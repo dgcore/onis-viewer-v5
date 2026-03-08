@@ -1,9 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:onis_viewer/api/view_type/2d/view_type_2d_widget.dart';
+import 'package:onis_viewer/core/graphics/container/container_wnd.dart';
+import 'package:onis_viewer/core/graphics/container/controllers/container_controller_2d.dart';
 import 'package:onis_viewer/core/layout/view_wnd.dart';
 
 class ViewType2DWnd extends ViewWnd {
-  ViewType2DWnd(super.parent, super.type);
+  late final OsContainerWnd _imageContainer;
+
+  ViewType2DWnd(super.parent, super.type) {
+    final OsContainerController2D controller = OsContainerController2D();
+    _imageContainer = OsContainerWnd(controller: controller, view: this);
+  }
 
   @override
   Widget? get widget {
@@ -15,9 +22,8 @@ class ViewType2DWnd extends ViewWnd {
   void onTap(Offset localPosition) {
     layout?.activeNode = parent?.layoutNode;
     layout?.notifyLayoutChanged();
-    // Override in subclasses or add logic (e.g. set active, show menu).
   }
-  //public _imageContainer:OsContainerWnd|null = null;
+
   //private _rectTimeout:any = null;
 
   /*constructor(parent:OsViewLayoutNodeWnd, type:OsViewType) {
@@ -79,12 +85,15 @@ class ViewType2DWnd extends ViewWnd {
         this._imageContainer.replaceWidgets();
         if (this._rectTimeout) clearTimeout(this._rectTimeout);
         this._rectTimeout = setTimeout(()=>{ this._rectTimeout = null; if (this._imageContainer) this._imageContainer.redrawSingleWindow(); }, 0);
-    }
-	
-	
+    }*/
 
-    //containers:
-    public getListOfContainerWindows(list:Array<OsContainerWnd>) { if (this._imageContainer) list.push(this._imageContainer); }
-    public getActiveContainerWindow():OsContainerWnd|null { return this._imageContainer; }
+  //containers:
+  @override
+  List<OsContainerWnd> get containers => [_imageContainer];
+
+  @override
+  OsContainerWnd? get activeContainer => _imageContainer;
+
+  /*
     public haveContainerWindow(dial:OsContainerWnd):boolean { if (dial && dial === this._imageContainer) return true; else return false; }*/
 }
