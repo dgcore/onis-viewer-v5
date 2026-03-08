@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:onis_viewer/core/graphics/container/container_wnd.dart';
 import 'package:onis_viewer/core/layout/view_layout.dart';
 import 'package:onis_viewer/core/layout/view_layout_node.dart';
 import 'package:onis_viewer/core/layout/view_layout_node_wnd.dart';
 import 'package:onis_viewer/core/layout/view_type.dart';
 
-class ViewWnd {
+abstract class ViewWnd {
   ViewLayoutNodeWnd? _parent;
   ViewType? _type;
   bool show = false;
@@ -64,11 +65,12 @@ class ViewWnd {
                     return true;
         }
         return false;
-    }
+    }*/
 
-    //containers:
-    public getListOfContainerWindows(list:Array<OsContainerWnd>) {}
-    public getActiveContainerWindow():OsContainerWnd|null { return null; }
+  //containers:
+  List<OsContainerWnd> get containers;
+  OsContainerWnd? get activeContainer;
+  /*public getActiveContainerWindow():OsContainerWnd|null { return null; }
     public haveContainerWindow(dial:OsContainerWnd):boolean { return false; }
 
     //-----------------------------------------------------------------------

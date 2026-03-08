@@ -25,16 +25,19 @@ class _ViewType2dWidgetState extends State<ViewType2dWidget> {
 
   @override
   Widget build(BuildContext context) {
+    final viewWnd = widget.wViewType2DWnd.target;
+    final container = viewWnd?.activeContainer;
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTapUp: (TapUpDetails details) {
         widget.wViewType2DWnd.target?.onTap(details.localPosition);
       },
-      child: Container(
-        width: double.infinity,
-        height: double.infinity,
-        color: Colors.black,
-      ),
+      child: container?.widget ??
+          Container(
+            width: double.infinity,
+            height: double.infinity,
+            color: Colors.black,
+          ),
     );
   }
 }
