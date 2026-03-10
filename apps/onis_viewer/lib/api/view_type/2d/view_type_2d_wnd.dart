@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:onis_viewer/api/view_type/2d/view_type_2d_widget.dart';
 import 'package:onis_viewer/core/graphics/container/container_wnd.dart';
 import 'package:onis_viewer/core/graphics/container/controllers/container_controller_2d.dart';
+import 'package:onis_viewer/core/graphics/drivers/dart_driver.dart';
 import 'package:onis_viewer/core/layout/view_wnd.dart';
 
 class ViewType2DWnd extends ViewWnd {
@@ -9,7 +10,8 @@ class ViewType2DWnd extends ViewWnd {
 
   ViewType2DWnd(super.parent, super.type) {
     final OsContainerController2D controller = OsContainerController2D();
-    _imageContainer = OsContainerWnd(controller: controller, view: this);
+    _imageContainer = OsContainerWnd(
+        driver: OsDartDriver(), controller: controller, view: this);
   }
 
   @override

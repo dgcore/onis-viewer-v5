@@ -1,8 +1,20 @@
+import 'package:flutter/material.dart';
+import 'package:onis_viewer/core/graphics/canvas/canvas.dart';
 import 'package:onis_viewer/core/graphics/container/container_widget.dart';
 import 'package:onis_viewer/core/graphics/container/controllers/container_controller.dart';
+import 'package:onis_viewer/core/graphics/drivers/driver.dart';
+import 'package:onis_viewer/core/graphics/renderer/renderer.dart';
 import 'package:onis_viewer/core/layout/view_wnd.dart';
 
-class OsContainerWnd {
+///////////////////////////////////////////////////////////////////////
+// container_image_box_info
+///////////////////////////////////////////////////////////////////////
+
+class OsContainerImageBoxInfo {
+  List<double> rect = [0, 0, 0, 0];
+}
+
+class OsContainerWnd extends ChangeNotifier {
   //private _image:OsDriverImage|null = null;
   //private _component:any = null;
 
@@ -11,24 +23,23 @@ class OsContainerWnd {
   final WeakReference<ViewWnd>? _wView;
   //private _controller:OsContainerController|null;
   //private _view:OsViewWnd|null;
-  //public rect:[number, number, number, number] = [0, 0, 50, 50];
   //members:
-  final int _rowCnt = 2;
-  final int _colCnt = 2;
-  //private _imageBoxes:Array<OsContainerImageBoxInfo>;
+  int _rowCnt = 0;
+  int _colCnt = 0;
+  List<OsContainerImageBoxInfo> _imageBoxes = [];
   final double _borderWidth = 1.0;
   final double _borderInter = 1.0;
   //private _lastDrawRowCnt;
   //private _lastDrawColCnt;
-  final bool _zoomed = false;
+  bool _zoomed = false;
   final bool _canZoom = true;
   //private _saveRowCnt:number;
   //private _saveColCnt:number;
   //private _singleWindow:boolean;
   //private _idriver:number;
-  //private _driver:OsDriver|null;
-  //private _context:OsDriverContext|null;
-  //private _sharedContext:OsDriverContext|null;
+  final OsDriver _driver;
+  late final OsDriverContext _context;
+  List<double> _rect = [0, 0, 0, 0];
   //private _refreshTimerId:any;
   //private _cineTimerId:any;
   //private _drawTarget:number;
@@ -97,8 +108,8 @@ class OsContainerWnd {
 
   //private _fonts:any[] = [{name:'', size:12, color:'#ffffff'}, {name:'', size:12, color:'#00ff00'}];
 
-  //private _backCol:Array<number> = [0, 0, 0, 255];
-  //private _borderCol:Array<number> = [64, 64, 64, 255];
+  final List<int> _backCol = [0, 0, 0, 255];
+  final List<int> _borderCol = [64, 64, 64, 255];
   //private _selCol:Array<number> = [255, 255, 255, 255];
   //private _wsupportSet:OsWeakObject|null;
 
@@ -114,12 +125,18 @@ class OsContainerWnd {
   //--------------------------------------------------
 
   OsContainerWnd(
-      {required OsContainerController controller, required ViewWnd view})
-      : _controller = controller,
+      {required OsDriver driver,
+      required OsContainerController controller,
+      required ViewWnd view})
+      : _driver = driver,
+        _context = driver.createContext(),
+        _controller = controller,
         _wView = WeakReference<ViewWnd>(view) {
     _controller.container = this;
+    setImageMatrix(2, 2);
   }
 
+  get context => _context;
   int get rowCnt => _rowCnt;
   int get colCnt => _colCnt;
   double get borderWidth => _borderWidth;
@@ -129,6 +146,11 @@ class OsContainerWnd {
     return OsContainerWidget(
       containerWnd: this,
     );
+  }
+
+  void setRect(double x, double y, double width, double height) {
+    _rect = [x, y, width, height];
+    replaceWidgets();
   }
 
   /*constructor(viewer:Viewer, type:OsContainerControllerType, view:OsViewWnd) {
@@ -359,12 +381,12 @@ class OsContainerWnd {
                     list[i].releaseMemory(0);
             }
         }*/
-    /*this.setImageBoxStock(row*col);
-        this._rowCnt = row;
-        this._colCnt = col;
-        if (this._rowCnt != 1 || this._colCnt != 1) this._zoomed = false;
-        this.replaceWidgets();
-        if (sendModifiedMessage && this._viewer && this._viewer.messageService) this._viewer.messageService.sendMessage(MSG.IMGCONT_MODIFIED, this);*/
+    setImageBoxStock(row * col);
+    _rowCnt = row;
+    _colCnt = col;
+    if (_rowCnt != 1 || _colCnt != 1) _zoomed = false;
+    replaceWidgets();
+    //if (sendModifiedMessage && this._viewer && this._viewer.messageService) this._viewer.messageService.sendMessage(MSG.IMGCONT_MODIFIED, this);*/
   }
 
   List<int> getImageMatrix() {
@@ -395,51 +417,52 @@ class OsContainerWnd {
                 return i;
         }
         return -1;
-    }
+    }*/
 
-    public setImageBoxStock(count:number):void {
-        if (count == this._imageBoxes.length) return;
-        if (count == 0) {
-            for (let i=0; i<this._imageBoxes.length; i++) this._imageBoxes[i].destroy();
-            this._imageBoxes.splice(0, this._imageBoxes.length);
-        }
-        else {
-            let tmp:Array<OsContainerImageBoxInfo> = new Array<OsContainerImageBoxInfo>(count);
-            //Copy what we can:
-            let copy:number = count > this._imageBoxes.length ? this._imageBoxes.length : count;
-            for (let i=0; i<copy; i++) tmp[i] = this._imageBoxes[i];
-            this._imageBoxes.splice(0, copy);
-            //Create additionals:
-            let create:number = count-copy;
-            for (let i=0; i<create; i++) tmp[i+copy] = this.createImageBoxInfo(this);
-            //Delete the extra:
-            for (let i=0; i<this._imageBoxes.length; i++) this._imageBoxes[i].destroy();
-            this._imageBoxes.splice(0, this._imageBoxes.length);
-            //finalize:
-            this._imageBoxes = tmp;
-        }
+  void setImageBoxStock(int count) {
+    if (count == _imageBoxes.length) return;
+    if (count == 0) {
+      _imageBoxes.clear();
+      return;
     }
+    List<OsContainerImageBoxInfo> tmp =
+        List.filled(count, OsContainerImageBoxInfo());
+    //Copy what we can:
+    int copy = count > _imageBoxes.length ? _imageBoxes.length : count;
+    for (int i = 0; i < copy; i++) {
+      tmp[i] = _imageBoxes[i];
+    }
+    _imageBoxes.removeRange(0, copy);
+    //Create additionals:
+    int create = count - copy;
+    for (int i = 0; i < create; i++) {
+      tmp[i + copy] = OsContainerImageBoxInfo();
+    }
+    //Delete the extra:
+    _imageBoxes.removeRange(0, _imageBoxes.length);
+    //finalize:
+    _imageBoxes = tmp;
+  }
 
-    public createImageBoxInfo(container:OsContainerWnd):OsContainerImageBoxInfo {
+  /*public createImageBoxInfo(container:OsContainerWnd):OsContainerImageBoxInfo {
         let info:OsContainerImageBoxInfo = new OsContainerImageBoxInfo();
         if (!container.isUsingSingleWindow()) {
             
         }
         return info;
-    }
-        
-        
-    
-    public setImageBoxRect(index:number, x:number, y:number, width:number, height:number) {
-        this._imageBoxes[index].rect[0] = x;
-        this._imageBoxes[index].rect[1] = y;
-        this._imageBoxes[index].rect[2] = width;
-        this._imageBoxes[index].rect[3] = height;
+    }*/
 
-       // console.log("set " + index + ": " + this._imageBoxes[index].rect[0] + " " + this._imageBoxes[index].rect[1] + " " + this._imageBoxes[index].rect[2] + " " + this._imageBoxes[index].rect[3]);
-    }
+  void setImageBoxRect(
+      int index, double x, double y, double width, double height) {
+    _imageBoxes[index].rect[0] = x;
+    _imageBoxes[index].rect[1] = y;
+    _imageBoxes[index].rect[2] = width;
+    _imageBoxes[index].rect[3] = height;
 
-    public findImageBoxIndexFromPoint(x:number, y:number):number {
+    // console.log("set " + index + ": " + this._imageBoxes[index].rect[0] + " " + this._imageBoxes[index].rect[1] + " " + this._imageBoxes[index].rect[2] + " " + this._imageBoxes[index].rect[3]);
+  }
+
+  /*public findImageBoxIndexFromPoint(x:number, y:number):number {
         for (let i=0; i<this._imageBoxes.length; i++) {
             if (x >= this._imageBoxes[i].rect[0] && x <= this._imageBoxes[i].rect[0] + this._imageBoxes[i].rect[2]) 
                 if (y >= this._imageBoxes[i].rect[1] && y <= this._imageBoxes[i].rect[1] + this._imageBoxes[i].rect[3]) 
@@ -538,42 +561,52 @@ class OsContainerWnd {
     //-----------------------------------------------------------------------
     
     //virtual void on_size(u32 type, f64 cx, f64 cy);
-    public replaceWidgets() {
-        if (this.rect[3] <= 0) return;
-        if (this.rect[2] <= 0) return;
-        if (this._colCnt*this._rowCnt <= 0) return;
 
-        //console.log("replace widgets: " + this.rect[0] + " " + this.rect[1] + " " + this.rect[2] + " " + this.rect[3]);
-        //we keep a minimum of d_BorderInter pixels between the images
-        let borderInterCountInWidth:number = this._colCnt-1;
-        let borderInterCountInHeight = this._rowCnt-1;
-        //we keep a minimum of d_BorderWidth pixels on the edges!
-        let imgWidth:number = (this.rect[2]-borderInterCountInWidth*this._borderInter-this._borderWidth*2) / this._colCnt;
-        let imgHeight:number = (this.rect[3]-borderInterCountInHeight*this._borderInter-this._borderWidth*2) / this._rowCnt;
-        imgWidth = Math.floor(imgWidth);
-        imgHeight = Math.floor(imgHeight);
-        let leftX:number = this.rect[2] - (imgWidth*this._colCnt) - this._borderWidth*2 - borderInterCountInWidth*this._borderInter;
-        let leftY:number = this.rect[3] - (imgHeight*this._rowCnt) - this._borderWidth*2 - borderInterCountInHeight*this._borderInter;
-        let offsetY:number = this._borderWidth + Math.floor(leftY*0.5);
-        for (let j=0; j<this._rowCnt; j++) {
-            let offsetX:number = this._borderWidth + Math.floor(leftX*0.5);
-            for (let i=0; i<this._colCnt; i++) {
-                this.setImageBoxRect(j*this._colCnt+i, offsetX, offsetY, imgWidth, imgHeight);
-                offsetX += imgWidth + this._borderInter;
-            }
-            offsetY += imgHeight + this._borderInter;
-        }
-        if (this._singleWindow) {
-            this.setCurrentPage(this._currentPage, OsContDraw.OS_FORCE_REDRAW);
-            let propagation:IContainerPropagateItem|null = this.getPropagationItem();
-            if (propagation) propagation.propagate(this, null, "POS|ROT|FOV", true, null);
-        }
+    */
+  void replaceWidgets() {
+    if (_rect[3] <= 0) return;
+    if (_rect[2] <= 0) return;
+    if (_colCnt * _rowCnt <= 0) return;
+
+    //we keep a minimum of d_BorderInter pixels between the images
+    double borderInterCountInWidth = _colCnt - 1;
+    double borderInterCountInHeight = _rowCnt - 1;
+    //we keep a minimum of d_BorderWidth pixels on the edges!
+    double imgWidth =
+        (_rect[2] - borderInterCountInWidth * _borderInter - _borderWidth * 2) /
+            _colCnt;
+    double imgHeight = (_rect[3] -
+            borderInterCountInHeight * _borderInter -
+            _borderWidth * 2) /
+        _rowCnt;
+    imgWidth = imgWidth.floorToDouble();
+    imgHeight = imgHeight.floorToDouble();
+    double leftX = _rect[2] -
+        (imgWidth * _colCnt) -
+        _borderWidth * 2 -
+        borderInterCountInWidth * _borderInter;
+    double leftY = _rect[3] -
+        (imgHeight * _rowCnt) -
+        _borderWidth * 2 -
+        borderInterCountInHeight * _borderInter;
+    double offsetY = _borderWidth + (leftY * 0.5).floorToDouble();
+    for (int j = 0; j < _rowCnt; j++) {
+      double offsetX = _borderWidth + (leftX * 0.5).floorToDouble();
+      for (int i = 0; i < _colCnt; i++) {
+        setImageBoxRect(j * _colCnt + i, offsetX, offsetY, imgWidth, imgHeight);
+        offsetX += imgWidth + _borderInter;
+      }
+      offsetY += imgHeight + _borderInter;
     }
-   
-    //-----------------------------------------------------------------------
-    //single window mode
-    //-----------------------------------------------------------------------
-    public setSingleWindowMode(single:boolean):void {
+    //this.setCurrentPage(this._currentPage, OsContDraw.OS_FORCE_REDRAW);
+    //let propagation:IContainerPropagateItem|null = this.getPropagationItem();
+    //if (propagation) propagation.propagate(this, null, "POS|ROT|FOV", true, null);
+  }
+
+  //-----------------------------------------------------------------------
+  //single window mode
+  //-----------------------------------------------------------------------
+  /*public setSingleWindowMode(single:boolean):void {
         this._singleWindow = single;
         this.setImageMatrix(this._rowCnt, this._colCnt, false);
         if (this._singleWindow) {
@@ -599,9 +632,59 @@ class OsContainerWnd {
 
     public isUsingSingleWindow():boolean {
         return this._singleWindow;
+    }*/
+
+  void redraw() {
+    _driver.currentContext = _context;
+    //Set the viewport:
+    _driver.setViewport(0, 0, _rect[2], _rect[3]);
+    //Disable the clipping mode:
+    _driver.disableClipping();
+    //Clear the window:
+    _driver.setClearColor4i(
+        _borderCol[0], _borderCol[1], _borderCol[2], _borderCol[3]);
+    _driver.clearBuffers();
+
+    if (_imageBoxes.isEmpty) return;
+    final firstRect = _imageBoxes[0].rect;
+    final lastRect = _imageBoxes[_rowCnt * _colCnt - 1].rect;
+    final rinfo = OsRenderInfo(null);
+    rinfo.projMat.buildOrthographicProjectionMatrixRH(
+        0.0, _rect[2], 0.0, _rect[3], -1.0, 1.0);
+    if (firstRect[0] != _borderWidth) {
+      rinfo.worldMat.mat[12] = (firstRect[0] - _borderWidth) * 0.5;
+      rinfo.worldMat.mat[13] = _rect[3] * 0.5;
+      _driver.setColor4i(0, 0, 0, 255);
+      _driver.fillSolidRect(rinfo, firstRect[0] - _borderWidth, _rect[3]);
+    }
+    if (lastRect[0] + lastRect[2] + _borderWidth != _rect[2]) {
+      double tmp = _rect[2] - (lastRect[0] + lastRect[2]) - _borderWidth;
+      rinfo.worldMat.mat[12] = _rect[2] - tmp * 0.5;
+      rinfo.worldMat.mat[13] = _rect[3] * 0.5;
+      _driver.setColor4i(0, 0, 0, 255);
+      _driver.fillSolidRect(rinfo, tmp, _rect[3]);
+    }
+    if (lastRect[1] + lastRect[3] + _borderWidth != _rect[3]) {
+      double tmp = _rect[3] - (lastRect[1] + lastRect[3]) - _borderWidth;
+      rinfo.worldMat.mat[12] = _rect[2] * 0.5;
+      rinfo.worldMat.mat[13] = tmp * 0.5;
+      _driver.setColor4i(0, 0, 0, 255);
+      _driver.fillSolidRect(rinfo, _rect[2], tmp);
+    }
+    if (firstRect[1] != _borderWidth) {
+      rinfo.worldMat.mat[12] = _rect[2] * 0.5;
+      rinfo.worldMat.mat[13] = _rect[3] - (firstRect[1] - _borderWidth) * 0.5;
+      _driver.setColor4i(0, 0, 0, 255);
+      _driver.fillSolidRect(rinfo, _rect[2], firstRect[1] - _borderWidth);
     }
 
-    public redrawSingleWindow():void {
+    //draw each image:
+    for (int i = 0; i < _rowCnt * _colCnt; i++) {
+      redrawImageBoxHelp(i);
+    }
+  }
+
+  /*public redrawSingleWindow():void {
         if (this._freezeDrawing) return;
         if (!this._singleWindow) return;
         if (!this._imageBoxes.length) return;
@@ -1072,87 +1155,73 @@ class OsContainerWnd {
             for (let i=0; i<list.length; i++) 
                 this.redrawImageBoxHelp(list[i]);
         }
-    }
-    
-    public redrawImageBoxHelp(index:number):void {
-        
-            this._redrawImageBox(this._imageBoxes[index], index);
-            //if (_on_end_draw_renderer_cbk != NULL) _on_end_draw_renderer_cbk(std::static_pointer_cast<ocontainer_wnd>(shared_from_this()), index, _wend_draw_renderer_cbk_data.lock());
-        //}
-    }
-    
-    private _redrawImageBox(imageBox:OsContainerImageBoxInfo, index:number):void {
-        if (!this._driver) return;
-        if (!this._singleWindow) {
-            
-        }
-    
-        //this._context.save();
+    }*/
 
-        //Set the viewport:
-        if (this._singleWindow) this._driver.setViewport(imageBox.rect[0], imageBox.rect[1], imageBox.rect[2], imageBox.rect[3]);
-        else this._driver.setViewport(0, 0, imageBox.rect[2], imageBox.rect[3]);
-    
-        //Set the clipping:
-        //this._driver.setClipArea(imageBox.rect[0], imageBox.rect[1], imageBox.rect[2], imageBox.rect[3]);
-        this._driver.pushClipping(imageBox.rect[0], imageBox.rect[1], imageBox.rect[2], imageBox.rect[3]);
-        
-        //Get the renderer:
-        let render:OsRenderer|null = imageBox.getRenderer();
-            
-        //Draw the image box:
-        if (render) {
+  void redrawImageBoxHelp(int index) {
+    _redrawImageBox(_imageBoxes[index], index);
+  }
+
+  void _redrawImageBox(OsContainerImageBoxInfo imageBox, int index) {
+    //Set the viewport:
+    _driver.setViewport(0, 0, imageBox.rect[2], imageBox.rect[3]);
+
+    //Set the clipping:
+    _driver.pushClipping(
+        imageBox.rect[0], imageBox.rect[1], imageBox.rect[2], imageBox.rect[3]);
+
+    //Get the renderer:
+    //let render:OsRenderer|null = imageBox.getRenderer();
+
+    //Draw the image box:
+    /*if (render) {
             
             render.setSelectionColor4i(this._selCol[0], this._selCol[1], this._selCol[2], 255);
-            render.draw(this._driver);
+            render.draw(_driver);
     
             
             if (this._inactive) {
-                let rinfo:OsRenderInfo = new OsRenderInfo(null);
+                let rinfo:OsRenderInfo = OsRenderInfo(null);
                 rinfo.projMat.buildOrthographicProjectionMatrixRH(0, imageBox.rect[2], 0, imageBox.rect[3], -1, 1);
                 rinfo.worldMat.mat[12] = imageBox.rect[2]*0.5;
                 rinfo.worldMat.mat[13] = imageBox.rect[3]*0.5;
-                this._driver.setColor4i(240, 190, 0, 50);
-                this._driver.fillSolidRect(rinfo, imageBox.rect[2], imageBox.rect[3]);
+                _driver.setColor4i(240, 190, 0, 50);
+                _driver.fillSolidRect(rinfo, imageBox.rect[2], imageBox.rect[3]);
             }
             
             //Draw the selection rectangle:
-            if (this._selectionRectangleIndex >= 0 && this._selectionRectangleIndex < this._imageBoxes.length) {
-                if (imageBox == this._imageBoxes[this._selectionRectangleIndex]) {
-                    let rinfo:OsRenderInfo = new OsRenderInfo(null);
+            if (this._selectionRectangleIndex >= 0 && this._selectionRectangleIndex < _imageBoxes.length) {
+                if (imageBox == _imageBoxes[this._selectionRectangleIndex]) {
+                    let rinfo:OsRenderInfo = OsRenderInfo(null);
                     rinfo.projMat.buildOrthographicProjectionMatrixRH(0.0, imageBox.rect[2], 0.0, imageBox.rect[3], -1.0, 1.0);
                     rinfo.worldMat.mat[12] = this._selectionRectangleRect[0]+this._selectionRectangleRect[2]*0.5;
                     rinfo.worldMat.mat[13] = imageBox.rect[3] - (this._selectionRectangleRect[1]+this._selectionRectangleRect[3]*0.5) - 1.0;
-                    this._driver.setColor4i(255, 255, 255, 100);
-                    this._driver.fillSolidRect(rinfo, this._selectionRectangleRect[2], this._selectionRectangleRect[3]);
+                    _driver.setColor4i(255, 255, 255, 100);
+                    _driver.fillSolidRect(rinfo, this._selectionRectangleRect[2], this._selectionRectangleRect[3]);
                 }
             }
             
             //draw the page slider:
             this.setPageSliderInfo(index);
-            let rinfo:OsRenderInfo = new OsRenderInfo(null);
+            let rinfo:OsRenderInfo = OsRenderInfo(null);
             rinfo.projMat.buildOrthographicProjectionMatrixRH(0.0, imageBox.rect[2], 0.0, imageBox.rect[3], -1.0, 1.0);
 
             let fontInfo:any = this._viewer?this._viewer.getCurrentFont(0):null;
-            if (fontInfo) this._driver.setColor3h(fontInfo.color);
-            else this._driver.setColor3h('#ffffff');
-            if (this._pageSlider) this._pageSlider.draw(this._driver, rinfo);
+            if (fontInfo) _driver.setColor3h(fontInfo.color);
+            else _driver.setColor3h('#ffffff');
+            if (this._pageSlider) this._pageSlider.draw(_driver, rinfo);
 
         }
-        else {
-            this._driver.setClearColor4i(this._backCol[0], this._backCol[1], this._backCol[2], 255);
-            this._driver.clearBuffers();
-        }
+        else {*/
+    _driver.setClearColor4i(_backCol[0], _backCol[1], _backCol[2], 255);
+    _driver.clearBuffers();
+    //}
 
-        //this._context.restore();
+    _driver.popClipping();
 
-        this._driver.popClipping();
+    //if (this._component) this._component.setCursor();
+  }
 
-        if (this._component) this._component.setCursor();
-
-    }
-    
-    public prepareForDrawingImageBox(index:number, info:OsWillDrawInfo) {
+  /*public prepareForDrawingImageBox(index:number, info:OsWillDrawInfo) {
         //if (_on_begin_will_draw_renderer_cbk != NULL) _on_begin_will_draw_renderer_cbk(std::static_pointer_cast<onis::graphics::container_wnd>(shared_from_this()), index, _wbegin_will_draw_renderer_cbk_data.lock());
         this.prepareForDrawingImageBox1(this._imageBoxes[index], info);
         //if (_on_end_will_draw_renderer_cbk != NULL) _on_end_will_draw_renderer_cbk(std::static_pointer_cast<onis::graphics::container_wnd>(shared_from_this()), index, _wend_will_draw_renderer_cbk_data.lock());
@@ -2331,13 +2400,17 @@ class OsContainerWnd {
 
 
     //dynamic fonts:
-    //void create_dynamics_fonts(driver_context_ptr &ctx);
+    //void create_dynamics_fonts(driver_context_ptr &ctx);*/
 
-    //-----------------------------------------------------------------------
-    //mouse events
-    //-----------------------------------------------------------------------
+  //-----------------------------------------------------------------------
+  //mouse events
+  //-----------------------------------------------------------------------
 
-    public onLeftButtonDown(box:number, x:number, y:number, shiftKey:boolean, controlKey:boolean, altKey:boolean):void {
+  bool onMouseHover(RawPointerInfo pointer) {
+    return false;
+  }
+
+  /*public onLeftButtonDown(box:number, x:number, y:number, shiftKey:boolean, controlKey:boolean, altKey:boolean):void {
         if (this.isPlaying(null)) return;
         let shouldCheckSlider:boolean = true;
         if (shiftKey || controlKey) shouldCheckSlider = false;
@@ -2885,9 +2958,12 @@ class OsContainerWnd {
 
     public setCursor(cursor:OsCursor):boolean {
         return this._component&&cursor?this._component.setCursor(cursor):false;
-    }
+    }*/
 
-    public onSetCursor(box:number, x:number, y:number, shiftKey:boolean, ctrlKey:boolean):boolean {
+  bool onSetCursor(RawPointerInfo pointer) {
+    return false;
+  }
+  /*public onSetCursor(box:number, x:number, y:number, shiftKey:boolean, ctrlKey:boolean):boolean {
         if (box == -1) return false;
         //is cursor over a toolbar?
        
