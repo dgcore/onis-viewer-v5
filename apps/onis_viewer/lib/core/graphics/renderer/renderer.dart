@@ -205,7 +205,7 @@ abstract class OsRenderer {
   //virtual driver_context_ptr get_context() = 0;
 
   //dirty:
-  //bool isDirty() { return false; }
+  bool get dirty => false;
 
   //pixel:
   //bool getPixelPosition(int width, int height, double x, double y, List<double> output, bool onlyInside) { return false; }
@@ -312,11 +312,11 @@ abstract class OsRenderer {
     public shouldAutoStart():boolean { return false; }
 
     //toolbars
-    public getToolbars(list:OsGraphicToolbar[], onlyVisible:boolean):void {}
+    public getToolbars(list:OsGraphicToolbar[], onlyVisible:boolean):void {}*/
 
-    //refresh:
-    public wantRefreshAsSoonAsPossible():boolean { return false; } 
+  //refresh:
+  bool get wantRefreshAsSoonAsPossible => false;
 
-    //events:
-    public onCalibrationChanged():void {}*/
+  //events:
+  /*public onCalibrationChanged():void {}*/
 }

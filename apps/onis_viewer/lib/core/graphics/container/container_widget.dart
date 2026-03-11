@@ -11,15 +11,19 @@ class OsContainerWidget extends StatefulWidget {
 
   @override
   State<OsContainerWidget> createState() => _OsContainerWidgetState();
+
+  get containerWnd => wContainerWnd.target;
 }
 
 class _OsContainerWidgetState extends State<OsContainerWidget> {
-  final redrawNotifier = ValueNotifier<int>(0);
-  late final OsPainter _painter = OsPainter(redrawNotifier);
+  late final OsPainter? _painter;
 
   @override
   void initState() {
     super.initState();
+    final containerWnd = widget.containerWnd;
+    final redrawNotifier = containerWnd?.redrawNotifier;
+    if (redrawNotifier != null) _painter = OsPainter(redrawNotifier!);
   }
 
   @override
@@ -29,8 +33,11 @@ class _OsContainerWidgetState extends State<OsContainerWidget> {
 
   @override
   Widget build(BuildContext context) {
-    final containerWnd = widget.wContainerWnd.target;
-    if (containerWnd == null) return const SizedBox.shrink();
+    final containerWnd = widget.containerWnd;
+    final redrawNotifier = containerWnd?.redrawNotifier;
+    if (containerWnd == null || redrawNotifier == null || _painter == null) {
+      return const SizedBox.shrink();
+    }
     OsCanvas canvas = OsCanvas(_painter);
     _painter.container = containerWnd;
     redrawNotifier.value++;

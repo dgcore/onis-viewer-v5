@@ -1,3 +1,4 @@
+import 'package:onis_viewer/core/models/database/image.dart' as database;
 import 'package:onis_viewer/core/models/database/patient.dart' as database;
 import 'package:onis_viewer/core/models/database/series.dart' as database;
 import 'package:onis_viewer/core/models/database/study.dart' as database;
@@ -196,6 +197,7 @@ class Study {
 class Series {
   database.Series? _series;
   WeakReference<Study>? _wStudy;
+  final List<Image> images = [];
 
   // Getters:
   database.Series? get databaseInfo => _series;
@@ -211,5 +213,36 @@ class Series {
     if (study == newStudy) return;
     study?.removeSeries(this);
     if (newStudy != null) newStudy.addSeries(this);
+  }
+}
+
+///////////////////////////////////////////////////////////////////////
+// OsOpenedImage
+///////////////////////////////////////////////////////////////////////
+
+class Image {
+  //static CURRENT:number = 0;
+  //static ORIGINAL:number = 1;
+  //static CALIBRATED:number = 2;
+
+  database.Image? _image;
+  WeakReference<Series>? _wSeries;
+
+  /*bool _highestQuality = false;
+    public loadStatus:OsResult = new OsResult();
+    public loadIndex:number = 0;
+    //public isStreaming:
+    private _dicomInfo:OsImageDicomInfo|null = null;
+    private _dcm:OsDicomFile|null = null;
+    private _frameCount:number;*/
+
+  // Getters:
+  database.Image? get databaseInfo => _image;
+  Series? get series => _wSeries?.target;
+
+  // Setters:
+  set databaseInfo(database.Image? image) {
+    if (image == _image) return;
+    _image = image;
   }
 }

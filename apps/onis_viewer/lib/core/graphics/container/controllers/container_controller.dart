@@ -1,5 +1,7 @@
 import 'package:onis_viewer/core/error_codes.dart';
 import 'package:onis_viewer/core/graphics/container/container_wnd.dart';
+import 'package:onis_viewer/core/graphics/renderer/renderer.dart';
+import 'package:onis_viewer/core/models/entities/patient.dart' as entities;
 import 'package:onis_viewer/core/onis_exception.dart';
 
 class OsContainerController {
@@ -19,13 +21,32 @@ class OsContainerController {
 
   //renderer type:
   /*public createRenderer():OsRenderer|null { return null; }
-    public getRendererElements():Array<OsRenderer> { return []; }
+    */
+  List<OsRenderer> get rendererElements => [];
 
-    //series:
-    public canAddSeries(list =Array<OsOpenedSeries>):boolean { return false; }
-    public addSeries(series =OsOpenedSeries, notify =boolean, fromHangingProtocol =boolean, modifiedContainers =Array<OsContainerWnd>|null):void;
-    //virtual void remove_series(const onis::opened_series_ptr &series, b32 notify, container_wnd_list *modified_containers) = 0;
-    public resetContent(notify =boolean, resetSynchro =boolean, modifiedContainers =OsContainerWnd[]|null) {}
+  //series:
+
+  void resetContent(
+      bool resetSynchro, List<OsContainerWnd>? modifiedContainers) {}
+
+  bool canAddSeries(List<entities.Series> list) {
+    return false;
+  }
+
+  void addSeries({
+    required entities.Series series,
+    required bool refresh,
+    required bool fromHangingProtocol,
+    List<OsContainerWnd>? modifiedContainers,
+  }) {
+    return;
+  }
+
+  bool isSeriesDisplayed(entities.Series series) {
+    return false;
+  }
+  //virtual void remove_series(const onis::opened_series_ptr &series, b32 notify, container_wnd_list *modified_containers) = 0;
+  /*public resetContent(notify =boolean, resetSynchro =boolean, modifiedContainers =OsContainerWnd[]|null) {}
     public isSeriesDisplayed(series =OsOpenedSeries):boolean { return false; }
     public getDisplayedSeries(list =OsOpenedSeries[]):void;
     public isStillDownloading():boolean { return false; }
