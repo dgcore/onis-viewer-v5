@@ -1,6 +1,236 @@
-//import 'package:onis_viewer/core/graphics/container/container_wnd.dart';
+import 'package:onis_viewer/api/graphics/renderers/renderer_2d.dart';
+import 'package:onis_viewer/core/graphics/container/container_wnd.dart';
 import 'package:onis_viewer/core/graphics/container/controllers/container_controller.dart';
+import 'package:onis_viewer/core/graphics/renderer/items/item.dart';
+import 'package:onis_viewer/core/models/entities/patient.dart' as entities;
+
+///////////////////////////////////////////////////////////////////////
+// OsDisplayedSeriesInfo
+///////////////////////////////////////////////////////////////////////
+
+class OsDisplayedSeriesInfo {
+  WeakReference<entities.Series>? _wSeries;
+  int rendererCount = 0;
+  int preloadCount = 0;
+  bool firstImageArrived = false;
+  OsItemDuplicateInfo? dupInfo;
+
+  entities.Series? get series => _wSeries?.target;
+  set series(entities.Series? series) {
+    _wSeries = series != null ? WeakReference<entities.Series>(series) : null;
+  }
+}
 
 class OsContainerController2D extends OsContainerController {
-  OsContainerController2D();
+  final List<OsDisplayedSeriesInfo> _listOfSeriesInfo = [];
+  final List<OsRenderer2D> _listRenderElements = [];
+  final String _stateId = "";
+
+  @override
+  List<OsRenderer2D> get rendererElements => _listRenderElements;
+
+  //series:
+  @override
+  void resetContent(
+      bool resetSynchro, List<OsContainerWnd>? modifiedContainers) {
+    //Stop playing the container:
+    /*let container:OsContainerWnd|null = this.getWindow();
+        if (container) {
+            container.stopPlaying();
+            container.zoomImageBox(false, 0, notify);
+        }
+        
+        //Save all state:
+        for (let iinnumber=0; i<_listOfSeriesInfo.length; i++) {
+            //let series:OsOpenedSeries = this._listOfSeriesInfo[i].getSeries(false);
+            this._saveSeriesState(_listOfSeriesInfo[i]);
+            //if (this._listOfSeriesInfo[i].dupInfo) this._listOfSeriesInfo[i].dupInfo.release();
+            //this._listOfSeriesInfo[i].dupInfo = null;
+            //if (series) {
+                //store_series_state(series);
+                //fire the callback:
+                /*if (this._removeSeriesHandler) {
+                    let bindData:OsStrongObject = this._wremoveSeriesData?this._wremoveSeriesData.lock(false):null;
+                    if (bindData && series)
+                        this._removeSeriesHandler.bind(bindData)(this, series); 
+                }*/
+            //}
+        }
+
+    //#ifdef OS_AUTO_EXPORT_WHEN_CONTAINER_CLEAR
+        //_app->send_message(OSMSG_IMGCONT_AUTO_EXPORT, WPARAM(_container.get()), 0);
+    //#endif
+        
+        //unselect all the images (to fire annotation selection event):
+        if (container) container.unselectAll(true, false, null, null, null);
+
+        //we destroy all the render elements:
+        for (let i=0; i<this._listRenderElements.length; i++) this._listRenderElements[i].release();
+        this._listRenderElements.splice(0, this._listRenderElements.length);
+        
+        //we release all the series info:
+        for (let i=0; i<_listOfSeriesInfo.length; i++) _listOfSeriesInfo[i].destroy();
+        _listOfSeriesInfo.splice(0, _listOfSeriesInfo.length);
+        
+        let localModifiedContainers:Array<OsContainerWnd> = [];
+        let targetModifiedContainers:Array<OsContainerWnd> = modifiedContainers;
+        if (!targetModifiedContainers) targetModifiedContainers = localModifiedContainers;
+        if (container) {
+            if (targetModifiedContainers.indexOf(container) == -1)
+                targetModifiedContainers.push(container);		
+            if (resetSynchro) {
+                let synchro:IContainerSynchroItem|null = container.getSynchroItem();
+                if (synchro) {
+                    synchro.setShouldSynchronize(container, false, false, 0.0, false, targetModifiedContainers); 
+                    synchro.synchronize(null, null);
+                }
+            }
+        }
+        this._incomingImageProperties.reset();
+        if (notify && this._viewer && this._viewer.messageService) {
+            for (let i=0; i<targetModifiedContainers.length; i++) 
+                this._viewer.messageService.sendMessage(MSG.IMGCONT_MODIFIED, targetModifiedContainers[i]);
+        }*/
+  }
+
+  @override
+  bool canAddSeries(List<entities.Series> list) {
+    return true;
+  }
+
+  @override
+  void addSeries({
+    required entities.Series series,
+    required bool refresh,
+    required bool fromHangingProtocol,
+    List<OsContainerWnd>? modifiedContainers,
+  }) {
+    //Don't add the series if we are already displaying it:
+    if (isSeriesDisplayed(series)) return;
+
+    //Stop playing the container:
+    //let container:OsContainerWnd|null = this.getWindow();
+
+    //Add the series:
+    final seriesInfo = OsDisplayedSeriesInfo();
+    seriesInfo.series = series;
+    seriesInfo.rendererCount = 0;
+    _listOfSeriesInfo.add(seriesInfo);
+
+    //prepare to load the states if required:
+    if (_stateId.isNotEmpty) {
+      seriesInfo.dupInfo = OsItemDuplicateInfo();
+    }
+
+    int imageCount = series.images.length;
+    if (imageCount == 0) {
+      //the series may be not loaded yet
+      final render = OsRenderer2D(OsRenderer2DType());
+      seriesInfo.rendererCount++;
+      /*let grp:OsGraphicGroup|null = render.getImageGroupItem(false);
+            if (grp) {
+                let item:OsGraphicImage = OsGraphicImage("");
+                item.setNullImage(series);
+                item.setParent(grp);
+                item.setLoadImageIndex(0);
+                render.setActiveImageItem(item);
+                render.setPrimaryImageItem(item);
+                item.release();
+            }*/
+      _listRenderElements.add(render);
+    } else {
+      /*if (container) {
+                let matrix:[number, number] = [0, 0]; //rows, cols
+                container.getImageMatrix(matrix);
+                let imageBoxCount:number = matrix[0] * matrix[1];
+                let refresh:boolean = false;
+                let pageToRefresh:number = -1;
+                let propagate:IContainerPropagateItem|null = container.getPropagationItem();
+                for (let i=0; i<imageCount; i++) {
+                    let render:OsRenderer2D = <OsRenderer2D>this.createRenderer();
+                    seriesInfo.rendererCount++;
+                    let grp:OsGraphicGroup|null = render.getImageGroupItem(false);
+                    if (grp) {
+                        let item:OsGraphicImage = OsGraphicImage("");
+                        if (!series.images[i]) {
+                            item.setNullImage(series);
+                            item.setLoadImageIndex(i);
+                        }
+                        else {
+                            item.setImage(series.images[i]);
+                            item.setLoadImageIndex(series.images[i].loadIndex);
+                        }
+                        item.setParent(grp);
+                        if (!render.getActiveImageItem(false)) render.setActiveImageItem(item);
+                        if (!render.getPrimaryImageItem(false)) render.setPrimaryImageItem(item);
+                        item.release();
+                    }
+                    this._listRenderElements.push(render);
+                    pageToRefresh = this.applyIncomingImageProperties(render, false);
+                    if (pageToRefresh != container.getCurrentPage()) refresh = true;
+                    else {
+                        //refresh only if renderer is visible:
+                        for (let j=0; j<imageBoxCount; j++) {
+                            if (container.getImageBoxRenderer(j) == render) {
+                                refresh = true;
+                                break;
+                            }
+                        }
+                    }
+                    //restore the states:
+                    let img1:OsGraphicImage|null = render.getPrimaryImageItem(false);
+                    let image1:OsOpenedImage|null = img1?img1.getImage():null;
+                    if (image1 && seriesInfo.dupInfo) this._applyImageStates(i, render, series, image1, seriesInfo.dupInfo, series.findState(this._stateId, 0), fromHangingProtocol);
+                    
+                    //propagate:
+                    if (propagate) propagate.onReceivedImage(container, render);
+                }
+           
+
+                
+                if (refresh) 
+                    if (pageToRefresh != -1) container.setCurrentPage(pageToRefresh, OsContDraw.OS_FORCE_REDRAW);
+                    else container.setCurrentPage(container.getCurrentPage(), OsContDraw.OS_FORCE_REDRAW);
+            }*/
+    }
+
+    /*if (series.loadStatus.status == RESULT.OSRSP_PENDING) {
+            let cont1:OsContainerWnd|null = this.getWindow();
+            if (cont1) {
+                let vw1:OsViewWnd|null = cont1.getView();
+                if (vw1 && vw1.viewer) vw1.viewer.getDownloadManager().addSeriesToLoadingQueue(series, true);
+            }
+        }
+
+        let localModifiedContainers:Array<OsContainerWnd> = [];
+        let targetModifiedContainers:Array<OsContainerWnd>|null = modifiedContainers;
+        if (!targetModifiedContainers) targetModifiedContainers = localModifiedContainers;
+        if (container) {
+            if (targetModifiedContainers.indexOf(container) == -1)
+                targetModifiedContainers.push(container);		
+            let synchro:IContainerSynchroItem|null = container.getSynchroItem();
+            if (synchro) {
+                synchro.resolve(null, false, targetModifiedContainers);
+                synchro.synchronize(null, null);
+            }
+        }
+        if (notify && this._viewer && this._viewer.messageService) {
+            for (let i=0; i<targetModifiedContainers.length; i++) 
+                this._viewer.messageService.sendMessage(MSG.IMGCONT_MODIFIED, targetModifiedContainers[i]);
+        }
+
+        //Start preloading:
+        this.preloadRenderers();
+        if (container) container.startLoadingRefreshTimer();*/
+  }
+
+  @override
+  bool isSeriesDisplayed(entities.Series series) {
+    for (int i = 0; i < _listOfSeriesInfo.length; i++) {
+      if (_listOfSeriesInfo[i].series == series) {
+        return true;
+      }
+    }
+    return false;
+  }
 }

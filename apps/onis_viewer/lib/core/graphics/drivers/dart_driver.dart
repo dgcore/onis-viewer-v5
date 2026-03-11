@@ -143,6 +143,8 @@ class OsDartDriverContext extends OsDriverContext {
 class OsDartDriver extends OsDriver {
   OsDartDriverContext? _currentContext;
   final List<double> _viewport = [0, 0, 0, 0];
+  int _clipDepth = 0;
+  final List<Rect> _clipStack = [];
 
   // Getters:
   @override
@@ -193,6 +195,8 @@ class OsDartDriver extends OsDriver {
     _currentContext!.canvas!.save();
     Rect clipRect = Rect.fromLTWH(offsetX, offsetY, width, height);
     _currentContext!.canvas!.clipRect(clipRect);
+    _clipStack.add(clipRect);
+    _clipDepth++;
     return true;
   }
 
@@ -202,6 +206,10 @@ class OsDartDriver extends OsDriver {
       return false;
     }
     _currentContext!.canvas!.restore();
+    if (_clipDepth > 0) {
+      _clipDepth--;
+      if (_clipStack.isNotEmpty) _clipStack.removeLast();
+    }
     return true;
   }
 
@@ -212,11 +220,31 @@ class OsDartDriver extends OsDriver {
 
   @override
   bool isClippingEnabled() {
-    return false;
+    return _clipDepth > 0;
   }
 
   @override
-  void getClipArea(List<double> output) {}
+  void getClipArea(List<double> output) {
+    if (_clipStack.isEmpty) {
+      if (output.length >= 4) {
+        output[0] = 0;
+        output[1] = 0;
+        output[2] = 0;
+        output[3] = 0;
+      }
+      return;
+    }
+    Rect effective = _clipStack.first;
+    for (int i = 1; i < _clipStack.length; i++) {
+      effective = effective.intersect(_clipStack[i]);
+    }
+    if (output.length >= 4) {
+      output[0] = effective.left;
+      output[1] = effective.top;
+      output[2] = effective.width;
+      output[3] = effective.height;
+    }
+  }
 
   // Clear:
   @override

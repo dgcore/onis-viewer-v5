@@ -29,10 +29,10 @@ class OsRenderer2D extends OsRenderer {
   //private _wprimaryImg:OsWeakObject|null;
   //private _wactiveImg:OsWeakObject|null;
   //private _preloaded:boolean;
-  //private _backCol:Array<number> = [0, 0, 0, 255];
-  //private _selCol:Array<number> = [255, 255, 255, 255];
+  final List<int> _backCol = [0, 0, 0, 255];
+  final List<int> _selCol = [255, 255, 255, 255];
   //private _keyCol:Array<number> = [255, 255, 0, 255];
-  //private _wantRefreshAsap:boolean;
+  final bool _wantRefreshAsap = false;
   //private _info:OsRenderInfo;
   bool _selected = false;
   bool _hidden = false;
@@ -1257,39 +1257,46 @@ class OsRenderer2D extends OsRenderer {
 
   @override
   void draw(OsDriver driver) {
-    /*let cameraValid:boolean = true;
-        this._wantRefreshAsap = false;
-        if (!this._camera) return;
+    bool cameraValid = true;
+    /*_wantRefreshAsSoonAsPossible = false;
+        if (!this._camera) return;*/
 
-        this._info.render = this;
+    //_info.render = this;
 
-        //Get the viewport size:
-        let viewport:[number, number, number, number] =[0,0,0,0];
-        driver.getViewport(viewport)
-        let ratio:number = (viewport[2]) ? viewport[3]/viewport[2] : 1.0;
+    //Get the viewport size:
+    List<double> viewport = [0, 0, 0, 0];
+    driver.getViewport(viewport);
+    double ratio = (viewport[2] != 0) ? viewport[3] / viewport[2] : 1.0;
 
-        let originalClipArea:[number, number, number, number] = [0, 0, 0, 0];
-        if (driver.isClippingEnabled()) driver.getClipArea(originalClipArea);
-        else for (let i:number=0; i<4; i++) originalClipArea[i] = viewport[i];
+    List<double> originalClipArea = [0, 0, 0, 0];
+    if (driver.isClippingEnabled()) {
+      driver.getClipArea(originalClipArea);
+    } else {
+      for (int i = 0; i < 4; i++) {
+        originalClipArea[i] = viewport[i];
+      }
+    }
 
-        //if the renderer is selected, we need to leave a white border:
-        if (this._selected) {
-            driver.setClearColor4i(this._selCol[0], this._selCol[1], this._selCol[2], this._selCol[3]);
-            driver.clearBuffers();
-            if (driver.isClippingEnabled()) {
-                let clipArea:[number, number, number, number] = [0, 0, 0, 0];
-                driver.getClipArea(clipArea)
-                clipArea[0] += 1.0;
-                clipArea[1] += 1.0;
-                clipArea[2] -= 2.0;
-                clipArea[3] -= 2.0;
-                driver.pushClipping(clipArea[0], clipArea[1], clipArea[2], clipArea[3]);
-            }
-            else driver.pushClipping(viewport[0]+1, viewport[1]+1, viewport[2]-2, viewport[3]-2);
-        }
-        
-        //if (this._isKey && this._drawTarget == OS_DRAW_TARGET_SCREEN) {
-        if (this._isKey) {
+    //if the renderer is selected, we need to leave a white border:
+    if (_selected) {
+      driver.setClearColor4i(_selCol[0], _selCol[1], _selCol[2], _selCol[3]);
+      driver.clearBuffers();
+      if (driver.isClippingEnabled()) {
+        List<double> clipArea = [0, 0, 0, 0];
+        driver.getClipArea(clipArea);
+        clipArea[0] += 1.0;
+        clipArea[1] += 1.0;
+        clipArea[2] -= 2.0;
+        clipArea[3] -= 2.0;
+        driver.pushClipping(clipArea[0], clipArea[1], clipArea[2], clipArea[3]);
+      } else {
+        driver.pushClipping(
+            viewport[0] + 1, viewport[1] + 1, viewport[2] - 2, viewport[3] - 2);
+      }
+    }
+
+    //if (this._isKey && this._drawTarget == OS_DRAW_TARGET_SCREEN) {
+    /*if (this._isKey) {
             driver.setClearColor4i(this._keyCol[0], this._keyCol[1], this._keyCol[2], this._keyCol[3]);
             driver.clearBuffers();
             if (driver.isClippingEnabled()) {
@@ -1302,13 +1309,13 @@ class OsRenderer2D extends OsRenderer {
                 driver.pushClipping(clipArea[0], clipArea[1], clipArea[2], clipArea[3]);
             }
             else driver.pushClipping(viewport[0]+1, viewport[1]+1, viewport[2]-2, viewport[3]-2);
-        }
+        }*/
 
-        //Clear the buffers:
-        driver.setClearColor4i(this._backCol[0], this._backCol[1], this._backCol[2], this._backCol[3]);
-        driver.clearBuffers();
+    //Clear the buffers:
+    driver.setClearColor4i(_backCol[0], _backCol[1], _backCol[2], _backCol[3]);
+    driver.clearBuffers();
 
-        if (cameraValid) {
+    /*if (cameraValid) {
 
             //Set the projection matrix:
             this._info.projMat.copyFrom(this._camera.getProjectionMatrix(ratio));
@@ -1423,11 +1430,11 @@ class OsRenderer2D extends OsRenderer {
         //if (this._isKey && this._drawTarget == OS_DRAW_TARGET_SCREEN) {
           if (this._isKey) {
             driver.popClipping();
-        }
-
-        if (this._selected) {
-            driver.popClipping();
         }*/
+
+    if (_selected) {
+      driver.popClipping();
+    }
   }
 
   /*public setDrawTarget(target:number, factor:number):void {
@@ -2008,31 +2015,30 @@ class OsRenderer2D extends OsRenderer {
             }
         }
         driver.stopDrawingMultipleTexts();
-    }
+    }*/
 
-    //-----------------------------------------------------------------------
-    //dirty
-    //-----------------------------------------------------------------------
-    public isDirty():boolean { 
-        if (this._rootItem != null) return this._rootItem.isDirty(true);
-	    return false;
-    }
+  //-----------------------------------------------------------------------
+  //dirty
+  //-----------------------------------------------------------------------
 
-    //-----------------------------------------------------------------------
-    //refresh
-    //-----------------------------------------------------------------------
+  @override
+  bool get dirty {
+    //if (this._rootItem != null) return this._rootItem.isDirty(true);
+    return false;
+  }
 
-    public wantRefreshAsSoonAsPossible():boolean {
+  //-----------------------------------------------------------------------
+  //refresh
+  //-----------------------------------------------------------------------
 
-        return this._wantRefreshAsap; 
+  @override
+  bool get wantRefreshAsSoonAsPossible => _wantRefreshAsap;
 
-    }
+  //-----------------------------------------------------------------------
+  //pixel
+  //-----------------------------------------------------------------------
 
-    //-----------------------------------------------------------------------
-    //pixel
-    //-----------------------------------------------------------------------
-
-    public getPixelPosition(width:number, height:number, x:number, y:number, output:[number,number,number], onlyInside:boolean):boolean{
+  /*public getPixelPosition(width =number, height =number, x =number, y =number, output =[number,number,number], onlyInside =boolean):boolean{
     
         if (this._camera == null) return false;
         if (!this._camera.isOrthographicMode()) return false;
@@ -2040,12 +2046,6 @@ class OsRenderer2D extends OsRenderer {
         let img:OsGraphicImage|null = this.getPrimaryImageItem(false);
         let image:OsOpenedImage|null = null;
         let frame:OsDicomFrame|null = null;
-        if (img != null) {
-        
-            image = img.getImage();
-            frame = img.getFrame(img.getCurrentFrame());
-
-        }
         if (img == null || frame == null || image == null) return false;
 
         let imageWidthHeight:[number,number] = [0, 0];
@@ -2075,7 +2075,7 @@ class OsRenderer2D extends OsRenderer {
         realDimensions[0] = imageWidthHeight[0] * pixelSpacing[0];
         realDimensions[1] = imageWidthHeight[1] * pixelSpacing[1];
 
-        let imageOrientation:OsMatrix = new OsMatrix();    
+        let imageOrientation:OsMatrix = OsMatrix();    
         if (!image.getImageOrientation(imageOrientation)) return false;
                 
         let win:[number,number,number] = [0, 0, 0];
@@ -2083,10 +2083,10 @@ class OsRenderer2D extends OsRenderer {
         win[1] = y;
         win[2] = 0.0;
         
-        let modelView:OsMatrix = new OsMatrix();  
+        let modelView:OsMatrix = OsMatrix();  
         this._camera.getWorldInvertMatrix(modelView, null);
         
-        let proj:OsMatrix = new OsMatrix();
+        let proj:OsMatrix = OsMatrix();
         let viewport:[number,number,number,number] = [0, 0, 0, 0];  
         viewport[0] = 0;
         viewport[1] = 0;
@@ -2103,7 +2103,7 @@ class OsRenderer2D extends OsRenderer {
             
             let imagePos:[number,number,number] = [0, 0, 0];
             
-            let imageMatrixInv:OsMatrix = new OsMatrix();
+            let imageMatrixInv:OsMatrix = OsMatrix();
             img.getWorldInvertMatrix(imageMatrixInv,null);
             imagePos[0] = imageMatrixInv.mat[0]*world[0] + imageMatrixInv.mat[4]*world[1] + imageMatrixInv.mat[8]*world[2] + imageMatrixInv.mat[12];
             imagePos[1] = imageMatrixInv.mat[1]*world[0] + imageMatrixInv.mat[5]*world[1] + imageMatrixInv.mat[9]*world[2] + imageMatrixInv.mat[13];
@@ -2163,18 +2163,17 @@ class OsRenderer2D extends OsRenderer {
 
     }
 
-    public getPixelValue(width:number, height:number, x:number, y:number, position:[number,number,number], isMonochrome:[boolean], value:[number], rgb:[number,number,number]):boolean{
+    public getPixelValue(width =number, height =number, x =number, y =number, position =[number,number,number], isMonochrome =[boolean], value =[number], rgb =[number,number,number]):boolean{
      
         if (!this._camera) return false;
         if (!this._camera.isOrthographicMode()) return false;
         position[2] = VALUE.S32_MAX;
         let img:OsGraphicImage|null = this.getPrimaryImageItem(false);
         let image:OsOpenedImage|null = null;
-        if (img != null) image = img.getImage();
         if (img == null ||image == null) return false;
 
         let frame:OsDicomFrame|null = img.getFrame(img.getCurrentFrame());
-        if (frame == null) return false;
+        return false;
         
         let dimensions:[number,number] = [0, 0];
         if (!frame.getDimensions(dimensions)) return false;
@@ -2184,10 +2183,10 @@ class OsRenderer2D extends OsRenderer {
         win[1] = y;
         win[2] = 0.0;
         
-        let modelView:OsMatrix = new OsMatrix();  
+        let modelView:OsMatrix = OsMatrix();  
         this._camera.getWorldInvertMatrix(modelView, null);
         
-        let proj:OsMatrix = new OsMatrix();
+        let proj:OsMatrix = OsMatrix();
         let viewport:[number,number,number,number] = [0, 0, 0, 0]; 
         viewport[0] = 0;
         viewport[1] = 0;
@@ -2204,7 +2203,7 @@ class OsRenderer2D extends OsRenderer {
             
             let imagePos:[number,number,number] = [0, 0, 0];
             
-            let imageMatrixInv:OsMatrix = new OsMatrix();  
+            let imageMatrixInv:OsMatrix = OsMatrix();  
             img.getWorldInvertMatrix(imageMatrixInv,null);
             imagePos[0] = imageMatrixInv.mat[0]*world[0] + imageMatrixInv.mat[4]*world[1] + imageMatrixInv.mat[8]*world[2] + imageMatrixInv.mat[12];
             imagePos[1] = imageMatrixInv.mat[1]*world[0] + imageMatrixInv.mat[5]*world[1] + imageMatrixInv.mat[9]*world[2] + imageMatrixInv.mat[13];
@@ -2252,7 +2251,7 @@ class OsRenderer2D extends OsRenderer {
                     let sourceIndex:number = Math.floor(position[0] + sourceStride * position[1]);
 
                     if (representation == 32) {
-                        let interSource = (isSigned) ? new Int32Array(interData.intermediatePixelData.buffer) : new Uint32Array(interData.intermediatePixelData.buffer);
+                        let interSource = (isSigned) ? Int32Array(interData.intermediatePixelData.buffer) : Uint32Array(interData.intermediatePixelData.buffer);
                         let realValue:number = interSource[sourceIndex];
                         realValue = realValue*rescaleIntercept[0] + rescaleIntercept[1];
                         value[0] = realValue;
@@ -2269,7 +2268,7 @@ class OsRenderer2D extends OsRenderer {
                     else
                     if (representation == 16) {
                         
-                        let interSource = (isSigned) ? new Int16Array(interData.intermediatePixelData.buffer) : new Uint16Array(interData.intermediatePixelData.buffer);
+                        let interSource = (isSigned) ? Int16Array(interData.intermediatePixelData.buffer) : Uint16Array(interData.intermediatePixelData.buffer);
                         let realValue:number = interSource[sourceIndex];
                         realValue = realValue*rescaleIntercept[0] + rescaleIntercept[1];
                         value[0] = realValue;
@@ -2285,7 +2284,7 @@ class OsRenderer2D extends OsRenderer {
                     else 
                     if (representation == 8) {
                         
-                        let interSource = (isSigned) ? new Int8Array(interData.intermediatePixelData.buffer) : new Uint8Array(interData.intermediatePixelData.buffer);
+                        let interSource = (isSigned) ? Int8Array(interData.intermediatePixelData.buffer) : Uint8Array(interData.intermediatePixelData.buffer);
                         let realValue:number = interSource[sourceIndex];
                         realValue = realValue*rescaleIntercept[0] + rescaleIntercept[1];
                         value[0] = realValue;
@@ -2426,7 +2425,7 @@ class OsRenderer2D extends OsRenderer {
     //overlays
     //-----------------------------------------------------------------------
 
-    public shouldDisplayDicomAnnotations(set:[OsDbAnnotationSet|null]):boolean {
+    public shouldDisplayDicomAnnotations(set =[OsDbAnnotationSet|null]):boolean {
         if (set) {
             let tmp:OsDbAnnotationSet|null = this._wannotationSet ? <OsDbAnnotationSet>this._wannotationSet.lock(false) : null;
             let type:OsRendererType|null = this.getType();
@@ -2435,7 +2434,7 @@ class OsRenderer2D extends OsRenderer {
                 
                 let siteSet:[OsDbPreferenceSet|null] = [null];
                 let userSet:OsDbPreferenceSet|null = viewer.getActivePreferenceSet(siteSet);
-                for (let i:number=0; i<2; i++) {
+                for (let iinnumber=0; i<2; i++) {
                     let currentSet = i == 0 ? userSet : siteSet[0];
                     if (currentSet && 'AS' in currentSet.items) {
                         let items:OsDbPreferenceItem[] = currentSet.items['AS']; 
@@ -2461,7 +2460,7 @@ class OsRenderer2D extends OsRenderer {
         return this._shouldDisplayRuler;
     }
 
-    public setShouldDisplayDicomAnnotations(display:boolean, set:OsDbAnnotationSet) {
+    public setShouldDisplayDicomAnnotations(display =boolean, set =OsDbAnnotationSet) {
         this._shouldDisplayDicom = display;
         if (set) {
             let modified:boolean = false;
@@ -2475,11 +2474,11 @@ class OsRenderer2D extends OsRenderer {
         }
     }
   
-    public setShouldDisplayGraphicAnnotations(display:boolean) {
+    public setShouldDisplayGraphicAnnotations(display =boolean) {
         this._shouldDisplayGraphics = display;
     }
 
-    public setShouldDisplayRuler(display:boolean) {
+    public setShouldDisplayRuler(display =boolean) {
         this._shouldDisplayRuler = display;
     }
 
@@ -2487,9 +2486,9 @@ class OsRenderer2D extends OsRenderer {
     //warning messages
     //-----------------------------------------------------------------------
 
-    public addWarningMessage(data:OsStrongObject|null, text:string):void {
+    public addWarningMessage(data =OsStrongObject|null, text =string):void {
         if (!data || text.length == 0) return;
-        for (let i:number=0; i<this._warningMessages.length; i++) {
+        for (let iinnumber=0; i<this._warningMessages.length; i++) {
             if (this._warningMessages[i].haveData) {
                 if (this._warningMessages[i].wdata.lock(false) === data && this._warningMessages[i].text === text) 
                     return;
@@ -2498,7 +2497,7 @@ class OsRenderer2D extends OsRenderer {
             if (this._warningMessages[i].text === text) 
                 return;
         }
-        let message:OsRenderer2dWarningMessage = new OsRenderer2dWarningMessage();
+        let message:OsRenderer2dWarningMessage = OsRenderer2dWarningMessage();
         if (data) {
             message.haveData = true;
             message.wdata = data.getWeakObject();
@@ -2507,10 +2506,10 @@ class OsRenderer2D extends OsRenderer {
         this._warningMessages.push(message);
     }
 
-    public removeWarningMessage(data:OsStrongObject|null, text:string):boolean {
+    public removeWarningMessage(data =OsStrongObject|null, text =string):boolean {
         let ret:boolean = false;
         if (data) {
-            for (let i:number = 0; i < this._warningMessages.length; i++) {
+            for (let iinnumber = 0; i < this._warningMessages.length; i++) {
                 if (this._warningMessages[i].haveData && this._warningMessages[i].wdata.lock(false) === data) {
                     if (text.length == 0 || text === this._warningMessages[i].text) {
                         ret = true;
@@ -2524,7 +2523,7 @@ class OsRenderer2D extends OsRenderer {
         }
         else {
             if (text.length > 0) {
-                for (let i:number = 0; i < this._warningMessages.length; i++) {
+                for (let iinnumber = 0; i < this._warningMessages.length; i++) {
                     if (!this._warningMessages[i].haveData) {
                         if (text === this._warningMessages[i].text) {
                             ret = true;
@@ -2538,7 +2537,7 @@ class OsRenderer2D extends OsRenderer {
             }
             else {
                 ret = this._warningMessages.length > 0 ? true : false;
-                for (let i:number=0; i<this._warningMessages.length; i++) this._warningMessages[i].destroy();
+                for (let iinnumber=0; i<this._warningMessages.length; i++) this._warningMessages[i].destroy();
                 this._warningMessages.splice(0, this._warningMessages.length);
             }
             
@@ -2550,7 +2549,7 @@ class OsRenderer2D extends OsRenderer {
     //-----------------------------------------------------------------------
     //memory
     //-----------------------------------------------------------------------
-    public releaseMemory(level:number):void {
+    public releaseMemory(level =number):void {
         if (this._rootItem) this._rootItem.releaseMemory(this, level, true);
     }
     
@@ -2567,7 +2566,7 @@ class OsRenderer2D extends OsRenderer {
         }
         //Search all the intersections:
         let intersections:OsAnnotationIntersection[] = [];
-        this.calculateAnnotationIntersections(list, intersections);
+        calculateAnnotationIntersections(list, intersections);
         //Regenerate the segment for each annotations:
         for (let i=0; i<list.length; i++) 
             list[i].regenerateSegments(this, intersections);
@@ -2577,7 +2576,7 @@ class OsRenderer2D extends OsRenderer {
                 intersections[i].release();
     }
 
-    public calculateAnnotationIntersections(list:OsGraphicAnnotation[], intersections:OsAnnotationIntersection[]) {
+    public calculateAnnotationIntersections(list =OsGraphicAnnotation[], intersections =OsAnnotationIntersection[]) {
         for (let i=0; i<list.length; i++) {
             for (let j=i+1; j<list.length; j++) {
                 list[i].calculateIntersections(this, list[j], intersections);

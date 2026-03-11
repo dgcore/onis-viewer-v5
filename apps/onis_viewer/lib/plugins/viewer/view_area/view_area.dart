@@ -112,10 +112,20 @@ class _ViewAreaState extends State<ViewArea> {
       ),
     );
 
+    final container = leafWidget?.currentViewWindow?.activeContainer;
+
+    //node.containerWnd.canDropOpenedEntity(item);
+
     return DragTarget<entities.Series>(
-      onWillAcceptWithDetails: (details) => true,
+      onWillAcceptWithDetails: (details) {
+        return container == null
+            ? false
+            : container.canDropOpenedEntity(details.data);
+      },
       onAcceptWithDetails: (details) {
-        widget.onSeriesDropped?.call(node, details.data);
+        if (container == null) return;
+        container.onDropOpenedEntity(details.data);
+        //widget.onSeriesDropped?.call(node, details.data);
       },
       builder: (context, candidateData, rejectedData) {
         final isHighlighted = candidateData.isNotEmpty;

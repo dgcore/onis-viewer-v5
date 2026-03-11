@@ -5,6 +5,19 @@ import 'package:onis_viewer/core/graphics/container/controllers/container_contro
 import 'package:onis_viewer/core/graphics/drivers/driver.dart';
 import 'package:onis_viewer/core/graphics/renderer/renderer.dart';
 import 'package:onis_viewer/core/layout/view_wnd.dart';
+import 'package:onis_viewer/core/models/entities/patient.dart' as entities;
+
+enum OsContDraw {
+  osDraw,
+  osForceRedraw,
+  osNoDraw,
+}
+
+enum OsContDrawTarget {
+  osDrawTargetScreen,
+  osDrawTargetPrinter,
+  osDrawTargetPrintPreviewContainer,
+}
 
 ///////////////////////////////////////////////////////////////////////
 // container_image_box_info
@@ -12,6 +25,12 @@ import 'package:onis_viewer/core/layout/view_wnd.dart';
 
 class OsContainerImageBoxInfo {
   List<double> rect = [0, 0, 0, 0];
+  WeakReference<OsRenderer>? wRenderer;
+
+  OsRenderer? get renderer => wRenderer?.target;
+  set renderer(OsRenderer? renderer) {
+    wRenderer = renderer != null ? WeakReference<OsRenderer>(renderer) : null;
+  }
 }
 
 class OsContainerWnd extends ChangeNotifier {
@@ -19,6 +38,7 @@ class OsContainerWnd extends ChangeNotifier {
   //private _component:any = null;
 
   //protected _viewer:Viewer|null = null;
+  final ValueNotifier<int> _redrawNotifier = ValueNotifier<int>(0);
   final OsContainerController _controller;
   final WeakReference<ViewWnd>? _wView;
   //private _controller:OsContainerController|null;
@@ -65,7 +85,7 @@ class OsContainerWnd extends ChangeNotifier {
   //private _propagationItem:IContainerPropagateItem|null;
   //private _wscoutItem:OsWeakObject|null;
 
-  //private _currentPage:number;
+  int _currentPage = 0;
   //private _savePageIndex:number;
   //private _inactive:boolean;
   //private _inactiveColor:Array<number>;
@@ -78,7 +98,7 @@ class OsContainerWnd extends ChangeNotifier {
   //private _cineOptionSource:number;
   //private _cineOptionSetId:string = '';
   //private _cineOptionCategory:string;
-  //private _freezeDrawing:boolean;
+  final bool _freezeDrawing = false;
 
   //protected _shouldAutoHideAnnotations = false;
   //protected _shouldDisplayRuler:boolean = true;
@@ -96,7 +116,7 @@ class OsContainerWnd extends ChangeNotifier {
   //protected _pageSlider:OsContainerPageSlider|null;
   //private _pageSliderEnable:boolean;
 
-  //private _pageMode:boolean;
+  final bool _pageMode = false;
 
   //private _drawLocalizer:boolean = false;
   //private _wLocalizerStudy:OsWeakObject|null = null;
@@ -110,7 +130,7 @@ class OsContainerWnd extends ChangeNotifier {
 
   final List<int> _backCol = [0, 0, 0, 255];
   final List<int> _borderCol = [64, 64, 64, 255];
-  //private _selCol:Array<number> = [255, 255, 255, 255];
+  final List<int> _selCol = [255, 255, 255, 255];
   //private _wsupportSet:OsWeakObject|null;
 
   //private _shouldAutoSelect1x1:boolean = true;
@@ -147,6 +167,8 @@ class OsContainerWnd extends ChangeNotifier {
       containerWnd: this,
     );
   }
+
+  ValueNotifier<int> get redrawNotifier => _redrawNotifier;
 
   void setRect(double x, double y, double width, double height) {
     _rect = [x, y, width, height];
@@ -393,16 +415,13 @@ class OsContainerWnd extends ChangeNotifier {
     return [_rowCnt, _colCnt];
   }
 
-  /*public getImageBoxRenderer(index:number):OsRenderer|null  {
-        if (index < 0 || index >= this._rowCnt*this._colCnt) return null;
-        if (this._imageBoxes) {
-            let box:OsContainerImageBoxInfo|null = this._imageBoxes[index];
-            return box?box.getRenderer():null;
-        }
-        else return null;
-    }
+  OsRenderer? getImageBoxRenderer(int index) {
+    if (index < 0 || index >= _rowCnt * _colCnt) return null;
+    OsContainerImageBoxInfo? box = _imageBoxes[index];
+    return box.renderer;
+  }
 
-    public getImageBoxRect(index:number, rect:[number, number, number, number]):void {
+  /*public getImageBoxRect(index:number, rect:[number, number, number, number]):void {
         let box:OsContainerImageBoxInfo|null = this._imageBoxes[index];
         if (!box) return;
         for (let i=0; i<4; i++) rect[i] = box.rect[i];
@@ -898,135 +917,129 @@ class OsContainerWnd extends ChangeNotifier {
         this._pageMode = enable;
         this.setCurrentPage(0, OsContDraw.OS_FORCE_REDRAW);
     }
-    
-    public getPageCount():number {
-        let items:Array<OsRenderer>|null = this._controller?this._controller.getRendererElements():null;
-        if (items) {
-            let count:number = 0;
-            for (let i=0; i<items.length; i++) {
-                if (!items[i].isHidden()) count++;
-            }
-            if (count <= this._rowCnt*this._colCnt) return 1;
-            else {
-                if (this._pageMode) {
-                    let tmp:number = Math.round(Math.floor(count / (this._rowCnt*this._colCnt)));
-                    if (tmp*this._rowCnt*this._colCnt < count) tmp++;
-                    return tmp;
-                }
-                else return count;
-            }
-        }
-        else return 1;
+    */
+
+  int get pageCount {
+    final items = _controller.rendererElements;
+    int count = 0;
+    for (final item in items) {
+      if (!item.hidden) count++;
     }
-    
-    public getCurrentPage():number {
-        return this._currentPage;
+    if (count <= _rowCnt * _colCnt) {
+      return 1;
+    } else {
+      if (_pageMode) {
+        int tmp = (count / (_rowCnt * _colCnt)).floor();
+        if (tmp * _rowCnt * _colCnt < count) tmp++;
+        return tmp;
+      }
+      return count;
+    }
+  }
+
+  int get currentPage => _currentPage;
+
+  bool setCurrentPage({required int index, required OsContDraw mode}) {
+    bool ret = false;
+    if (_freezeDrawing) return ret;
+    //if (this._controller) this._controller.getLoadingProgression();
+    if (_currentPage != index) {
+      //We can change the page only if we are not running any tools:
+      /*let tool:OsContainerTool|null = this.getRunningTool(null, false);
+      if (tool) {
+          if (tool.getId() !== 'IMGTOOL_SLIDER')
+              return ret;
+      }
+      //Do we have a running annotation action?
+      let action:OsAnnotationAction|null = this.getCurrentAnnotationAction();
+      if (action) {
+          if (action.isRunning()) 
+              return ret;
+      }*/
+    }
+    if (index <= 0 || index >= pageCount) {
+      //Invalid page index, set to 0 by default:
+      index = 0;
     }
 
-    public setCurrentPage(index:number, mode:number):boolean {
-        let ret:boolean = false;
-        if (this._freezeDrawing) return ret;
-        if (this._controller) this._controller.getLoadingProgression();
-        if (this._currentPage != index) {
-            //We can change the page only if we are not running any tools:
-            let tool:OsContainerTool|null = this.getRunningTool(null, false);
-            if (tool) {
-                if (tool.getId() !== 'IMGTOOL_SLIDER')
-                    return ret;
-            }
-            //Do we have a running annotation action?
-            let action:OsAnnotationAction|null = this.getCurrentAnnotationAction();
-            if (action) {
-                if (action.isRunning()) 
-                    return ret;
-            }
+    bool pageChanged = (_currentPage == index) ? false : true;
+    ret = pageChanged;
+    OsRenderer? previousFirstRender;
+    if (_rowCnt * _colCnt == 1) previousFirstRender = getImageBoxRenderer(0);
+    _currentPage = index;
+    int startIndex = _currentPage;
+    int count = _rowCnt * _colCnt;
+    if (_pageMode) startIndex *= count;
+
+    //Before drawing the page, we need to release the memory of the image boxes that will not be visible anymore in the page!
+    //We also need to release the memory of the items that are context related if their context has changed!
+    //This is because we need to release some data that may be context related!
+    int releaseCount = 0;
+    List<OsRenderer?> releaseItems = [];
+
+    int redrawCount = 0;
+    List<int> redrawItems = List.filled(count, 0);
+    final items = _controller.rendererElements;
+    int pos = findStartingPosition(items, startIndex);
+    for (int i = 0; i < count; i++) {
+      OsRenderer? oldRender = getImageBoxRenderer(i);
+      OsRenderer? newRender;
+      if (pos != -1) {
+        while (pos < items.length) {
+          if (!items[pos].hidden) {
+            newRender = items[pos];
+            pos++;
+            break;
+          }
+          pos++;
         }
-        if (index <= 0 || index >= this.getPageCount()) {
-            //Invalid page index, set to 0 by default:
-            index = 0;
+      }
+      if (newRender != null) {
+        //start auto-playing if needed:
+      }
+
+      if (oldRender == newRender) {
+        //we display the same item.
+        //the context for the item will not change, we don't need to release the memory!
+        //but we may need to redraw it:
+        if (newRender != null) {
+          if (newRender.dirty || newRender.wantRefreshAsSoonAsPossible) {
+            redrawItems[redrawCount] = i;
+            redrawCount++;
+          }
         }
-        
-        let pageChanged = (this._currentPage == index) ? false : true;
-        ret = pageChanged;
-        let previousFirstRender:OsRenderer|null = null;
-        if (this._rowCnt*this._colCnt == 1) previousFirstRender = this.getImageBoxRenderer(0);
-        this._currentPage = index;
-        let startIndex = this._currentPage;
-        let count:number = this._rowCnt*this._colCnt;
-        if (this._pageMode) startIndex *= count;
-        
-        //Before drawing the page, we need to release the memory of the image boxes that will not be visible anymore in the page!
-        //We also need to release the memory of the items that are context related if their context has changed!
-        //This is because we need to release some data that may be context related!
-        
-        let releaseCount:number = 0;
-        let releaseItems:OsRenderer[]|null[] = [];
-        let redrawCount:number = 0;
-        let redrawItems:number[] = new Array<number>(count);
-        let items:OsRenderer[]|null = this._controller?this._controller.getRendererElements():null;
-        if (items) {
-            let pos:number = this.findStartingPosition(items, startIndex);
-            for (let i=0; i<count; i++) {
-                let oldRender:OsRenderer|null = this.getImageBoxRenderer(i);
-                let newRender:OsRenderer|null = null;
-                if (pos != -1) 
-                    while (pos < items.length) {
-                        if (!items[pos].isHidden()) {
-                            newRender = items[pos];
-                            pos++;
-                            break;
-                        }
-                        pos++;
-                    }
-                if (newRender) {
-                    //start auto-playing if needed:
-                    
-                }
-                let tryToStart:boolean = true;
-                if (oldRender === newRender) {
-                    //we display the same item.
-                    //the context for the item will not change, we don't need to release the memory!
-                    //but we may need to redraw it:
-                    if (newRender) {
-                        if (newRender.isDirty() || newRender.wantRefreshAsSoonAsPossible()) {
-                            redrawItems[redrawCount] = i;
-                            redrawCount++;
-                        }
-                    }
-                }
-                else {
-                    this.setImageBoxRender(i, newRender);
-                    redrawItems[redrawCount] = i;
-                    redrawCount++;
-                    if (newRender) {
-                        //if the item was inserted in the list of item to release, we remove it:
-                        for (let j=0; j<releaseCount; j++) {
-                            if (newRender === releaseItems[j]) {
-                                releaseItems[j] = null;
-                                break;
-                            }
-                        }
-                    }
-                    if (oldRender) {
-                        //we need to add the old item in the list of items to release
-                        //if this old item will be drawn, this means that it will be visible so
-                        //we should not release its memory:
-                        let j:number;
-                        for (j=0; j<redrawCount; j++) {
-                            if (oldRender == this.getImageBoxRenderer(redrawItems[j]))
-                                break;
-                        }
-                        if (j == redrawCount) {
-                            releaseItems[releaseCount] = oldRender;
-                            releaseCount++;
-                        }
-                    }
-                }
+      } else {
+        _imageBoxes[index].renderer = newRender;
+
+        redrawItems[redrawCount] = i;
+        redrawCount++;
+        if (newRender != null) {
+          //if the item was inserted in the list of item to release, we remove it:
+          for (int j = 0; j < releaseCount; j++) {
+            if (newRender == releaseItems[j]) {
+              releaseItems[j] = null;
+              break;
             }
+          }
         }
-        
-        //Release the memory of the items that are no more visible now:
-        for (let i=0; i<releaseCount; i++) {
+        if (oldRender != null) {
+          //we need to add the old item in the list of items to release
+          //if this old item will be drawn, this means that it will be visible so
+          //we should not release its memory:
+          int j;
+          for (j = 0; j < redrawCount; j++) {
+            if (oldRender == getImageBoxRenderer(redrawItems[j])) break;
+          }
+          if (j == redrawCount) {
+            releaseItems[releaseCount] = oldRender;
+            releaseCount++;
+          }
+        }
+      }
+    }
+
+    //Release the memory of the items that are no more visible now:
+    /*for (let i=0; i<releaseCount; i++) {
             if (releaseItems[i]) {
                 if (this._autoPlaySupport) {
                     let tmp:OsRenderer|null = releaseItems[i];
@@ -1078,16 +1091,16 @@ class OsContainerWnd extends ChangeNotifier {
                     //}
                 }
             }
-        }
+        }*/
 
-        //Redraw the items:
-       
-            if (mode == OsContDraw.OS_FORCE_REDRAW) this.redrawSingleWindow(); 
-            else if (mode == OsContDraw.OS_DRAW && redrawCount) this.redrawSingleWindow(); 
-        
+    //Redraw the items:
+    if (mode == OsContDraw.osForceRedraw ||
+        (mode == OsContDraw.osDraw && redrawCount > 0)) {
+      _redrawNotifier.value++;
+    }
 
-        //check if one of the displayed renderers need to be redrawn asap:
-        let refreshAsap = false;
+    //check if one of the displayed renderers need to be redrawn asap:
+    /*let refreshAsap = false;
         for (let i=0; i<count; i++) {
             let render:OsRenderer|null = this._imageBoxes[i].getRenderer();
             if (render) {
@@ -1115,14 +1128,11 @@ class OsContainerWnd extends ChangeNotifier {
         if (pageChanged && this._viewer && this._viewer.messageService) this._viewer.messageService.sendMessage(MSG.IMGCONT_PAGE_CHANGED, this);
         
         this._lastDrawRowCnt = this._rowCnt;
-        this._lastDrawColCnt = this._colCnt;
+        this._lastDrawColCnt = this._colCnt;*/
+    return ret;
+  }
 
-        
-
-        return ret;
-    }
-
-    public nextPage() {
+  /*public nextPage() {
         let pageCount:number = this.getPageCount();
         let newPage:number = this._currentPage+1;
         if (newPage < 0) newPage = 0;
@@ -1170,16 +1180,14 @@ class OsContainerWnd extends ChangeNotifier {
         imageBox.rect[0], imageBox.rect[1], imageBox.rect[2], imageBox.rect[3]);
 
     //Get the renderer:
-    //let render:OsRenderer|null = imageBox.getRenderer();
+    final renderer = imageBox.renderer;
 
     //Draw the image box:
-    /*if (render) {
-            
-            render.setSelectionColor4i(this._selCol[0], this._selCol[1], this._selCol[2], 255);
-            render.draw(_driver);
-    
-            
-            if (this._inactive) {
+    if (renderer != null) {
+      renderer.setSelectionColor4i(_selCol[0], _selCol[1], _selCol[2], 255);
+      renderer.draw(_driver);
+
+      /*if (this._inactive) {
                 let rinfo:OsRenderInfo = OsRenderInfo(null);
                 rinfo.projMat.buildOrthographicProjectionMatrixRH(0, imageBox.rect[2], 0, imageBox.rect[3], -1, 1);
                 rinfo.worldMat.mat[12] = imageBox.rect[2]*0.5;
@@ -1208,16 +1216,12 @@ class OsContainerWnd extends ChangeNotifier {
             let fontInfo:any = this._viewer?this._viewer.getCurrentFont(0):null;
             if (fontInfo) _driver.setColor3h(fontInfo.color);
             else _driver.setColor3h('#ffffff');
-            if (this._pageSlider) this._pageSlider.draw(_driver, rinfo);
-
-        }
-        else {*/
-    _driver.setClearColor4i(_backCol[0], _backCol[1], _backCol[2], 255);
-    _driver.clearBuffers();
-    //}
-
+            if (this._pageSlider) this._pageSlider.draw(_driver, rinfo);*/
+    } else {
+      _driver.setClearColor4i(_backCol[0], _backCol[1], _backCol[2], 255);
+      _driver.clearBuffers();
+    }
     _driver.popClipping();
-
     //if (this._component) this._component.setCursor();
   }
 
@@ -1294,25 +1298,23 @@ class OsContainerWnd extends ChangeNotifier {
         if (target == 1) { 
             
         }
+    }*/
+
+  int findStartingPosition(List<OsRenderer> list, int startIndex) {
+    int index = 0;
+    for (int i = 0; i < list.length; i++) {
+      if (list[i].hidden) continue;
+      if (index == startIndex) return i;
+      index++;
     }
-    
-    
+    return -1;
+  }
 
-    public findStartingPosition(list:OsRenderer[], startIndex:number):number {
-        let index:number = 0;
-        for (let i=0; i<list.length; i++) {
-            if (list[i].isHidden()) continue;
-            if (index === startIndex) return i;
-            index++;
-        }
-        return -1;
-    }
+  //-----------------------------------------------------------------------
+  //selection
+  //-----------------------------------------------------------------------
 
-    //-----------------------------------------------------------------------
-    //selection
-    //-----------------------------------------------------------------------
-
-    public selectAll(message:boolean, redraw:boolean, renderers:OsRenderer[]|null, boxes:number[]|null):number {
+  /*public selectAll(message:boolean, redraw:boolean, renderers:OsRenderer[]|null, boxes:number[]|null):number {
         return this._doSelection(1, message, redraw, renderers, boxes, null);
     }
 
@@ -2984,36 +2986,28 @@ class OsContainerWnd extends ChangeNotifier {
         let action:OsAnnotationAction|null = this.getCurrentAnnotationAction();
         if (action) return action.onSetCursor(this, box, x, y, shiftKey, ctrlKey);
         return false;
+    }*/
+
+  //-----------------------------------------------------------------------
+  //drop opened entities
+  //-----------------------------------------------------------------------
+
+  bool canDropOpenedEntity(Object item) {
+    if (item is entities.Study) {
+      //final study = item;
+      //let series:OsOpenedSeries[] = study.getSeries();
+      //if (_controller && _controller.canAddSeries(series)) return true;
+    } else if (item is entities.Series) {
+      final series = item;
+      final list = [series];
+      if (_controller.canAddSeries(list)) return true;
     }
+    return false;
+  }
 
-    
-    //-----------------------------------------------------------------------
-    //drop opened entities
-    //-----------------------------------------------------------------------
-
-    public canDropOpenedEntity(obj:OsStrongObject, type:number):boolean {
-        if (type == OsDbItem.type_study) {
-            let study:OsOpenedStudy = <OsOpenedStudy>obj;
-            if (study != null) {
-                let series:OsOpenedSeries[] = study.getSeries();
-                if (this._controller && this._controller.canAddSeries(series)) return true;
-            }
-        }
-        else
-        if (type == OsDbItem.type_series) {
-            let series:OsOpenedSeries = <OsOpenedSeries>obj;
-            if (series != null) {
-                let list:OsOpenedSeries[] = [];
-                list.push(series);
-                if (this._controller && this._controller.canAddSeries(list)) return true;
-            }
-        }
-        return false;
-    }
-
-    public onDropOpenedEntity(obj:OsStrongObject, type:number) {
-        if (type == OsDbItem.type_study) {
-            let study:OsOpenedStudy = <OsOpenedStudy>obj;
+  void onDropOpenedEntity(Object item) {
+    if (item is entities.Study) {
+      /* let study:OsOpenedStudy = <OsOpenedStudy>obj;
             if (study != null) {
 
                 let sortingSeries:number = 0;
@@ -3060,17 +3054,14 @@ class OsContainerWnd extends ChangeNotifier {
                 }
 
                 
-            }
-        }
-        else
-        if (type == OsDbItem.type_series) {
-            let series:OsOpenedSeries = <OsOpenedSeries>obj;
-            if (series != null) {
-                if (this._controller) {
-                    this._controller.resetContent(false, false, null);
-                    this._controller.addSeries(series, true, false, null);
-                    this.setCurrentPage(this._currentPage, OsContDraw.OS_FORCE_REDRAW);
-                    setTimeout(() => {
+            }*/
+    } else if (item is entities.Series) {
+      final series = item;
+      _controller.resetContent(false, null);
+      _controller.addSeries(
+          series: series, refresh: false, fromHangingProtocol: false);
+      setCurrentPage(index: _currentPage, mode: OsContDraw.osForceRedraw);
+      /*setTimeout(() => {
                         let synchro:IContainerSynchroItem|null = this.getSynchroItem();
                         if (synchro != null) this.setSynchroItem(null);
                         this.makeFirstResponder();
@@ -3082,21 +3073,15 @@ class OsContainerWnd extends ChangeNotifier {
                             if (container != null) synchro.synchronize(container, null);
                         }
                         if (this._viewer && this._viewer.messageService) this._viewer.messageService.sendMessage(MSG.IMGCONT_MODIFIED, this);
-                    }, 1);
-                }
-
-                //this._viewer.getDownloadManager().downloadImages();
-                
-            }
-        }
+                    }, 1);*/
     }
+  }
 
-    
-    //-----------------------------------------------------------------------
-    //page slider
-    //-----------------------------------------------------------------------
+  //-----------------------------------------------------------------------
+  //page slider
+  //-----------------------------------------------------------------------
 
-    public setPageSliderInfo(index:number):void {
+  /*public setPageSliderInfo(index:numbe):void {
         if (!this._pageSlider) this.getPageSlider();
         if (!this._pageSlider) return;
         let rect:[number, number, number, number] = this._imageBoxes[index].rect;
