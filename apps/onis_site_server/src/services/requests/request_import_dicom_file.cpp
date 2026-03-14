@@ -49,22 +49,20 @@ void request_service::process_import_dicom_file_request(
   try {
     // import the dicom file into the partition:
     std::string dicom_file_path = req->input_json["dicom_file_path"].asString();
-    req->write_output([&](Json::Value& output) {
-      std::uint32_t flags[4] = {0, onis::database::info_study_status, 0, 0};
-      local_store_request store(shared_from_this());
-      /*store.set_origin(req->session->user_seq,
-                       "Imported by " + req->session->login,
-                       req->log_info->get_client_ip());*/
-      store.import_file_to_partition(
-          db, source_id, partition[PT_PARAM_KEY].asString(), media, folder,
-          dicom_file_path, true, &output, flags);
-    });
+    req->write_output(
+        [&](Json::Value& output, std::vector<std::uint8_t>& binary_output) {
+          std::uint32_t flags[4] = {0, onis::database::info_study_status, 0, 0};
+          local_store_request store(shared_from_this());
+          /*store.set_origin(req->session->user_seq,
+                           "Imported by " + req->session->login,
+                           req->log_info->get_client_ip());*/
+          store.import_file_to_partition(
+              db, source_id, partition[PT_PARAM_KEY].asString(), media, folder,
+              dicom_file_path, true, &output, flags);
+        });
   } catch (const onis::exception& e) {
     db->rollback();
     throw e;
-  } catch (const std::exception& e) {
-    db->rollback();
-    throw;
   } catch (...) {
     db->rollback();
     throw;

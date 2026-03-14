@@ -150,29 +150,38 @@ void request_service::process_request(const request_data_ptr& req) {
       case request_type::kImportDicom:
         process_import_dicom_file_request(req);
         break;
+      case request_type::kInitSeriesDownload:
+        process_init_series_download_request(req);
+        break;
+      case request_type::kDownloadImages:
+        process_download_images_request(req);
+        break;
       default:
         break;
     }
   } catch (const onis::exception& e) {
-    req->write_output([&](json& output) {
-      output.clear();
-      output["status"] = e.get_code();
-      output["message"] = e.what();
-      std::string error_message = e.what();
-      std::cout << "Error: " << error_message << std::endl;
-    });
+    req->write_output(
+        [&](json& output, std::vector<std::uint8_t>& binary_output) {
+          output.clear();
+          output["status"] = e.get_code();
+          output["message"] = e.what();
+          std::string error_message = e.what();
+          std::cout << "Error: " << error_message << std::endl;
+        });
   } catch (const std::exception& e) {
-    req->write_output([&](json& output) {
-      output.clear();
-      output["status"] = EOS_UNKNOWN;
-      output["message"] = e.what();
-    });
+    req->write_output(
+        [&](json& output, std::vector<std::uint8_t>& binary_output) {
+          output.clear();
+          output["status"] = EOS_UNKNOWN;
+          output["message"] = e.what();
+        });
   } catch (...) {
-    req->write_output([&](json& output) {
-      output.clear();
-      output["status"] = EOS_UNKNOWN;
-      output["message"] = "Unknown error";
-    });
+    req->write_output(
+        [&](json& output, std::vector<std::uint8_t>& binary_output) {
+          output.clear();
+          output["status"] = EOS_UNKNOWN;
+          output["message"] = "Unknown error";
+        });
   }
 }
 
@@ -297,4 +306,67 @@ std::string request_service::get_media_folder(std::int32_t target,
     }
   }
   return folder;
+}
+
+//------------------------------------------------------------------------------
+// utilities
+//------------------------------------------------------------------------------
+
+std::string request_service::convert_dicom_file_to_json(
+    const onis::dicom_file_ptr& dcm) {
+  if (dcm == NULL)
+    return "";
+  Json::Value root;
+  dcm->lock();
+  std::string charset;
+  dcm->get_string_element(charset, TAG_SPECIFIC_CHARACTER_SET, "CS", "");
+  std::int32_t tag;
+  std::string vr;
+  std::int32_t vm;
+  for (std::int32_t i = 0; i < 2; i++) {
+    void* elem = dcm->get_next_element(i, NULL, &tag, &vr, &vm);
+    while (elem != NULL) {
+      std::string value;
+      dcm->get_string_from_element(value, elem, charset);
+      std::uint16_t* tmp = (std::uint16_t*)&tag;
+      char key_buf[16];
+      snprintf(key_buf, sizeof(key_buf), "%04X:%04X", std::uint16_t(tmp[1]),
+               std::uint16_t(tmp[0]));
+      std::string key = key_buf;
+      root[key] = value;
+      elem = dcm->get_next_element(i, elem, &tag, &vr, &vm);
+    }
+  }
+
+  onis::frame_region_list regions;
+  dcm->get_regions(regions);
+  dcm->unlock();
+
+  Json::Value region_nodes(Json::arrayValue);
+  for (onis::frame_region_list::iterator it1 = regions.begin();
+       it1 != regions.end(); it1++) {
+    Json::Value region_node(Json::objectValue);
+
+    Json::Value area(Json::arrayValue);
+    area.append((*it1)->x0);
+    area.append((*it1)->x1);
+    area.append((*it1)->y0);
+    area.append((*it1)->y1);
+    region_node["area"] = area;
+    region_node["spatial_format"] = (*it1)->spatial_format;
+    region_node["data_type"] = (*it1)->data_type;
+    Json::Value spacing(Json::arrayValue);
+    spacing.append((*it1)->original_spacing[0]);
+    spacing.append((*it1)->original_spacing[1]);
+    region_node["spacing"] = spacing;
+    Json::Value units(Json::arrayValue);
+    units.append((*it1)->original_unit[0]);
+    units.append((*it1)->original_unit[1]);
+    region_node["units"] = units;
+    region_nodes.append(region_node);
+  }
+  root["regions"] = region_nodes;
+
+  Json::FastWriter writer;
+  return writer.write(root);
 }

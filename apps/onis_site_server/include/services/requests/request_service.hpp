@@ -81,6 +81,12 @@ public:
   void process_authenticate_request(const request_data_ptr& req);
   void process_find_studies_request(const request_data_ptr& req);
   void process_import_dicom_file_request(const request_data_ptr& req);
+  void process_init_series_download_request(const request_data_ptr& req);
+  void process_download_images_request(const request_data_ptr& req);
+
+  // utilities:
+  static std::string convert_dicom_file_to_json(
+      const onis::dicom_file_ptr& dcm);
 
 private:
   // database pool

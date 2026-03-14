@@ -72,7 +72,8 @@ void request_service::process_authenticate_request(
   register_session(session);
 
   // Add the user to the output:
-  req->write_output([&](json& output) {
+  req->write_output([&](json& output,
+                        std::vector<std::uint8_t>& binary_output) {
     output["user"] = Json::Value(Json::objectValue);
     onis::database::user::create(
         output["user"],

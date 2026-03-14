@@ -647,11 +647,11 @@ onis::astring& origin_ip, Json::Value& patient, onis::aresult& res);*/
                           onis::aresult& res);
   b32 find_single_series(const onis::astring& clause, u32 flags,
                          b32 for_clients, s32 lock_mode, Json::Value& output,
-                         onis::astring* study_seq, onis::aresult& res);
-  void find_series_by_seq(const onis::astring& seq, u32 flags, b32 for_client,
-                          s32 lock_mode, Json::Value& output,
-                          onis::astring* study_seq, onis::aresult& res);
-  b32 find_series_study(const onis::astring& series_seq, u32 study_flags,
+                         onis::astring* study_seq, onis::aresult& res);*/
+  void find_series_by_seq(const std::string& seq, std::uint32_t flags,
+                          bool for_client, onis::database::lock_mode lock_mode,
+                          Json::Value& output, std::string* study_seq);
+  /*b32 find_series_study(const onis::astring& series_seq, u32 study_flags,
                         b32 for_client, s32 lock_mode, Json::Value& output,
                         onis::aresult& res);*/
   void create_series(const std::string& study_seq,
@@ -813,39 +813,39 @@ onis::astring& origin_ip, Json::Value& patient, onis::aresult& res);*/
   /*
   void find_images(const onis::astring& clause, u32 flags, b32 for_client,
                    s32 lock_mode, Json::Value& list, onis::astring*
-  series_seq, onis::aresult& res); void find_images(const onis::astring&
-  series_seq, u32 flags, b32 for_client, s32 lock_mode, Json::Value& output,
-  onis::aresult& res); void find_images(const onis::astring& partition_seq,
-                   const onis::dicom_file_ptr& dataset,
-                   const onis::astring& code_page, b32 patient_root, u32
-  flags, b32 for_client, s32 lock_mode, Json::Value& output, onis::aresult&
-  res); void find_images(const onis::astring& partition_seq, const
-  onis::astring& pseq, const onis::astring& pid, const onis::astring& stseq,
-  const onis::astring& stuid, const onis::astring& srseq, const
-  onis::astring& sruid, const Json::Value& filters, u32 flags, b32
+  series_seq, onis::aresult& res); */
+  void find_images(const std::string& series_seq, std::uint32_t flags,
+                   bool for_client, onis::database::lock_mode lock_mode,
+                   Json::Value& output);
+  /*void find_images(const onis::astring&
+  partition_seq, const onis::dicom_file_ptr& dataset, const onis::astring&
+  code_page, b32 patient_root, u32 flags, b32 for_client, s32 lock_mode,
+  Json::Value& output, onis::aresult& res); void find_images(const
+  onis::astring& partition_seq, const onis::astring& pseq, const
+  onis::astring& pid, const onis::astring& stseq, const onis::astring&
+  stuid, const onis::astring& srseq, const onis::astring& sruid, const
+  Json::Value& filters, u32 flags, b32 for_client, s32 lock_mode,
+  Json::Value& output, onis::aresult& res); void find_images(const
+  onis::astring& series_seq, const Json::Value& filters, u32 flags, b32
   for_client, s32 lock_mode, Json::Value& output, onis::aresult& res); void
-  find_images(const onis::astring& series_seq, const Json::Value& filters,
-                   u32 flags, b32 for_client, s32 lock_mode,
-                   Json::Value& output, onis::aresult& res);
-  void find_images_from_album(const onis::astring& partition_seq,
-                              const onis::astring& album_seq,
-                              const onis::dicom_file_ptr& dataset,
-                              const onis::astring& code_page, b32
-  patient_root, u32 flags, b32 for_client, s32 lock_mode, Json::Value&
-  output, onis::aresult& res); void find_images_from_album( const
-  onis::astring& partition_seq, const onis::astring& album_seq, const
-  onis::astring& pseq, const onis::astring& pid, const onis::astring& stseq,
-  const onis::astring& stuid, const onis::astring& srseq, const
-  onis::astring& sruid, const Json::Value& filters, u32 flags, b32
-  for_client, s32 lock_mode, Json::Value& output, onis::aresult& res); b32
-  decode_find_image_filters_from_dataset( const onis::dicom_file_ptr&
-  dataset, const onis::astring code_page, b32 include_pid_and_study_uid,
-  Json::Value& filters); void find_online_images(const onis::astring&
-  series_seq, u32 flags, b32 for_client, s32 lock_mode, Json::Value& output,
-                          onis::aresult& res);
-  void find_image_by_seq(const onis::astring& seq, u32 flags, b32
-  for_client, s32 lock_mode, Json::Value& output, onis::astring* series_seq,
-  onis::aresult& res); b32 find_image_series(const onis::astring& image_seq,
+  find_images_from_album(const onis::astring& partition_seq, const
+  onis::astring& album_seq, const onis::dicom_file_ptr& dataset, const
+  onis::astring& code_page, b32 patient_root, u32 flags, b32 for_client, s32
+  lock_mode, Json::Value& output, onis::aresult& res); void
+  find_images_from_album( const onis::astring& partition_seq, const
+  onis::astring& album_seq, const onis::astring& pseq, const onis::astring&
+  pid, const onis::astring& stseq, const onis::astring& stuid, const
+  onis::astring& srseq, const onis::astring& sruid, const Json::Value&
+  filters, u32 flags, b32 for_client, s32 lock_mode, Json::Value& output,
+  onis::aresult& res); b32 decode_find_image_filters_from_dataset( const
+  onis::dicom_file_ptr& dataset, const onis::astring code_page, b32
+  include_pid_and_study_uid, Json::Value& filters); void
+  find_online_images(const onis::astring& series_seq, u32 flags, b32
+  for_client, s32 lock_mode, Json::Value& output, onis::aresult& res);*/
+  void find_image_by_seq(const std::string& seq, std::uint32_t flags,
+                         bool for_client, onis::database::lock_mode lock_mode,
+                         Json::Value& output, std::string* series_seq);
+  /*onis::aresult& res); b32 find_image_series(const onis::astring& image_seq,
   u32 series_flags, b32 for_client, s32 lock_mode, Json::Value& output,
                         onis::aresult& res);
   b32 find_single_image(const onis::astring& clause, u32 flags, b32
@@ -891,6 +891,46 @@ onis::astring& origin_ip, Json::Value& patient, onis::aresult& res);*/
   s32 get_image_compression_update_index(const onis::astring& image_id,
                                          onis::aresult& res);*/
 
+  // download series:
+  std::string get_download_series_columns(bool add_table_name);
+  std::unique_ptr<onis_kit::database::database_query>
+  create_download_series_insertion_query(
+      const std::string& series_seq, const std::string& session_id,
+      const onis::core::date_time& dt, std::int32_t completed,
+      std::int32_t error, std::int32_t expected, Json::Value& output);
+  void create_download_series(const std::string& series_seq,
+                              const std::string& session_id,
+                              const onis::core::date_time& dt,
+                              std::int32_t completed, std::int32_t error,
+                              std::int32_t expected, Json::Value& output);
+  void find_download_series_by_seq(const std::string& seq, lock_mode lock_mode,
+                                   Json::Value& output);
+  void create_download_series_item(const onis_kit::database::database_row& rec,
+                                   int* index, Json::Value& item);
+  void set_download_series_status(const std::string& seq,
+                                  std::int32_t completed, std::int32_t error,
+                                  std::int32_t expected);
+
+  // download images:
+  std::string get_download_image_columns(bool add_table_name);
+  void find_download_image_by_index(const std::string& download_seq,
+                                    std::int32_t index,
+                                    onis::database::lock_mode lock_mode,
+                                    Json::Value& output);
+  void create_download_image_item(const onis_kit::database::database_row& rec,
+                                  Json::Value& output);
+  std::unique_ptr<onis_kit::database::database_query>
+  create_download_image_insertion_query(const std::string& series_seq,
+                                        std::int32_t num,
+                                        const std::string& path,
+                                        std::int32_t type, std::int32_t rescnt,
+                                        std::int32_t error,
+                                        Json::Value& output);
+  void create_download_image(const std::string& series_seq, std::int32_t num,
+                             const std::string& path, std::int32_t type,
+                             std::int32_t rescnt, std::int32_t error,
+                             Json::Value& output);
+
   // Utilities:
   std::unique_ptr<onis_kit::database::database_query> create_and_prepare_query(
       const std::string& columns, const std::string& from,
@@ -905,8 +945,8 @@ onis::astring& origin_ip, Json::Value& patient, onis::aresult& res);*/
 
   template <typename T>
   void bind_parameter(
-      std::unique_ptr<onis_kit::database::database_query>& query, int& index,
-      const T& value, const std::string& param_name) {
+      std::unique_ptr<onis_kit::database::database_query>& query,
+      std::int32_t& index, const T& value, const std::string& param_name) {
     if (!query) {
       throw std::runtime_error("Query is null when binding " + param_name +
                                " parameter");
@@ -930,8 +970,8 @@ onis::astring& origin_ip, Json::Value& patient, onis::aresult& res);*/
 
   // Specialization for nullptr
   void bind_parameter(
-      std::unique_ptr<onis_kit::database::database_query>& query, int& index,
-      std::nullptr_t, const std::string& param_name) {
+      std::unique_ptr<onis_kit::database::database_query>& query,
+      std::int32_t& index, std::nullptr_t, const std::string& param_name) {
     if (!query) {
       throw std::runtime_error("Query is null when binding " + param_name +
                                " parameter");
@@ -956,8 +996,9 @@ onis::astring& origin_ip, Json::Value& patient, onis::aresult& res);*/
   // Overload for nullable string pointer (binds NULL if pointer is null or
   // string is empty)
   void bind_parameter(
-      std::unique_ptr<onis_kit::database::database_query>& query, int& index,
-      const std::string* value, const std::string& param_name) {
+      std::unique_ptr<onis_kit::database::database_query>& query,
+      std::int32_t& index, const std::string* value,
+      const std::string& param_name) {
     if (!value || value->empty()) {
       bind_parameter(query, index, nullptr, param_name);
     } else {
@@ -967,8 +1008,9 @@ onis::astring& origin_ip, Json::Value& patient, onis::aresult& res);*/
 
   // Overload for string that binds NULL if empty
   void bind_parameter_optional(
-      std::unique_ptr<onis_kit::database::database_query>& query, int& index,
-      const std::string& value, const std::string& param_name) {
+      std::unique_ptr<onis_kit::database::database_query>& query,
+      std::int32_t& index, const std::string& value,
+      const std::string& param_name) {
     if (value.empty()) {
       bind_parameter(query, index, nullptr, param_name);
     } else {

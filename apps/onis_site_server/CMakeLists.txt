@@ -36,6 +36,9 @@ elseif(EXISTS "/usr/local/opt/openssl")
 endif()
 find_package(OpenSSL REQUIRED)
 
+# Find libpng (e.g. brew install libpng)
+find_package(PNG REQUIRED)
+
 # Find jwt-cpp
 include(FetchContent)
 FetchContent_Declare(
@@ -55,10 +58,13 @@ set(SERVER_SOURCES
     src/services/requests/request_service.cpp
     src/services/requests/request_service_authenticate.cpp
     src/services/requests/request_find_studies.cpp
+    src/services/requests/request_init_series_download.cpp
+    src/services/requests/request_download_images.cpp
     src/services/requests/request_import_dicom_file.cpp
     src/services/requests/sessions/request_session.cpp
     src/services/requests/request_database.cpp
     src/services/requests/sessions/request_session_access_cache.cpp
+    src/services/requests/request_entity_access_info.cpp
     src/services/requests/store/local_store_request.cpp
     src/services/config/config_service.cpp
     src/database/site_database.cpp
@@ -78,7 +84,8 @@ set(SERVER_SOURCES
     src/database/site_database_study.cpp
     src/database/site_database_series.cpp
     src/database/site_database_image.cpp
-    src/database/site_database_image.cpp
+    src/database/site_database_download_series.cpp
+    src/database/site_database_download_image.cpp
     src/database/sql_builder.cpp
     src/database/site_database_pool.cpp
 
@@ -143,6 +150,7 @@ target_link_libraries(onis_site_server PRIVATE
     ijg16
     iconv
     onis_j2k_kit
+    PNG::PNG
 )
 
 # Add library search directories

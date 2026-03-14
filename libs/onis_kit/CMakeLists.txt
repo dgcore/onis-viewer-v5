@@ -28,6 +28,7 @@ set(ONIS_KIT_SOURCES
     src/core/thread.cpp
     src/core/event.cpp
     src/core/date_time.cpp
+    src/core/file.cpp
     src/dicom/dicom.cpp
     src/database/postgresql/postgresql_connection.cpp
     src/database/postgresql/postgresql_query.cpp

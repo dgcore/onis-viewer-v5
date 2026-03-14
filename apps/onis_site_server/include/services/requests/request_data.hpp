@@ -18,6 +18,8 @@ enum class request_type {
   kLogout,
   kFindStudies,
   kImportDicom,
+  kInitSeriesDownload,
+  kDownloadImages,
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -54,14 +56,14 @@ public:
   template <typename Func>
   void write_output(Func&& func) {
     std::lock_guard<std::mutex> lock(output_mutex_);
-    func(output_json_);
+    func(output_json_, output_binary_);
   }
 
   // Method to read from output_json using a lambda (thread-safe)
   template <typename Func>
   void read_output(Func&& func) const {
     std::lock_guard<std::mutex> lock(output_mutex_);
-    func(output_json_);
+    func(output_json_, output_binary_);
   }
 
   request_session_ptr session;
@@ -69,5 +71,6 @@ public:
 private:
   request_type type_;
   json output_json_;
+  std::vector<std::uint8_t> output_binary_;
   mutable std::mutex output_mutex_;
 };

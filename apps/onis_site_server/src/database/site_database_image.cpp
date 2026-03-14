@@ -332,3 +332,50 @@ void site_database::create_image(
       origin_name, origin_ip, image);
   execute_and_check_affected(query, "Failed to create image");
 }
+
+//------------------------------------------------------------------------------
+// Find operations
+//------------------------------------------------------------------------------
+
+void site_database::find_image_by_seq(const std::string& seq,
+                                      std::uint32_t flags, bool for_client,
+                                      onis::database::lock_mode lock_mode,
+                                      Json::Value& output,
+                                      std::string* series_seq) {
+  const auto columns = get_image_columns(flags, false);
+  const std::string from = "pacs_images";
+  const auto clause = "id=?";
+  auto query = create_and_prepare_query(columns, from, clause, lock_mode);
+
+  int index = 1;
+  bind_parameter(query, index, seq, "id");
+
+  auto result = execute_query(query);
+  if (result->has_rows()) {
+    auto row = result->get_next_row();
+    create_image_item(*row, flags, for_client, nullptr, series_seq, output);
+  } else {
+    throw site_server_exception(EOS_NOT_FOUND, "Image not found");
+  }
+}
+
+void site_database::find_images(const std::string& series_seq,
+                                std::uint32_t flags, bool for_client,
+                                onis::database::lock_mode lock_mode,
+                                Json::Value& output) {
+  const auto columns = get_image_columns(flags, false);
+  const std::string from = "pacs_images";
+  const auto clause = "series_id=?";
+  auto query = create_and_prepare_query(columns, from, clause, lock_mode);
+
+  int index = 1;
+  bind_parameter(query, index, series_seq, "series_id");
+
+  auto result = execute_query(query);
+  if (result->has_rows()) {
+    while (auto row = result->get_next_row()) {
+      Json::Value& image = output.append(Json::objectValue);
+      create_image_item(*row, flags, for_client, nullptr, nullptr, image);
+    }
+  }
+}
