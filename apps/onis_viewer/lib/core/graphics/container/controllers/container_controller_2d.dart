@@ -1,8 +1,15 @@
+import 'dart:async';
+
 import 'package:onis_viewer/api/graphics/renderers/renderer_2d.dart';
+import 'package:onis_viewer/api/ov_api.dart';
+import 'package:onis_viewer/api/services/message_codes.dart';
+import 'package:onis_viewer/api/services/message_service.dart';
 import 'package:onis_viewer/core/graphics/container/container_wnd.dart';
 import 'package:onis_viewer/core/graphics/container/controllers/container_controller.dart';
 import 'package:onis_viewer/core/graphics/renderer/items/item.dart';
 import 'package:onis_viewer/core/models/entities/patient.dart' as entities;
+import 'package:onis_viewer/core/result/result.dart';
+import 'package:onis_viewer/plugins/database/public/database_api.dart';
 
 ///////////////////////////////////////////////////////////////////////
 // OsDisplayedSeriesInfo
@@ -25,6 +32,17 @@ class OsContainerController2D extends OsContainerController {
   final List<OsDisplayedSeriesInfo> _listOfSeriesInfo = [];
   final List<OsRenderer2D> _listRenderElements = [];
   final String _stateId = "";
+  StreamSubscription? _messageSubscription;
+
+  OsContainerController2D() {
+    _messageSubscription = OVApi().messages.getMessage().listen((message) {
+      onReceivedMessage(message);
+    });
+  }
+
+  void dispose() {
+    _messageSubscription?.cancel();
+  }
 
   @override
   List<OsRenderer2D> get rendererElements => _listRenderElements;
@@ -194,15 +212,15 @@ class OsContainerController2D extends OsContainerController {
             }*/
     }
 
-    /*if (series.loadStatus.status == RESULT.OSRSP_PENDING) {
-            let cont1:OsContainerWnd|null = this.getWindow();
-            if (cont1) {
-                let vw1:OsViewWnd|null = cont1.getView();
-                if (vw1 && vw1.viewer) vw1.viewer.getDownloadManager().addSeriesToLoadingQueue(series, true);
-            }
-        }
+    if (series.loadStatus.status == ResultStatus.pending) {
+      if (container != null) {
+        final dbApi =
+            OVApi().plugins.getPublicApi<DatabaseApi>('onis_database_plugin');
+        dbApi?.downloadController.addSeriesToLoadingQueue(series, true);
+      }
+    }
 
-        let localModifiedContainers:Array<OsContainerWnd> = [];
+    /* let localModifiedContainers:Array<OsContainerWnd> = [];
         let targetModifiedContainers:Array<OsContainerWnd>|null = modifiedContainers;
         if (!targetModifiedContainers) targetModifiedContainers = localModifiedContainers;
         if (container) {
@@ -232,5 +250,64 @@ class OsContainerController2D extends OsContainerController {
       }
     }
     return false;
+  }
+
+  OsDisplayedSeriesInfo? _findSeriesInfo(entities.Series series) {
+    for (int i = 0; i < _listOfSeriesInfo.length; i++) {
+      if (_listOfSeriesInfo[i].series == series) {
+        return _listOfSeriesInfo[i];
+      }
+    }
+    return null;
+  }
+
+  void onReceivedMessage(OsMessage? message) {
+    if (message?.id == OSMSG.seriesDownloadReceivedInfo) {
+      _onReceivedSeriesInfo(message!.data["series"] as entities.Series);
+    }
+  }
+
+  void _onReceivedSeriesInfo(entities.Series series) {
+    OsDisplayedSeriesInfo? info = _findSeriesInfo(series);
+    if (info == null) return;
+
+    int count = series.images.length;
+    info.rendererCount += count - 1;
+    for (int j = 0; j < count - 1; j++) {
+      _listRenderElements.add(OsRenderer2D(OsRenderer2DType()));
+    }
+    if (container != null) {
+      container?.setCurrentPage(index: 0, mode: OsContDraw.osForceRedraw);
+    }
+
+    /*for (let i=0; i<_listRenderElements.length; i++) {
+            let img:OsGraphicImage|null = _listRenderElements[i].getPrimaryImageItem(false);
+            if (img) {
+                if (img.isNullImage() === series) {
+                    let count:number = series.images.length;
+                    info.rendererCount += count-1;
+                    for (let j=0; j<count-1; j++) _listRenderElements.splice(i, 0, <OsRenderer2D>this.createRenderer());
+                    for (let j=0; j<count; j++) {
+                        let grp:OsGraphicGroup|null = _listRenderElements[i+j].getImageGroupItem(false);
+                        if (grp) {
+                            let item:OsGraphicImage|null = _listRenderElements[i+j].getPrimaryImageItem(false);
+                            if (!item) {
+                                item = OsGraphicImage('');
+                                item.setParent(grp);
+                                _listRenderElements[i+j].setActiveImageItem(item);
+                                _listRenderElements[i+j].setPrimaryImageItem(item);
+                                item.release();
+                            }
+                            //item.setNullImage(series);
+                            item.setImage(series.images[j]);
+                        }
+                    }
+                    if (this._viewer && this._viewer.messageService) this._viewer.messageService.sendMessage(MSG.IMGCONT_MODIFIED, this._wcontainer?this._wcontainer.lock(false):null);
+                    break;
+                }
+            }
+        }
+        let container:OsContainerWnd|null = this.getWindow();
+        if (container) container.setCurrentPage(container.getCurrentPage(), OsContDraw.OS_FORCE_REDRAW);*/
   }
 }

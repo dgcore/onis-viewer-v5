@@ -148,6 +148,28 @@ class SiteChildSource extends DatabaseSource {
           data["type"] = type.value;
           data["limit"] = 100;
           break;
+        case RequestType.initSeriesDownload:
+          data["source"] = sourceId;
+          data["type"] = type.value;
+          data["data"] = <Map<String, dynamic>>[];
+          for (final series in data["series"]) {
+            final dbseries = series.databaseInfo;
+            final dbstudy = series.study?.databaseInfo;
+            final dbpatient = series.study?.patient?.databaseInfo;
+            if (dbseries != null && dbstudy != null && dbpatient != null) {
+              data["data"].add({
+                "patient_seq": dbpatient.id,
+                "patient_id": dbpatient.pid,
+                "study_seq": dbstudy.id,
+                "study_uid": dbstudy.uid,
+                "series_seq": dbseries.id,
+                "series_uid": dbseries.uid,
+                "guid": series.guid,
+              });
+            }
+          }
+          data.remove("series");
+          break;
         default:
           break;
       }

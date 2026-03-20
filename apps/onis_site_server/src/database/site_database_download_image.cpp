@@ -63,16 +63,28 @@ site_database::create_download_image_insertion_query(
     std::int32_t type, std::int32_t rescnt, std::int32_t error,
     Json::Value& output) {
   std::string sql =
-      "INSERT INTO pacs_download_image (series_id, num, path, type, rescnt, "
-      "result) VALUES (?, ?, ?, ?, ?, ?)";
+      "INSERT INTO pacs_download_images (id, series_id, num, path, type, "
+      "rescnt, "
+      "result) VALUES (?, ?, ?, ?, ?, ?, ?)";
   auto query = prepare_query(sql, "create_download_image_insertion_query");
   std::int32_t index = 1;
+  std::string seq = onis::util::uuid::generate_random_uuid();
+  bind_parameter(query, index, seq, "id");
   bind_parameter(query, index, series_seq, "series_id");
   bind_parameter(query, index, num, "num");
   bind_parameter(query, index, path, "path");
   bind_parameter(query, index, type, "type");
   bind_parameter(query, index, rescnt, "rescnt");
   bind_parameter(query, index, error, "result");
+
+  onis::database::download_image::create(output);
+  output[BASE_SEQ_KEY] = seq;
+  output[DI_SERIES_KEY] = series_seq;
+  output[DI_NUM_KEY] = num;
+  output[DI_PATH_KEY] = path;
+  output[DI_RESCNT_KEY] = rescnt;
+  output[DI_RESULT_KEY] = error;
+
   return query;
 }
 

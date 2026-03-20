@@ -1,7 +1,10 @@
+import 'package:onis_viewer/core/dicom/image_region.dart';
+import 'package:onis_viewer/core/graphics/math/matrix.dart';
 import 'package:onis_viewer/core/models/database/image.dart' as database;
 import 'package:onis_viewer/core/models/database/patient.dart' as database;
 import 'package:onis_viewer/core/models/database/series.dart' as database;
 import 'package:onis_viewer/core/models/database/study.dart' as database;
+import 'package:onis_viewer/core/result/result.dart';
 import 'package:uuid_v4/uuid_v4.dart';
 
 /// Sort constants for studies
@@ -9,6 +12,58 @@ class OsSort {
   static const int sortByAccnum = 0;
   static const int sortByDate = 1;
   static const int sortBySeriesNum = 2;
+}
+
+///////////////////////////////////////////////////////////////////////
+// OsImageDicomInfo
+///////////////////////////////////////////////////////////////////////
+
+class ImageDicomInfo {
+  bool loaded = false;
+  int instanceNum = 0x7FFFFFFF;
+  double width = 0; //image width in pixel;
+  double height = 0; //image height in pixel;
+  String sop = '';
+  String modality = '';
+  ImageRegionInfo? regionInfo;
+  double originalSliceLocation = double.infinity;
+  double calibratedSliceLocation = double.infinity;
+  OsMatrix? originalImageOrientationMatrix; //original image orientation matrix
+  OsMatrix? calibratedImageOrientationMatrix; //calibrated image orientation
+  DateTime? acquisitionDate;
+  DateTime? imageDateTime;
+
+  void copyFrom(ImageDicomInfo other) {
+    //console.log("do we need to copy the sop and modality?????")
+    loaded = other.loaded;
+    instanceNum = other.instanceNum;
+    width = other.width;
+    height = other.height;
+    originalSliceLocation = other.originalSliceLocation;
+    if (other.calibratedImageOrientationMatrix != null) {
+      calibratedImageOrientationMatrix ??= OsMatrix();
+      calibratedImageOrientationMatrix!
+          .copyFrom(other.calibratedImageOrientationMatrix!);
+    }
+    if (other.originalImageOrientationMatrix != null) {
+      originalImageOrientationMatrix ??= OsMatrix();
+      originalImageOrientationMatrix!
+          .copyFrom(other.originalImageOrientationMatrix!);
+    }
+    calibratedSliceLocation = other.calibratedSliceLocation;
+
+    regionInfo = null;
+    if (other.regionInfo != null) regionInfo = other.regionInfo!.clone();
+    imageDateTime = other.imageDateTime != null
+        ? DateTime.fromMillisecondsSinceEpoch(
+            other.imageDateTime!.millisecondsSinceEpoch)
+        : null;
+
+    acquisitionDate = other.acquisitionDate != null
+        ? DateTime.fromMillisecondsSinceEpoch(
+            other.acquisitionDate!.millisecondsSinceEpoch)
+        : null;
+  }
 }
 
 /// Opened patient entity with studies
@@ -19,6 +74,9 @@ class Patient {
   // Getters
   database.Patient? get databaseInfo => _patient;
   List<Study> get studies => List.unmodifiable(_studies);
+  String? get sourceUid {
+    return _patient?.sourceUid;
+  }
 
   // Setters
   set databaseInfo(database.Patient? patient) {
@@ -134,6 +192,7 @@ class Study {
   database.Study? get databaseInfo => _study;
   Patient? get patient => _wPatient?.target;
   List<Series> get series => List.unmodifiable(_series);
+  String? get sourceUid => patient?.sourceUid;
 
   // Setters:
   set databaseInfo(database.Study? study) {
@@ -195,13 +254,19 @@ class Study {
 
 /// Opened study entity with series and reports
 class Series {
+  String guid = UUIDv4().toString();
   database.Series? _series;
   WeakReference<Study>? _wStudy;
   final List<Image> images = [];
+  OsResult loadStatus = OsResult();
 
+  Series() {
+    loadStatus.status = ResultStatus.pending;
+  }
   // Getters:
   database.Series? get databaseInfo => _series;
   Study? get study => _wStudy?.target;
+  String? get sourceUid => study?.sourceUid;
 
   // Setters:
   set databaseInfo(database.Series? series) {
@@ -213,6 +278,26 @@ class Series {
     if (study == newStudy) return;
     study?.removeSeries(this);
     if (newStudy != null) newStudy.addSeries(this);
+  }
+
+  /// Add image
+  void addImage(Image image) {
+    if (images.contains(image)) return;
+    images.add(image);
+    image._wSeries = WeakReference(this);
+  }
+
+  // Operations:
+  void prepareForDownload(int imageCount) {
+    if (imageCount > images.length) {
+      int count = imageCount - images.length;
+      for (int i = 0; i < count; i++) {
+        final image = Image();
+        image.loadStatus.status = ResultStatus.pending;
+        image.loadIndex = images.length;
+        addImage(image);
+      }
+    }
   }
 }
 
@@ -227,14 +312,16 @@ class Image {
 
   database.Image? _image;
   WeakReference<Series>? _wSeries;
+  //final bool _highestQuality = false;
+  OsResult loadStatus = OsResult();
+  int loadIndex = 0;
+  // _dicomInfo:OsImageDicomInfo|null = null;
+  //DicomFile? _dcm;
+  //final int _frameCount = 0;
 
-  /*bool _highestQuality = false;
-    public loadStatus:OsResult = new OsResult();
-    public loadIndex:number = 0;
-    //public isStreaming:
-    private _dicomInfo:OsImageDicomInfo|null = null;
-    private _dcm:OsDicomFile|null = null;
-    private _frameCount:number;*/
+  Image() {
+    loadStatus.status = ResultStatus.pending;
+  }
 
   // Getters:
   database.Image? get databaseInfo => _image;

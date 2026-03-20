@@ -1009,7 +1009,7 @@ class OsContainerWnd extends ChangeNotifier {
           }
         }
       } else {
-        _imageBoxes[index].renderer = newRender;
+        _imageBoxes[i].renderer = newRender;
 
         redrawItems[redrawCount] = i;
         redrawCount++;

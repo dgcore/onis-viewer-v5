@@ -294,6 +294,8 @@ class SiteAsyncRequest implements AsyncRequest {
         return '$baseUrl/api/user/info';
       case RequestType.updateSettings:
         return '$baseUrl/api/user/settings';
+      case RequestType.initSeriesDownload:
+        return '$baseUrl/series/download';
     }
   }
 

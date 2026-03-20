@@ -1,8 +1,10 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:onis_viewer/plugins/database/controller/download/download_controller.dart';
 import 'package:onis_viewer/plugins/database/controller/patient_controller.dart';
 import 'package:onis_viewer/plugins/database/controller/source_controller.dart';
+import 'package:onis_viewer/plugins/database/public/download_controller_interface.dart';
 import 'package:onis_viewer/plugins/database/public/patient_controller_interface.dart';
 import 'package:onis_viewer/plugins/database/public/source_controller_interface.dart';
 
@@ -134,10 +136,13 @@ import 'public/database_api.dart';
 class _DatabaseApiImpl implements DatabaseApi {
   final _sourceController = SourceController();
   final _patientController = PatientController();
+  final _downloadController = DownloadController();
   @override
   ISourceController get sourceController => _sourceController;
   @override
   IPatientController get patientController => _patientController;
+  @override
+  IDownloadController get downloadController => _downloadController;
 
   Future<void> initialize() async {
     await _sourceController.initialize();

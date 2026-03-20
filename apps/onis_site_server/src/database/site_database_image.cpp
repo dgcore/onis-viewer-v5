@@ -147,7 +147,7 @@ void site_database::create_image_item(onis_kit::database::database_row& rec,
   }
 
   if (flags & onis::database::info_image_depth) {
-    image[IM_DEPTH_KEY] = rec.get_float(*target_index, false);
+    image[IM_DEPTH_KEY] = rec.get_float(*target_index, true);
   }
 
   if (flags & onis::database::info_image_compression) {

@@ -34,7 +34,7 @@ class OsRenderer2D extends OsRenderer {
   //private _keyCol:Array<number> = [255, 255, 0, 255];
   final bool _wantRefreshAsap = false;
   //private _info:OsRenderInfo;
-  bool _selected = false;
+  bool _selected = true;
   bool _hidden = false;
   //private _isKey:boolean;
   //private _keyStatus:number;

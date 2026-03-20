@@ -1,3 +1,4 @@
+import 'package:onis_viewer/plugins/database/public/download_controller_interface.dart';
 import 'package:onis_viewer/plugins/database/public/patient_controller_interface.dart';
 import 'package:onis_viewer/plugins/database/public/source_controller_interface.dart';
 
@@ -5,6 +6,7 @@ import 'package:onis_viewer/plugins/database/public/source_controller_interface.
 abstract class DatabaseApi {
   ISourceController get sourceController;
   IPatientController get patientController;
+  IDownloadController get downloadController;
 
   /// Select a source by UID
   //void selectSourceByUid(String uid);

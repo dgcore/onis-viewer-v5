@@ -19,8 +19,8 @@ class Series {
 
   /// Flags indicating which fields are valid/present
   int flags;
-
-  String uid = '';
+  String id; // seq
+  String uid; // uid
   String charset = '';
   String modality = '';
   String seriesNum = '';
@@ -40,6 +40,7 @@ class Series {
   DateTime? crdate;
 
   Series({
+    this.id = '',
     this.flags = 0,
     this.uid = '',
     this.charset = '',
@@ -130,6 +131,7 @@ class Series {
 
     return Series(
       flags: flags,
+      id: json['seq'] as String? ?? '',
       uid: json['uid'] as String? ?? '',
       crdate: crdate,
       modality: json['modality'] as String? ?? '',

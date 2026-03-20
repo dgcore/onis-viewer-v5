@@ -148,7 +148,7 @@ class Study {
 
     return Study(
       flags: flags,
-      id: json['seq'] as String? ?? json['id'] as String? ?? '',
+      id: json['seq'] as String? ?? '',
       uid: json['uid'] as String? ?? '',
       charset: (flags & infoStudyCharacterSet) != 0
           ? (json['charset'] as String? ?? '')

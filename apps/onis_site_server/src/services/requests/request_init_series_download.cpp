@@ -92,8 +92,9 @@ void request_service::process_init_series_download_request(
       current_time.init_current_time();
       Json::Value download_series(Json::objectValue);
       db->create_download_series(
-          series_seq, req->session->session_id, current_time, true, EOS_NONE,
-          static_cast<std::int32_t>(images.size()), download_series);
+          series_seq, /*req->session->session_id*/ "fdsafsdfasf", current_time,
+          0, EOS_NONE, static_cast<std::int32_t>(images.size()),
+          download_series);
       std::string seq = download_series[BASE_SEQ_KEY].asString();
 
       std::string full_path;
@@ -122,6 +123,14 @@ void request_service::process_init_series_download_request(
                                   download_image);
       }
       db->commit();
+
+      req->write_output(
+          [&](json& output, std::vector<std::uint8_t>& binary_output) {
+            Json::Value& item = output["data"][output["data"].size() - 1];
+            item["seq"] = seq;
+            item["image_count"] = images.size();
+          });
+
     } catch (const onis::exception& e) {
       req->write_output(
           [&](json& output, std::vector<std::uint8_t>& binary_output) {

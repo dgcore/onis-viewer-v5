@@ -147,22 +147,22 @@ void site_database_entity_access_info::find(const request_database& db,
       valid = false;
     else if (image != nullptr && image_series_seq != _series_seq)
       valid = false;
-    else if (series != NULL && series_study_seq != _study_seq)
+    else if (series != nullptr && series_study_seq != _study_seq)
       valid = false;
-    else if (study != NULL && study_patient_seq != _patient_seq)
+    else if (study != nullptr && study_patient_seq != _patient_seq)
       valid = false;
-    else if (patient != NULL && patient_partition_seq != _partition_seq)
+    else if (patient != nullptr && patient_partition_seq != _partition_seq)
       valid = false;
-    else if (!_image_uid.empty() && image != NULL &&
+    else if (!_image_uid.empty() && image != nullptr &&
              (*image)[BASE_UID_KEY].asString() != _image_uid)
       valid = false;
-    else if (!_series_uid.empty() && series != NULL &&
+    else if (!_series_uid.empty() && series != nullptr &&
              (*series)[BASE_UID_KEY].asString() != _series_uid)
       valid = false;
-    else if (!_study_uid.empty() && study != NULL &&
+    else if (!_study_uid.empty() && study != nullptr &&
              (*study)[BASE_UID_KEY].asString() != _study_uid)
       valid = false;
-    else if (!_patient_id.empty() && patient != NULL &&
+    else if (!_patient_id.empty() && patient != nullptr &&
              (*patient)[BASE_UID_KEY].asString() != _patient_id)
       valid = false;
     if (!valid) {

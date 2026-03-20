@@ -1,7 +1,7 @@
 import '../../../utils/date.dart';
 
 class Patient {
-  // Flag constants matching C++ implementation
+  // Flag constants
   static const int infoPatientCharset = 1;
   static const int infoPatientName = 2;
   static const int infoPatientBirthdate = 4;
@@ -103,7 +103,7 @@ class Patient {
 
     return Patient(
       flags: flags,
-      id: json['seq'] as String? ?? json['seq'] as String? ?? '',
+      id: json['seq'] as String? ?? '',
       pid: json['pid'] as String? ?? json['uid'] as String? ?? '',
       name:
           (flags & infoPatientName) != 0 ? (json['name'] as String? ?? '') : '',

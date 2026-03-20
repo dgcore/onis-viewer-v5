@@ -38,6 +38,9 @@ enum RequestType {
 
   /// Update user settings
   updateSettings,
+
+  /// Init series download
+  initSeriesDownload,
 }
 
 /// Interface for asynchronous request responses
