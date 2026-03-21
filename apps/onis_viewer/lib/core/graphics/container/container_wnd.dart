@@ -1995,21 +1995,22 @@ class OsContainerWnd extends ChangeNotifier {
         return null;
         
 
-    }
+    }*/
 
-    //-----------------------------------------------------------------------
-    //capture mouse
-    //-----------------------------------------------------------------------
+  //-----------------------------------------------------------------------
+  //capture mouse
+  //-----------------------------------------------------------------------
 
-    public captureMouse(box:number, x:number, y:number, shiftKey:boolean, controlKey:boolean, mouseEvent:number) {
-        this._isCaptured = true;
+  void captureMouse(int box, double x, double y, bool shiftKey, bool controlKey,
+      int mouseEvent) {
+    /*this._isCaptured = true;
         this._capturedIndex = box;
         if (mouseEvent == 0) this.onLeftButtonDown(box, x, y, shiftKey, controlKey, false);
-        else if (mouseEvent == 3) this.onLeftButtonDoubleClick(box, x, y, shiftKey, controlKey, false);
-    }
+        else if (mouseEvent == 3) this.onLeftButtonDoubleClick(box, x, y, shiftKey, controlKey, false);*/
+  }
 
-    public releaseMouse(box:number) {
-        this.setRunningTool(null, null);
+  void releaseMouse(int box) {
+    /*this.setRunningTool(null, null);
         this.setRunningItem(null);
 
         if (this._isCaptured) {
@@ -2023,21 +2024,21 @@ class OsContainerWnd extends ChangeNotifier {
 
           
             this._isCaptured = false;
-        }
-    }
+        }*/
+  }
 
-    public isMouseCaptured(box:[number]|null):boolean {
-        if (this._isCaptured) {
+  bool isMouseCaptured(List<int>? box) {
+    /*if (this._isCaptured) {
             if (box) box[0] = this._capturedIndex;
             return true;
-        }
-        return false;
-    }
-    
-    //-----------------------------------------------------------------------
-    //driver
-    //-----------------------------------------------------------------------
-    public getDriver():OsDriver|null {
+        }*/
+    return false;
+  }
+
+  //-----------------------------------------------------------------------
+  //driver
+  //-----------------------------------------------------------------------
+  /*public getDriver():OsDriver|null {
         return this._driver;
     }
 

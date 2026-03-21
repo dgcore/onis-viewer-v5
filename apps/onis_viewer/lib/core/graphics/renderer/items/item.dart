@@ -21,8 +21,7 @@ enum OsRenderItemType {
 ///////////////////////////////////////////////////////////////////////
 
 class OsGraphicItem {
-  OsGraphicItem(
-      [OsRenderItemType type = OsRenderItemType.osAnyItem, String name = '']) {
+  OsGraphicItem({required OsRenderItemType type, String name = ''}) {
     _type = type;
     _name = name;
     _selectable = false;
