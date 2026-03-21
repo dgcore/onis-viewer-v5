@@ -1,5 +1,5 @@
 import 'package:onis_viewer/core/graphics/drivers/driver.dart';
-import 'package:onis_viewer/core/graphics/math/matrix.dart';
+import 'package:onis_viewer/core/math/matrix.dart';
 
 ///////////////////////////////////////////////////////////////////////
 // OsPushedMatrix

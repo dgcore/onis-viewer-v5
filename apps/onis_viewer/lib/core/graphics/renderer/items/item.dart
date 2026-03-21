@@ -1,7 +1,7 @@
 import 'package:onis_viewer/core/graphics/drivers/driver.dart';
 import 'package:onis_viewer/core/graphics/interfaces.dart';
-import 'package:onis_viewer/core/graphics/math/matrix.dart';
 import 'package:onis_viewer/core/graphics/renderer/renderer.dart';
+import 'package:onis_viewer/core/math/matrix.dart';
 
 const int s32Max = 2147483647;
 

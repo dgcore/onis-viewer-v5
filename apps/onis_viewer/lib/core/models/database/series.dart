@@ -125,7 +125,8 @@ class Series {
       final seriesDateStr = json['date'] as String?;
       final seriesTimeStr = json['time'] as String?;
       if (seriesDateStr != null && seriesDateStr.isNotEmpty) {
-        seriesDate = createDateTimeFromDicom(seriesDateStr, seriesTimeStr);
+        seriesDate =
+            DateUtils.createDateTimeFromDicom(seriesDateStr, seriesTimeStr);
       }
     }
 

@@ -1,88 +1,96 @@
-/// Utility functions for date and time manipulation
-library;
-
-/// Creates a DateTime object from DICOM-style date and time strings.
-///
-/// [dateStr] - Date string in YYYYMMDD format (e.g., "20231225")
-/// [timeStr] - Optional time string in HHMMSS.XXX format (e.g., "143025.123")
-///             The milliseconds part (.XXX) is optional.
-///             If [timeStr] is null, empty, or blank, the DateTime will
-///             only contain date information (time set to 00:00:00.000).
-///
-/// Returns a DateTime object in UTC, or null if parsing fails.
-///
-/// Example:
-/// ```dart
-/// // Date only
-/// final date1 = createDateTimeFromDicom("20231225", null);
-/// // DateTime(2023, 12, 25, 0, 0, 0, 0)
-///
-/// // Date and time without milliseconds
-/// final date2 = createDateTimeFromDicom("20231225", "143025");
-/// // DateTime(2023, 12, 25, 14, 30, 25, 0)
-///
-/// // Date and time with milliseconds
-/// final date3 = createDateTimeFromDicom("20231225", "143025.123");
-/// // DateTime(2023, 12, 25, 14, 30, 25, 123)
-/// ```
-DateTime? createDateTimeFromDicom(String dateStr, String? timeStr) {
-  // Validate and parse date string (YYYYMMDD)
-  if (dateStr.length != 8) {
-    return null;
-  }
-
-  try {
-    final year = int.parse(dateStr.substring(0, 4));
-    final month = int.parse(dateStr.substring(4, 6));
-    final day = int.parse(dateStr.substring(6, 8));
-
-    // Validate date components
-    if (month < 1 || month > 12 || day < 1 || day > 31) {
+class DateUtils {
+  /// Parse une date DICOM (YYYYMMDD) et une heure DICOM optionnelle
+  /// (HHMMSS, HHMMSS.F, HHMMSS.FF, HHMMSS.FFF, etc.).
+  ///
+  /// Retourne null si le format est invalide.
+  static DateTime? createDateTimeFromDicom(String dateStr, String? timeStr) {
+    if (dateStr.length != 8) {
       return null;
     }
 
-    // Parse time string if provided and not blank
+    final int year;
+    final int month;
+    final int day;
+
+    try {
+      year = int.parse(dateStr.substring(0, 4));
+      month = int.parse(dateStr.substring(4, 6));
+      day = int.parse(dateStr.substring(6, 8));
+    } catch (_) {
+      return null;
+    }
+
     int hour = 0;
     int minute = 0;
     int second = 0;
     int millisecond = 0;
 
-    if (timeStr != null && timeStr.trim().isNotEmpty) {
-      // Remove any whitespace
-      final trimmedTime = timeStr.trim();
-
-      // Minimum length is 6 (HHMMSS)
+    final String trimmedTime = timeStr?.trim() ?? '';
+    if (trimmedTime.isNotEmpty) {
       if (trimmedTime.length < 6) {
         return null;
       }
 
-      // Parse hours, minutes, seconds
-      hour = int.parse(trimmedTime.substring(0, 2));
-      minute = int.parse(trimmedTime.substring(2, 4));
-      second = int.parse(trimmedTime.substring(4, 6));
+      try {
+        hour = int.parse(trimmedTime.substring(0, 2));
+        minute = int.parse(trimmedTime.substring(2, 4));
+        second = int.parse(trimmedTime.substring(4, 6));
+      } catch (_) {
+        return null;
+      }
 
-      // Validate time components
       if (hour > 23 || minute > 59 || second > 59) {
         return null;
       }
 
-      // Parse milliseconds if present (format: .XXX)
       if (trimmedTime.length > 6) {
-        if (trimmedTime[6] == '.') {
-          final millisecondStr = trimmedTime.substring(7);
-          if (millisecondStr.isNotEmpty) {
-            // Pad or truncate to 3 digits
-            final paddedMs = millisecondStr.padRight(3, '0').substring(0, 3);
-            millisecond = int.parse(paddedMs);
-          }
+        if (trimmedTime[6] != '.') {
+          return null;
+        }
+
+        final String fraction = trimmedTime.substring(7);
+        if (fraction.isEmpty) {
+          return null;
+        }
+
+        if (!RegExp(r'^\d+$').hasMatch(fraction)) {
+          return null;
+        }
+
+        final String msText = fraction.padRight(3, '0').substring(0, 3);
+
+        try {
+          millisecond = int.parse(msText);
+        } catch (_) {
+          return null;
         }
       }
     }
 
-    // Create DateTime in UTC to avoid timezone issues
-    return DateTime.utc(year, month, day, hour, minute, second, millisecond);
-  } catch (e) {
-    // Return null if any parsing fails
-    return null;
+    final DateTime dt = DateTime(
+      year,
+      month,
+      day,
+      hour,
+      minute,
+      second,
+      millisecond,
+    );
+
+    if (dt.year != year ||
+        dt.month != month ||
+        dt.day != day ||
+        dt.hour != hour ||
+        dt.minute != minute ||
+        dt.second != second ||
+        dt.millisecond != millisecond) {
+      return null;
+    }
+
+    return dt;
+  }
+
+  static DateTime? parseDicomDate(String dateStr) {
+    return createDateTimeFromDicom(dateStr, null);
   }
 }

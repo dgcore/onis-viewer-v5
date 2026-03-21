@@ -87,7 +87,8 @@ class Patient {
       final birthdateStr = json['birthdate'] as String?;
       final birthtimeStr = json['birthtime'] as String?;
       if (birthdateStr != null && birthdateStr.isNotEmpty) {
-        birthDate = createDateTimeFromDicom(birthdateStr, birthtimeStr);
+        birthDate =
+            DateUtils.createDateTimeFromDicom(birthdateStr, birthtimeStr);
       }
     }
 
