@@ -20,8 +20,10 @@ class OsContainerController {
   }
 
   //renderer type:
-  /*public createRenderer():OsRenderer|null { return null; }
-    */
+  OsRenderer? createRenderer() {
+    return null;
+  }
+
   List<OsRenderer> get rendererElements => [];
 
   //series:

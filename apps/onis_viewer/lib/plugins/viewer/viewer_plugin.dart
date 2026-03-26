@@ -39,7 +39,7 @@ class _ViewerApiImpl implements ViewerApi {
 
   Future<void> initialize() async {
     _toolbar.addItem(OsLayoutToolbarItem('layout_toolbar_item', 'Layout'));
-    _layout.setTiling(2, 2);
+    _layout.setTiling(1, 1);
   }
 
   Future<void> dispose() async {
