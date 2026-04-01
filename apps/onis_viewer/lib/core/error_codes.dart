@@ -165,6 +165,8 @@ class OnisErrorCodes {
   static const int usbMultipleDrives = 2601;
   static const int usbUnmountFailed = 2602;
 
+  static const int missingPixelData = 2700;
+
   static String getErrorMessage(int errorCode) {
     switch (errorCode) {
       case none:

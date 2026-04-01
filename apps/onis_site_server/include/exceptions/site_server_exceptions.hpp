@@ -1,6 +1,6 @@
 #pragma once
 
-#include <exception>
+/*#include <exception>
 #include <string>
 
 class site_server_exception : public std::exception {
@@ -19,4 +19,4 @@ public:
 private:
   int code_;
   std::string message_;
-};
+};*/

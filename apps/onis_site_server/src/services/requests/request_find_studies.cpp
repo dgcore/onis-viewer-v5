@@ -173,8 +173,7 @@ void request_service::process_find_studies_request(
   // Verify input parameters:
   onis::database::item::verify_string_value(req->input_json, "source", true,
                                             false);
-  onis::database::item::verify_integer_value(req->input_json, SO_TYPE_KEY,
-                                             false);
+  onis::database::item::verify_integer_value(req->input_json, "type", false);
   onis::database::item::verify_integer_value(req->input_json, "limit", true);
   if (req->input_json.isMember("filters")) {
     onis::database::item::verify_object_value(req->input_json, "filters", true);
@@ -206,14 +205,16 @@ void request_service::process_find_studies_request(
   }
 
   // prepare output:
-  req->write_output([&](json& output) {
-    output["sources"] = Json::Value(Json::objectValue);
-  });
+  req->write_output(
+      [&](json& output, std::vector<std::uint8_t>& binary_output) {
+        output["sources"] = Json::Value(Json::objectValue);
+      });
 
   // Search studies:
   for (const auto& source : find_req->sources) {
     if (source.type == onis::database::source::type_partition) {
-      req->write_output([&](json& output) {
+      req->write_output([&](json& output,
+                            std::vector<std::uint8_t>& binary_output) {
         Json::Value& source_output = output["sources"][source.seq] =
             Json::Value(Json::objectValue);
         source_output["conflict"] = source.have_conflict;

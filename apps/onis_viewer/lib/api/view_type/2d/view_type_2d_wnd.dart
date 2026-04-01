@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:onis_viewer/api/core/ov_api_core.dart';
 import 'package:onis_viewer/api/view_type/2d/view_type_2d_widget.dart';
 import 'package:onis_viewer/core/graphics/container/container_wnd.dart';
 import 'package:onis_viewer/core/graphics/container/controllers/container_controller_2d.dart';
 import 'package:onis_viewer/core/graphics/drivers/dart_driver.dart';
 import 'package:onis_viewer/core/layout/view_wnd.dart';
+import 'package:onis_viewer/plugins/database/public/database_api.dart';
+import 'package:onis_viewer/plugins/database/public/download_controller_interface.dart';
 
 class ViewType2DWnd extends ViewWnd {
   late final OsContainerWnd _imageContainer;
@@ -12,6 +15,33 @@ class ViewType2DWnd extends ViewWnd {
     final OsContainerController2D controller = OsContainerController2D();
     _imageContainer = OsContainerWnd(
         driver: OsDartDriver(), controller: controller, view: this);
+
+    final dbApi =
+        OVApi().plugins.getPublicApi<DatabaseApi>('onis_database_plugin');
+    IDownloadController? downloadController = dbApi?.downloadController;
+
+    /*let manager:OsGraphicManager = this.viewer.getGraphicManager();
+            if (manager) {
+                let type:OsContainerControllerType|null = manager.findContainerControllerType("2D CONTROLLER");
+                let supportSet:OsContainerSupportSet|null = manager.findContainerSupportSet("2D", false);
+                if (type != null) this._imageContainer = manager.createContainer(type, true, this);*/
+
+    //this._imageContainer.setSupportSet(supportSet);
+    /*let controller:OsContainerController|null = this._imageContainer.controller;
+                    if (controller) {
+                        controller.setStateId(this.getStateId());
+                    }*/
+
+    downloadController?.registerContainer(_imageContainer, true);
+    //}
+    //}
+  }
+
+  void dispose() {
+    final dbApi =
+        OVApi().plugins.getPublicApi<DatabaseApi>('onis_database_plugin');
+    IDownloadController? downloadController = dbApi?.downloadController;
+    downloadController?.registerContainer(_imageContainer, false);
   }
 
   @override

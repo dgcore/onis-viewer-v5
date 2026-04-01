@@ -1,7 +1,7 @@
 #pragma once
 
-#include "../../exceptions/site_server_exceptions.hpp"
 #include "./db_item.hpp"
+#include "onis_kit/include/core/exception.hpp"
 
 using json = Json::Value;
 
@@ -39,7 +39,7 @@ const std::uint32_t info_patient_creation = 64;
 struct patient {
   static void create(json& patient, std::uint32_t flags, bool for_client) {
     if (!patient.isObject()) {
-      throw site_server_exception(EOS_PARAM, "patient is not an json object");
+      throw onis::exception(EOS_PARAM, "patient is not an json object");
     }
     patient.clear();
     patient[BASE_SEQ_KEY] = "";
@@ -136,15 +136,15 @@ struct patient {
 
     if (flags & info_patient_charset) {
       if ((input_flags & info_patient_charset) == 0)
-        throw site_server_exception(EOS_PARAM,
-                                    "Failed to copy the patient json object.");
+        throw onis::exception(EOS_PARAM,
+                              "Failed to copy the patient json object.");
       output[PA_CHARSET_KEY] = input[PA_CHARSET_KEY].asString();
     }
 
     if (flags & info_patient_name) {
       if ((input_flags & info_patient_name) == 0)
-        throw site_server_exception(EOS_PARAM,
-                                    "Failed to copy the patient json object.");
+        throw onis::exception(EOS_PARAM,
+                              "Failed to copy the patient json object.");
       output[PA_NAME_KEY] = input[PA_NAME_KEY].asString();
       output[PA_IDEOGRAM_KEY] = input[PA_IDEOGRAM_KEY].asString();
       output[PA_PHONETIC_KEY] = input[PA_PHONETIC_KEY].asString();
@@ -152,23 +152,23 @@ struct patient {
 
     if (flags & info_patient_birthdate) {
       if ((input_flags & info_patient_birthdate) == 0)
-        throw site_server_exception(EOS_PARAM,
-                                    "Failed to copy the patient json object.");
+        throw onis::exception(EOS_PARAM,
+                              "Failed to copy the patient json object.");
       output[PA_BDATE_KEY] = input[PA_BDATE_KEY].asString();
       output[PA_BTIME_KEY] = input[PA_BTIME_KEY].asString();
     }
 
     if (flags & info_patient_sex) {
       if ((input_flags & info_patient_sex) == 0)
-        throw site_server_exception(EOS_PARAM,
-                                    "Failed to copy the patient json object.");
+        throw onis::exception(EOS_PARAM,
+                              "Failed to copy the patient json object.");
       output[PA_SEX_KEY] = input[PA_SEX_KEY].asString();
     }
 
     if (flags & info_patient_statistics) {
       if ((input_flags & info_patient_statistics) == 0)
-        throw site_server_exception(EOS_PARAM,
-                                    "Failed to copy the patient json object.");
+        throw onis::exception(EOS_PARAM,
+                              "Failed to copy the patient json object.");
       output[PA_STCNT_KEY] = input[PA_STCNT_KEY].asInt();
       output[PA_SRCNT_KEY] = input[PA_SRCNT_KEY].asInt();
       output[PA_IMCNT_KEY] = input[PA_IMCNT_KEY].asInt();

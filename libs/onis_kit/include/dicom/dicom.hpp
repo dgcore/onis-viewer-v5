@@ -5,6 +5,7 @@
 #include <list>
 #include <memory>
 #include <string>
+#include "../core/bitmap.hpp"
 #include "../core/date_time.hpp"
 #include "../core/file.hpp"
 
@@ -2529,8 +2530,8 @@ public:
   }
 
   bool show{false};
-  std::uint32_t width{0};
-  std::uint32_t height{0};
+  std::size_t width{0};
+  std::size_t height{0};
   std::int32_t x{0};
   std::int32_t y{0};
   std::uint8_t* data{nullptr};
@@ -2660,24 +2661,24 @@ public:
   dicom_frame& operator=(dicom_frame&&) = delete;
 
   // dicom file:
-  virtual bool set_dicom_file(const onis::dicom_file_ptr& file) = 0;
-  virtual onis::dicom_file_ptr get_dicom_file() = 0;
+  // virtual bool set_dicom_file(const onis::dicom_file_ptr& file) = 0;
+  //  virtual onis::dicom_file_ptr get_dicom_file() = 0;
 
   // frame:
-  virtual bool set_frame_index(std::int32_t index) = 0;
+  virtual void set_frame_index(std::int32_t index) = 0;
   virtual std::int32_t get_frame_index() = 0;
 
   // properties:
   virtual bool is_monochrome() const = 0;
-  virtual bool get_dimensions(std::int32_t* width,
-                              std::int32_t* height) const = 0;
+  virtual bool get_dimensions(std::size_t* width,
+                              std::size_t* height) const = 0;
   virtual std::int32_t get_bits_per_pixel() const = 0;
 
   // window Level:
-  virtual bool set_window_level(double center, double width) = 0;
+  virtual void set_window_level(double center, double width) = 0;
   virtual bool get_window_level(double* center, double* width) const = 0;
   virtual void set_original_window_level(double center, double width) = 0;
-  virtual bool get_original_window_level(double* center,
+  virtual void get_original_window_level(double* center,
                                          double* width) const = 0;
 
   // voi lut:
@@ -2685,20 +2686,19 @@ public:
   virtual std::int32_t get_voi_lut_function() const = 0;
 
   // palette:
-  virtual onis::dicom_palette* get_palette(std::int32_t channel) const = 0;
+  virtual onis::dicom_palette* get_palette(std::int32_t channel) = 0;
   virtual bool have_palette() const = 0;
   virtual void reconstruct_palette_image(std::uint8_t* red, std::uint8_t* green,
                                          std::uint8_t* blue) = 0;
 
   // extract bitmap:
-  /*virtual onis::bitmap_ptr create_bitmap(
-      std::int32_t bits, bool inverse_color = OSFALSE,
-      onis::bitmap_ptr use_this_bitmap = onis::bitmap_ptr()) = 0;
-  virtual std::uint8_t* get_png_data(std::uint32_t* len) = 0;*/
+  virtual onis::core::bitmap_ptr create_bitmap(
+      std::int32_t bits, bool inverse_color = false,
+      onis::core::bitmap_ptr use_this_bitmap = nullptr) = 0;
+  virtual std::uint8_t* get_png_data(std::size_t* len) const = 0;
 
   // internal data:
-  virtual const void* get_intermediate_pixel_data(
-      std::int32_t* count) const = 0;
+  virtual const void* get_intermediate_pixel_data(std::size_t* count) const = 0;
   virtual std::int32_t get_representation(
       bool* signed_data) const = 0;  // representation of internal data
 

@@ -327,7 +327,19 @@ void site_database::find_study_by_seq(const std::string& partition_seq,
 void site_database::find_study_by_seq(const std::string& seq,
                                       std::uint32_t flags, bool for_client,
                                       lock_mode lock, Json::Value& output,
-                                      std::string* patient_seq) {}
+                                      std::string* patient_seq) {
+  const auto columns = get_study_columns(flags, false);
+  const std::string from = "pacs_studies";
+  const auto clause = "id=?";
+  auto query = create_and_prepare_query(columns, from, clause, lock, 0);
+  std::int32_t index = 1;
+  bind_parameter(query, index, seq, "id");
+  auto result = execute_query(query);
+  if (result->has_rows()) {
+    auto row = result->get_next_row();
+    create_study_item(*row, flags, for_client, patient_seq, output, nullptr);
+  }
+}
 bool site_database::find_study_patient(const std::string& study_seq,
                                        std::uint32_t patient_flags,
                                        bool for_client, lock_mode lock,

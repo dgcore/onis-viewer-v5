@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:onis_viewer/api/core/page_manager.dart';
 import 'package:onis_viewer/api/core/plugin_manager.dart';
 import 'package:onis_viewer/api/graphics/managers/render_type_manager.dart';
+import 'package:onis_viewer/api/services/message_service.dart';
 import 'package:onis_viewer/api/view_type/view_type_manager.dart';
 
 /// Core OVApi singleton that coordinates all API modules
@@ -18,11 +19,15 @@ class OVApi {
   late final ViewTypeManager _viewTypeManager;
   late final OsRenderTypeManager _renderTypeManager;
 
+  // Services
+  late final OsMessageService _messageService;
+
   // Getters for API modules
   PageManager get pages => _pageManager;
   PluginManager get plugins => _pluginManager;
   ViewTypeManager get viewTypes => _viewTypeManager;
   OsRenderTypeManager get renderTypes => _renderTypeManager;
+  OsMessageService get messages => _messageService;
 
   /// Initialize the API with all modules
   Future<void> initialize() async {
@@ -32,6 +37,9 @@ class OVApi {
       _pageManager = PageManager();
       _pluginManager = PluginManager();
       _renderTypeManager = OsRenderTypeManager();
+
+      // Initialize services
+      _messageService = OsMessageService();
 
       // Initialize modules
       _renderTypeManager.initialize();

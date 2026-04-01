@@ -1,3 +1,4 @@
+import 'package:onis_viewer/core/dicom/dicom_frame.dart';
 import 'package:onis_viewer/core/graphics/renderer/renderer.dart';
 
 ///////////////////////////////////////////////////////////////////////
@@ -54,10 +55,18 @@ abstract class OsDriverContext {
   //void setTargetBuffer(int target);
   //void swappBuffers();
 
+  //video text:
+  bool registerText(OsDriverText item, Object data);
+  OsDriverText? findText(
+      Object data, String value, String fontName, int fontSize);
+  void cleanTexts();
+  void resetTexts();
+  void setMaximumVideoTextEntries(int maxValue);
+
   //character list:
-  //OsDriverCharacterList? createCharacterList(String id);
-  //OsDriverCharacterList? findCharacterList(String id);
-  //bool removeCharacterList(String id);
+  OsDriverCharacterList? createCharacterList(String id);
+  OsDriverCharacterList? findCharacterList(String id);
+  bool removeCharacterList(String id);
 
   //capacity:
   //void getMaximumTextureSize(List<double> size);
@@ -146,6 +155,8 @@ abstract class OsDriver {
 ///////////////////////////////////////////////////////////////////////
 
 abstract class OsDriverImage {
+  bool initWithFrame(DicomFrame frame);
+
   //public initWithFrame(frame =OsDicomFrame):void;
   //public initWithPixels(width =number, height =number, pixelFormat =number, pixels =Uint8ClampedArray):boolean { return false; }
   //public initFromImageData(data =ImageData):boolean { return false; }
@@ -173,11 +184,7 @@ abstract class OsDriverText {
   set text(String str);
 
   //color:
-  void setColor4d(double red, double green, double blue, double alpha);
   void setColor4i(int red, int green, int blue, int alpha);
-  void setColor4iv(List<int> rgba);
-  void setColor3h(String value);
-  void setColorString(String value);
 
   //alignment:
   int get alignment;
@@ -190,11 +197,13 @@ abstract class OsDriverText {
   //antialiasing:
   bool get antialiasing;
   set antialiasing(bool use);
-  bool isUsingAntialiasing();
 
   //font:
   void setFont(String name, int size);
-  String getFont(int size);
+  String getFont(List<int>? size);
+
+  // frame:
+  bool getFrameSize(OsDriver driver, List<double> widthHeight);
 
   //Draw:
   bool willDraw(OsDriverContext ctx);

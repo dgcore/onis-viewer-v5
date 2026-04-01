@@ -9,7 +9,7 @@ class OsContainerController {
 
   OsContainerController();
 
-  OsContainerWnd? get container => _wcontainer?.target;
+  OsContainerWnd? getContainer() => _wcontainer?.target;
   set container(OsContainerWnd? container) {
     if (_wcontainer != null) {
       throw OnisException(
@@ -20,8 +20,10 @@ class OsContainerController {
   }
 
   //renderer type:
-  /*public createRenderer():OsRenderer|null { return null; }
-    */
+  OsRenderer? createRenderer() {
+    return null;
+  }
+
   List<OsRenderer> get rendererElements => [];
 
   //series:

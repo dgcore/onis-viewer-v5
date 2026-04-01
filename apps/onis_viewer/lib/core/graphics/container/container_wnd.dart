@@ -5,6 +5,11 @@ import 'package:onis_viewer/core/graphics/container/controllers/container_contro
 import 'package:onis_viewer/core/graphics/drivers/driver.dart';
 import 'package:onis_viewer/core/graphics/renderer/renderer.dart';
 import 'package:onis_viewer/core/layout/view_wnd.dart';
+import 'package:onis_viewer/core/models/database/color_lut.dart';
+import 'package:onis_viewer/core/models/database/convolution_filter.dart';
+import 'package:onis_viewer/core/models/database/hanging_protocol.dart';
+import 'package:onis_viewer/core/models/database/opacity_table.dart';
+import 'package:onis_viewer/core/models/database/window_level.dart';
 import 'package:onis_viewer/core/models/entities/patient.dart' as entities;
 
 enum OsContDraw {
@@ -17,6 +22,36 @@ enum OsContDrawTarget {
   osDrawTargetScreen,
   osDrawTargetPrinter,
   osDrawTargetPrintPreviewContainer,
+}
+
+///////////////////////////////////////////////////////////////////////
+// incoming_image_properties
+///////////////////////////////////////////////////////////////////////
+
+class OsIncomingImageProperties {
+  bool flipHorizontally = false;
+  bool flipVertically = false;
+  double rotation = 0;
+  double zoom = 0.0;
+  WindowLevel? windowLevelPreset;
+  ColorLut? colorLutPreset;
+  OpacityTable? opacityTablePreset;
+  ConvolutionFilter? convolutionFilterPreset;
+  int targetMode = 0;
+  int targetPage = 0;
+  List<HpDicomTag> targetTags = [];
+
+  void reset() {
+    flipHorizontally = false;
+    flipVertically = false;
+    rotation = 0.0;
+    zoom = 0.0;
+    windowLevelPreset = null;
+    colorLutPreset = null;
+    opacityTablePreset = null;
+    convolutionFilterPreset = null;
+    targetTags.clear();
+  }
 }
 
 ///////////////////////////////////////////////////////////////////////
@@ -41,7 +76,6 @@ class OsContainerWnd extends ChangeNotifier {
   final ValueNotifier<int> _redrawNotifier = ValueNotifier<int>(0);
   final OsContainerController _controller;
   final WeakReference<ViewWnd>? _wView;
-  //private _controller:OsContainerController|null;
   //private _view:OsViewWnd|null;
   //members:
   int _rowCnt = 0;
@@ -116,7 +150,7 @@ class OsContainerWnd extends ChangeNotifier {
   //protected _pageSlider:OsContainerPageSlider|null;
   //private _pageSliderEnable:boolean;
 
-  final bool _pageMode = false;
+  bool _pageMode = false;
 
   //private _drawLocalizer:boolean = false;
   //private _wLocalizerStudy:OsWeakObject|null = null;
@@ -379,14 +413,14 @@ class OsContainerWnd extends ChangeNotifier {
     //-----------------------------------------------------------------------
     public getLastMousePosition(xy:[number, number]):boolean {
         return this._component?this._component.getLastMousePosition(xy):false;
-    }
-
-    //-----------------------------------------------------------------------
-    //controller
-    //-----------------------------------------------------------------------
-    public getController():OsContainerController|null {
-        return this._controller;
     }*/
+
+  //-----------------------------------------------------------------------
+  //controller
+  //-----------------------------------------------------------------------
+  OsContainerController get controller {
+    return _controller;
+  }
 
   //-----------------------------------------------------------------------
   //image matrix
@@ -419,6 +453,20 @@ class OsContainerWnd extends ChangeNotifier {
     if (index < 0 || index >= _rowCnt * _colCnt) return null;
     OsContainerImageBoxInfo? box = _imageBoxes[index];
     return box.renderer;
+  }
+
+  ({double x, double y, double width, double height}) getImageBoxRect(
+      int index) {
+    if (index < 0 || index >= _rowCnt * _colCnt) {
+      return (x: 0, y: 0, width: 0, height: 0);
+    }
+    OsContainerImageBoxInfo? box = _imageBoxes[index];
+    return (
+      x: box.rect[0],
+      y: box.rect[1],
+      width: box.rect[2],
+      height: box.rect[3]
+    );
   }
 
   /*public getImageBoxRect(index:number, rect:[number, number, number, number]):void {
@@ -654,6 +702,25 @@ class OsContainerWnd extends ChangeNotifier {
     }*/
 
   void redraw() {
+    for (int i = 0; i < _rowCnt * _colCnt; i++) {
+      final boxRect = _imageBoxes[i].rect;
+      final info = OsWillDrawInfo();
+      info.context = _context;
+      info.viewport[0] = boxRect[0];
+      info.viewport[1] = boxRect[1];
+      info.viewport[2] = boxRect[2];
+      info.viewport[3] = boxRect[3];
+
+      //info.mouse[0] = mousePos[0] - boxRect[0];
+      //info.mouse[1] = mousePos[1] - boxRect[1];
+
+      prepareForDrawingImageBox(i, info);
+      /*let tool:OsContainerTool|null = this.getRunningTool(null, false);
+                if (!tool) tool = this.getCurrentTool(null, false);
+                if (tool) tool.willDraw(this, i, info);
+                info.destroy();*/
+    }
+
     _driver.currentContext = _context;
     //Set the viewport:
     _driver.setViewport(0, 0, _rect[2], _rect[3]);
@@ -904,20 +971,19 @@ class OsContainerWnd extends ChangeNotifier {
 
     public isUsingOpengl():boolean {
         return this._idriver == 2;
-    }
+    }*/
 
-    //-----------------------------------------------------------------------
-    //pages
-    //-----------------------------------------------------------------------
-    public getPageMode():boolean {
-        return this._pageMode;
-    }
-    
-    public setPageMode(enable:boolean) {
-        this._pageMode = enable;
-        this.setCurrentPage(0, OsContDraw.OS_FORCE_REDRAW);
-    }
-    */
+  //-----------------------------------------------------------------------
+  //pages
+  //-----------------------------------------------------------------------
+  bool get pageMode {
+    return _pageMode;
+  }
+
+  set pageMode(bool enable) {
+    _pageMode = enable;
+    setCurrentPage(index: 0, mode: OsContDraw.osForceRedraw);
+  }
 
   int get pageCount {
     final items = _controller.rendererElements;
@@ -975,7 +1041,7 @@ class OsContainerWnd extends ChangeNotifier {
     //We also need to release the memory of the items that are context related if their context has changed!
     //This is because we need to release some data that may be context related!
     int releaseCount = 0;
-    List<OsRenderer?> releaseItems = [];
+    List<OsRenderer?> releaseItems = List.filled(count, null);
 
     int redrawCount = 0;
     List<int> redrawItems = List.filled(count, 0);
@@ -998,7 +1064,7 @@ class OsContainerWnd extends ChangeNotifier {
         //start auto-playing if needed:
       }
 
-      if (oldRender == newRender) {
+      if (identical(oldRender, newRender)) {
         //we display the same item.
         //the context for the item will not change, we don't need to release the memory!
         //but we may need to redraw it:
@@ -1009,14 +1075,14 @@ class OsContainerWnd extends ChangeNotifier {
           }
         }
       } else {
-        _imageBoxes[index].renderer = newRender;
+        _imageBoxes[i].renderer = newRender;
 
         redrawItems[redrawCount] = i;
         redrawCount++;
         if (newRender != null) {
           //if the item was inserted in the list of item to release, we remove it:
           for (int j = 0; j < releaseCount; j++) {
-            if (newRender == releaseItems[j]) {
+            if (identical(newRender, releaseItems[j])) {
               releaseItems[j] = null;
               break;
             }
@@ -1028,7 +1094,9 @@ class OsContainerWnd extends ChangeNotifier {
           //we should not release its memory:
           int j;
           for (j = 0; j < redrawCount; j++) {
-            if (oldRender == getImageBoxRenderer(redrawItems[j])) break;
+            if (identical(oldRender, getImageBoxRenderer(redrawItems[j]))) {
+              break;
+            }
           }
           if (j == redrawCount) {
             releaseItems[releaseCount] = oldRender;
@@ -1173,7 +1241,8 @@ class OsContainerWnd extends ChangeNotifier {
 
   void _redrawImageBox(OsContainerImageBoxInfo imageBox, int index) {
     //Set the viewport:
-    _driver.setViewport(0, 0, imageBox.rect[2], imageBox.rect[3]);
+    _driver.setViewport(
+        imageBox.rect[0], imageBox.rect[1], imageBox.rect[2], imageBox.rect[3]);
 
     //Set the clipping:
     _driver.pushClipping(
@@ -1225,49 +1294,44 @@ class OsContainerWnd extends ChangeNotifier {
     //if (this._component) this._component.setCursor();
   }
 
-  /*public prepareForDrawingImageBox(index:number, info:OsWillDrawInfo) {
-        //if (_on_begin_will_draw_renderer_cbk != NULL) _on_begin_will_draw_renderer_cbk(std::static_pointer_cast<onis::graphics::container_wnd>(shared_from_this()), index, _wbegin_will_draw_renderer_cbk_data.lock());
-        this.prepareForDrawingImageBox1(this._imageBoxes[index], info);
-        //if (_on_end_will_draw_renderer_cbk != NULL) _on_end_will_draw_renderer_cbk(std::static_pointer_cast<onis::graphics::container_wnd>(shared_from_this()), index, _wend_will_draw_renderer_cbk_data.lock());
-    }
-    
-    public prepareForDrawingImageBox1(imageBox:OsContainerImageBoxInfo, info:OsWillDrawInfo) {
-        let render:OsRenderer|null = imageBox.getRenderer();
-        if (render) {
-            
-            let annotSet:[OsDbAnnotationSet|null] = [null];
+  void prepareForDrawingImageBox(int index, OsWillDrawInfo info) {
+    prepareForDrawingImageBox1(_imageBoxes[index], info);
+  }
+
+  void prepareForDrawingImageBox1(
+      OsContainerImageBoxInfo imageBox, OsWillDrawInfo info) {
+    OsRenderer? render = imageBox.renderer;
+    if (render != null) {
+      /*let annotSet:[OsDbAnnotationSet|null] = [null];
             let showAnnotSet:boolean = this.shouldDisplayDicomAnnotations(annotSet);
             render.setShouldDisplayDicomAnnotations(showAnnotSet, annotSet[0]);
             render.setShouldDisplayRuler(this._shouldDisplayRuler);
             render.setShouldDisplayGraphicAnnotations(this._shouldDisplayGraphics);
             render.setShouldAutoHideAnnotations(this._shouldAutoHideAnnotations);
-            render.setShouldDisplayDicomOverlays(this._shouldDisplayOverlays);
+            render.setShouldDisplayDicomOverlays(this._shouldDisplayOverlays);*/
 
-            info.render = render;
-            render.setFilterType(this._filterType);
-            let wasPreloaded:boolean = render.isPreloaded();
+      info.render = render;
+      //render.setFilterType(this._filterType);
+      //let wasPreloaded:boolean = render.isPreloaded();
 
-            if (this._viewer) {
+      /*if (this._viewer) {
                 let fontInfo:any = this._viewer.getCurrentFont(0);
                 if (fontInfo) render.setFont(0, fontInfo.name, fontInfo.size, fontInfo.color);
                 fontInfo = this._viewer.getCurrentFont(1);
                 if (fontInfo) render.setFont(1, fontInfo.name, fontInfo.size, fontInfo.color);
-            }
-    
-            
-    
-            if (this._drawLocalizer) render.setShouldDrawLocalizer(true, this._wLocalizerStudy?<OsOpenedStudy>this._wLocalizerStudy.lock(false):null, this._wLocalizerSeries?<OsOpenedSeries>this._wLocalizerSeries.lock(false):null, this._localizerMat, this._localizerSize);
-            else render.setShouldDrawLocalizer(false, null, null, null, null);
-    
-            //render->set_draw_target(_draw_target, _draw_factor);
-            render.willDraw(info);
-            if (!wasPreloaded && render.isPreloaded() && this._controller) 
-                this._controller.onPreloadedRenderer(render);
-        }
-    
-    }
+            }*/
 
-    public drawRectangleSelection(box:number, rect:[number, number, number, number]|null) {
+      //if (this._drawLocalizer) render.setShouldDrawLocalizer(true, this._wLocalizerStudy?<OsOpenedStudy>this._wLocalizerStudy.lock(false):null, this._wLocalizerSeries?<OsOpenedSeries>this._wLocalizerSeries.lock(false):null, this._localizerMat, this._localizerSize);
+      //else render.setShouldDrawLocalizer(false, null, null, null, null);
+
+      //render->set_draw_target(_draw_target, _draw_factor);
+      render.willDraw(info);
+      //if (!wasPreloaded && render.isPreloaded() && this._controller)
+      //  this._controller.onPreloadedRenderer(render);
+    }
+  }
+
+  /*public drawRectangleSelection(box:number, rect:[number, number, number, number]|null) {
         this._selectionRectangleIndex = box;
         if (rect) 
             for (let i:number=0; i<4; i++) this._selectionRectangleRect[i] = rect[i];
@@ -1995,21 +2059,22 @@ class OsContainerWnd extends ChangeNotifier {
         return null;
         
 
-    }
+    }*/
 
-    //-----------------------------------------------------------------------
-    //capture mouse
-    //-----------------------------------------------------------------------
+  //-----------------------------------------------------------------------
+  //capture mouse
+  //-----------------------------------------------------------------------
 
-    public captureMouse(box:number, x:number, y:number, shiftKey:boolean, controlKey:boolean, mouseEvent:number) {
-        this._isCaptured = true;
+  void captureMouse(int box, double x, double y, bool shiftKey, bool controlKey,
+      int mouseEvent) {
+    /*this._isCaptured = true;
         this._capturedIndex = box;
         if (mouseEvent == 0) this.onLeftButtonDown(box, x, y, shiftKey, controlKey, false);
-        else if (mouseEvent == 3) this.onLeftButtonDoubleClick(box, x, y, shiftKey, controlKey, false);
-    }
+        else if (mouseEvent == 3) this.onLeftButtonDoubleClick(box, x, y, shiftKey, controlKey, false);*/
+  }
 
-    public releaseMouse(box:number) {
-        this.setRunningTool(null, null);
+  void releaseMouse(int box) {
+    /*this.setRunningTool(null, null);
         this.setRunningItem(null);
 
         if (this._isCaptured) {
@@ -2023,21 +2088,21 @@ class OsContainerWnd extends ChangeNotifier {
 
           
             this._isCaptured = false;
-        }
-    }
+        }*/
+  }
 
-    public isMouseCaptured(box:[number]|null):boolean {
-        if (this._isCaptured) {
+  bool isMouseCaptured(List<int>? box) {
+    /*if (this._isCaptured) {
             if (box) box[0] = this._capturedIndex;
             return true;
-        }
-        return false;
-    }
-    
-    //-----------------------------------------------------------------------
-    //driver
-    //-----------------------------------------------------------------------
-    public getDriver():OsDriver|null {
+        }*/
+    return false;
+  }
+
+  //-----------------------------------------------------------------------
+  //driver
+  //-----------------------------------------------------------------------
+  /*public getDriver():OsDriver|null {
         return this._driver;
     }
 

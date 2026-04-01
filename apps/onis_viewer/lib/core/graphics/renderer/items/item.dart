@@ -1,7 +1,7 @@
 import 'package:onis_viewer/core/graphics/drivers/driver.dart';
 import 'package:onis_viewer/core/graphics/interfaces.dart';
-import 'package:onis_viewer/core/graphics/math/matrix.dart';
 import 'package:onis_viewer/core/graphics/renderer/renderer.dart';
+import 'package:onis_viewer/core/math/matrix.dart';
 
 const int s32Max = 2147483647;
 
@@ -21,8 +21,7 @@ enum OsRenderItemType {
 ///////////////////////////////////////////////////////////////////////
 
 class OsGraphicItem {
-  OsGraphicItem(
-      [OsRenderItemType type = OsRenderItemType.osAnyItem, String name = '']) {
+  OsGraphicItem({required OsRenderItemType type, String name = ''}) {
     _type = type;
     _name = name;
     _selectable = false;
@@ -259,8 +258,8 @@ class OsGraphicItem {
   void draw(OsDriver driver, OsRenderInfo info) {
     info.pushMatrix();
     info.applyWorldTransformation(localMatrix);
-    for (final c in _children) {
-      c.draw(driver, info);
+    for (final child in _children) {
+      child.draw(driver, info);
     }
     info.popMatrix();
   }

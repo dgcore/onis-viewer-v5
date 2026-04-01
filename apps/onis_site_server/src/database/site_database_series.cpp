@@ -231,6 +231,28 @@ void site_database::find_online_series(const std::string& study_seq,
   }
 }
 
+void site_database::find_series_by_seq(const std::string& seq,
+                                       std::uint32_t flags, bool for_client,
+                                       onis::database::lock_mode lock_mode,
+                                       Json::Value& output,
+                                       std::string* study_seq) {
+  const auto columns = get_series_columns(flags, false);
+  const std::string from = "pacs_series";
+  const auto clause = "id=?";
+  auto query = create_and_prepare_query(columns, from, clause, lock_mode);
+
+  int index = 1;
+  bind_parameter(query, index, seq, "id");
+
+  auto result = execute_query(query);
+  if (result->has_rows()) {
+    auto row = result->get_next_row();
+    create_series_item(*row, flags, for_client, nullptr, study_seq, output);
+  } else {
+    throw onis::exception(EOS_NOT_FOUND, "Series not found");
+  }
+}
+
 //------------------------------------------------------------------------------
 // Create operations
 //------------------------------------------------------------------------------

@@ -1,5 +1,7 @@
+import 'package:flutter/material.dart';
 import 'package:onis_viewer/core/graphics/drivers/driver.dart';
-import 'package:onis_viewer/core/graphics/math/matrix.dart';
+import 'package:onis_viewer/core/graphics/renderer/items/image.dart';
+import 'package:onis_viewer/core/math/matrix.dart';
 
 ///////////////////////////////////////////////////////////////////////
 // OsPushedMatrix
@@ -12,6 +14,91 @@ class OsPushedMatrix {
   final OsMatrix worldViewInvMat = OsMatrix();
   final OsMatrix worldInvTransposeMat = OsMatrix();
   final OsMatrix worldViewProjMat = OsMatrix();
+}
+
+///////////////////////////////////////////////////////////////////////
+// multi_text_draw_info
+///////////////////////////////////////////////////////////////////////
+
+class OsMultiTextDrawInfo {
+  bool drawBackground = true;
+  double margin = 0;
+  int alignment = OsDriverText.alignLeft;
+  final List<double> pos = [0, 0];
+  final List<double> size = [0, 0];
+  List<WeakReference<Object>> texts = [];
+  Color _backColor = Color.fromRGBO(0, 0, 0, 1);
+  Color _textColor = Color.fromRGBO(255, 255, 255, 1);
+
+  //--------------------------------------------
+  //colors
+  //--------------------------------------------
+
+  void setTextColor4i(int red, int green, int blue, int alpha) {
+    _textColor = Color.fromRGBO(red, green, blue, alpha / 255.0);
+  }
+
+  void setBackColor4i(int red, int green, int blue, int alpha) {
+    _backColor = Color.fromRGBO(red, green, blue, alpha / 255.0);
+  }
+
+  //--------------------------------------------
+  //frame
+  //--------------------------------------------
+
+  void calculateFrameSize(OsDriver driver) {
+    size[0] = 0;
+    size[1] = 0;
+    List<double> widthHeight = [0, 0];
+    for (int i = 0; i < texts.length; i++) {
+      OsDriverText? videoText = texts[i].target as OsDriverText?;
+      if (videoText != null) {
+        videoText.getFrameSize(driver, widthHeight);
+        if (widthHeight[0] > size[0]) size[0] = widthHeight[0];
+        size[1] += widthHeight[1];
+      }
+    }
+    size[0] += margin * 2.0;
+    size[1] += margin * 2.0;
+  }
+
+  //--------------------------------------------
+  //draw
+  //--------------------------------------------
+
+  void draw(OsDriver driver, OsRenderInfo info) {
+    info.pushMatrix();
+    double center = info.worldMat.mat[12];
+    driver.setColor4i(
+        _backColor.red, _backColor.green, _backColor.blue, _backColor.alpha);
+    driver.fillSolidRect(info, size[0], size[1]);
+
+    double offsetY = info.worldMat.mat[13] - size[1] * 0.5 + margin;
+    info.worldMat.mat[13] = offsetY;
+    bool isDrawingMultipleTexts = driver.isDrawingMultipleTexts();
+    if (!isDrawingMultipleTexts) driver.startDrawingMultipleTexts();
+
+    List<double> widthHeight = [0, 0];
+    for (int i = 0; i < texts.length; i++) {
+      OsDriverText? videoText = texts[i].target as OsDriverText?;
+      if (videoText == null) continue;
+      videoText.getFrameSize(driver, widthHeight);
+      if (alignment == OsDriverText.alignLeft) {
+        info.worldMat.mat[12] =
+            center - size[0] * 0.5 + margin + widthHeight[0] * 0.5;
+      } else if (alignment == OsDriverText.alignRight) {
+        info.worldMat.mat[12] =
+            center + size[0] * 0.5 - margin - widthHeight[0] * 0.5;
+      }
+      info.worldMat.mat[13] += widthHeight[1] * 0.5;
+      videoText.setColor4i(
+          _textColor.red, _textColor.green, _textColor.blue, _textColor.alpha);
+      videoText.draw(driver, info);
+      info.worldMat.mat[13] += widthHeight[1] * 0.5;
+    }
+    if (!isDrawingMultipleTexts) driver.stopDrawingMultipleTexts();
+    info.popMatrix();
+  }
 }
 
 ///////////////////////////////////////////////////////////////////////
@@ -66,8 +153,7 @@ class OsRenderInfo {
   }
 
   void popMatrix() {
-    OsPushedMatrix info = _pushedMatrices[_pushedMatrices.length - 1];
-    _pushedMatrices.clear();
+    OsPushedMatrix info = _pushedMatrices.removeLast();
     worldMat.copyFrom(info.worldMat);
     worldInvMat.copyFrom(info.worldInvMat);
     worldViewMat.copyFrom(info.worldViewMat);
@@ -114,7 +200,9 @@ abstract class OsRenderer {
   final WeakReference<OsRendererType>? _wtype;
 
   OsRenderer(OsRendererType type)
-      : _wtype = WeakReference<OsRendererType>(type);
+      : _wtype = WeakReference<OsRendererType>(type) {
+    print("OsRenderer constructor: ${type.id}");
+  }
 
   OsRendererType? get type => _wtype?.target;
 
@@ -169,7 +257,9 @@ abstract class OsRenderer {
   //render items:
   //void getImageItems(List<OsGraphicImage> list) {}
   //OsGraphicImage? getActiveImageItem(bool retain) { return null; }
-  //OsGraphicImage? getPrimaryImageItem(bool retain) { return null; }
+  OsGraphicImage? getPrimaryImageItem() {
+    return null;
+  }
   //OsGraphicGroup? getRootItem(bool retain) { return null; }
   //OsGraphicGroup? getImageGroupItem(bool retain) { return null; }
   //OsGraphicGroup? getAnnotationGroupItem(bool retain) { return null; }

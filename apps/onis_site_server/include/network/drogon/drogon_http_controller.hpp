@@ -31,6 +31,10 @@ public:
                 drogon::Post);
   ADD_METHOD_TO(http_drogon_controller::dicom_import, "/dicom/import",
                 drogon::Post);
+  ADD_METHOD_TO(http_drogon_controller::init_series_download,
+                "/series/download", drogon::Post);
+  ADD_METHOD_TO(http_drogon_controller::download_images, "/images/download",
+                drogon::Post);
   METHOD_LIST_END
 
   // Accounts
@@ -48,6 +52,15 @@ public:
 
   // Import:
   void dicom_import(
+      const drogon::HttpRequestPtr& req,
+      std::function<void(const drogon::HttpResponsePtr&)>&& callback) const;
+
+  // Download:
+  void init_series_download(
+      const drogon::HttpRequestPtr& req,
+      std::function<void(const drogon::HttpResponsePtr&)>&& callback) const;
+
+  void download_images(
       const drogon::HttpRequestPtr& req,
       std::function<void(const drogon::HttpResponsePtr&)>&& callback) const;
 

@@ -1,5 +1,38 @@
+import 'dart:math' as math;
+
+import 'package:onis_viewer/api/core/ov_api_core.dart';
+import 'package:onis_viewer/api/graphics/managers/render_type_manager.dart';
+import 'package:onis_viewer/core/dicom/dicom_frame.dart';
+import 'package:onis_viewer/core/dicom/image_region.dart';
+import 'package:onis_viewer/core/graphics/container/container_wnd.dart';
 import 'package:onis_viewer/core/graphics/drivers/driver.dart';
+import 'package:onis_viewer/core/graphics/renderer/items/camera.dart';
+import 'package:onis_viewer/core/graphics/renderer/items/group.dart';
+import 'package:onis_viewer/core/graphics/renderer/items/image.dart';
+import 'package:onis_viewer/core/graphics/renderer/items/item.dart';
 import 'package:onis_viewer/core/graphics/renderer/renderer.dart';
+import 'package:onis_viewer/core/math/matrix.dart';
+import 'package:onis_viewer/core/models/database/color_lut.dart';
+import 'package:onis_viewer/core/models/database/convolution_filter.dart';
+import 'package:onis_viewer/core/models/database/opacity_table.dart';
+import 'package:onis_viewer/core/models/database/window_level.dart';
+import 'package:onis_viewer/core/models/entities/patient.dart' as entities;
+import 'package:onis_viewer/core/result/result.dart';
+
+///////////////////////////////////////////////////////////////////////
+// renderer_2d_warning_message
+///////////////////////////////////////////////////////////////////////
+
+class OsRenderer2dWarningMessage {
+  String text = '';
+  bool haveData = false;
+  WeakReference<Object>? wdata;
+
+  OsRenderer2dWarningMessage(this.text, Object? data) {
+    haveData = data != null;
+    wdata = data != null ? WeakReference<Object>(data) : null;
+  }
+}
 
 ///////////////////////////////////////////////////////////////////////
 // renderer_type
@@ -20,268 +53,175 @@ class OsRenderer2DType extends OsRendererType {
 ///////////////////////////////////////////////////////////////////////
 
 class OsRenderer2D extends OsRenderer {
-  //private _camera:OsGraphicCamera;
-  //private _saveFitCameraRot:number;
-  //private _saveFitCameraWidth:number;
-  //private _rootItem:OsGraphicGroup;
-  //private _wimageGroup:OsWeakObject|null;
-  //private _wannotationGroup:OsWeakObject|null;
-  //private _wprimaryImg:OsWeakObject|null;
-  //private _wactiveImg:OsWeakObject|null;
-  //private _preloaded:boolean;
+  late final OsGraphicCamera _camera;
+  double _saveFitCameraRot = double.infinity;
+  double _saveFitCameraWidth = double.infinity;
+  late final OsGraphicGroup _rootItem;
+  WeakReference<OsGraphicGroup>? _wimageGroup;
+  WeakReference<OsGraphicGroup>? _wannotationGroup;
+  WeakReference<OsGraphicImage>? _wprimaryImg;
+  WeakReference<OsGraphicImage>? _wactiveImg;
   final List<int> _backCol = [0, 0, 0, 255];
   final List<int> _selCol = [255, 255, 255, 255];
-  //private _keyCol:Array<number> = [255, 255, 0, 255];
+  final List<int> _keyCol = [255, 255, 0, 255];
   final bool _wantRefreshAsap = false;
-  //private _info:OsRenderInfo;
+  final OsRenderInfo _info = OsRenderInfo(null);
   bool _selected = false;
   bool _hidden = false;
-  //private _isKey:boolean;
-  //private _keyStatus:number;
-  //private _autoSizeHide:number;
-  //private _shouldAutoHideAnnotations:boolean;
-  //private _shouldDisplayGraphics:boolean;
-  //private _shouldDisplayDicom:boolean;
-  //private _shouldDisplayRuler:boolean;
-  //private _drawFactor:number = 1.0;
-  //private _drawTarget:number = OsContDrawTarget.OS_DRAW_TARGET_SCREEN;
+  bool _isKey = false;
+  final int _autoSizeHide = 0;
+  bool _shouldAutoHideAnnotations = false;
+  bool _shouldDisplayGraphics = true;
+  bool _shouldDisplayDicom = true;
+  bool _shouldDisplayRuler = true;
+  bool _shouldDisplayOverlays = false;
+  final double _drawFactor = 1.0;
+  final OsContDrawTarget _drawTarget = OsContDrawTarget.osDrawTargetScreen;
   //private _wannotationSet:OsWeakObject|null;
   //private _dicomAnnotationBoxes:OsGraphicDicomAnnotationBox[];
   //private _fontInfo:any[] = [{name:'', size:12, color:'#ffffff'}, {name:'', size:12, color:'#ffffff'}];
-  //private _showScope:boolean;
-  //private _scopeX:number;
-  //private _scopeY:number;
-  //private _scopeFactor:number;
+  bool _showScope = false;
+  double _scopeX = 0;
+  double _scopeY = 0;
+  double _scopeFactor = 4.0;
   int _filterType = 1;
-  //private _drawLocalizer:boolean;
-  //private _wLocalizerStudy:OsWeakObject|null;
-  //private _wLocalizerSeries:OsWeakObject|null;
-  //private _localizerMat:OsMatrix;
-  //private _localizerSize:[number, number];
-  //private _initialized:boolean;
+  bool _drawLocalizer = false;
+  WeakReference<entities.Study>? _wLocalizerStudy;
+  WeakReference<entities.Series>? _wLocalizerSeries;
+  final OsMatrix _localizerMat = OsMatrix();
+  final List<double> _localizerSize = [0, 0];
+  bool _initialized = false;
+  bool _preloaded = false;
   //private _movieToolbar:OsMovieToolbar|null;
   //private _multiframePlayInfo:OsPlayRender2dInfo|null;
   //private _previousMousePosition:[number, number] = [0, 0];
   //private _showMoveControllerTime:number = Date.now();
-  //private _playSpeed:number = 0;
-  //private _autoStart:boolean = false;
-  //private _warningMessages:OsRenderer2dWarningMessage[] = [];
+  double _playSpeed = 0;
+  final bool _autoStart = false;
+  final List<OsRenderer2dWarningMessage> _warningMessages = [];
 
   OsRenderer2D(super.type) {
     /*this._multiframePlayInfo = null;
         this._movieToolbar = null;
         this._wtype = type.getWeakObject();
         this._info = new OsRenderInfo(null);
-        //_auto_start = OSTRUE;
-        this._shouldAutoHideAnnotations = false;
-        this._shouldDisplayDicom = true;
-        this._shouldDisplayRuler = true;
-        this._wantRefreshAsap = false;
-        this._initialized = false;
         
-       
-
-        this._selected = false;
-        this._isKey = false;
-        this._keyStatus = 0;
-        //_is_dirty = OSTRUE;
-        this._hidden = false;
-        this._preloaded = false;
-
-        this._camera = new OsGraphicCamera('');
-        this._camera.setOrthographicMode(true);
-        this._camera.setOrthoWidth(900);
-        this._camera.pos[0] = 0.0;
-        this._camera.pos[1] = 0.0;
-        this._camera.pos[2] = 100.0;
-        this._camera.setFarPlane(1000.0);
-        this._camera.setNearPlane(0.01);
-        this._camera.validateMatrix();
-
-        this._saveFitCameraRot = Number.MAX_VALUE;
-        this._saveFitCameraWidth = Number.MAX_VALUE;
         
-        this._rootItem = new OsGraphicGroup("ROOT");
-        let grp:OsGraphicGroup = new OsGraphicGroup("IMAGES");
-        grp.setParent(this._rootItem);
-        grp.release();
-        this._wimageGroup = grp.getWeakObject();
-        this._wannotationGroup = null;
-        this._wprimaryImg = null;
-        this._wactiveImg = null;
-
-        this._autoSizeHide = 0;
-
-        //_should_display_ruler = OSTRUE;
-        this._shouldDisplayGraphics = true;
-        //_should_display_overlays = OSTRUE;
-        this._shouldDisplayDicom = true;
-
-        this._wannotationSet = null;
         
-        //_filter_type = 0;
-        
-        //_play_speed = 0.0;
-        //_play_base_time = -1;
-        //_play_offset = 0;
-
-        this._showScope = false;
-        this._scopeX = 0;
-        this._scopeY = 0;
-        this._scopeFactor = 4.0;
-        
-        //_show_scope = OSFALSE;
-        //_scope_x = 0;
-        //_scope_y = 0;
-        //_scope_factor = 4.0;
-
-        this._drawLocalizer = false;
-        this._wLocalizerStudy = null;
-        this._wLocalizerSeries = null;
-        this._localizerMat = new OsMatrix();
-        this._localizerSize = [0, 0];
-        
-        //_draw_target = OS_DRAW_TARGET_SCREEN;
-        //_draw_factor = 1.0;
-
-        //_target_ruler_font_size = 10.0;
-        //_printing_base_point = 0;
-        
-
-    //#ifdef OS_SHOW_RENDER2D_DOWNLOADING_INFO_WAIT
-        //_set_image_time = 0.0;
-    //#endif
-
-
-        this._dicomAnnotationBoxes = new Array<OsGraphicDicomAnnotationBox>(8);
-        for (let i=0; i<this._dicomAnnotationBoxes.length; i++) this._dicomAnnotationBoxes[i] = new OsGraphicDicomAnnotationBox();
-        //this._dicomAnnotations = new Array<OsGraphicRenderer2dDicomAnnotations>(8);
-        //for (let i=0; i<this._dicom_annotations.length; i++) this._dicom_annotations[i] = new os_graphic_renderer_2d_dicom_annotations();
         */
+
+    //_is_dirty = OSTRUE;
+
+    //this._preloaded = false;
+
+    _camera = OsGraphicCamera('');
+    _camera.setOrthographicMode(true);
+    _camera.setOrthoWidth(900);
+    _camera.pos[0] = 0.0;
+    _camera.pos[1] = 0.0;
+    _camera.pos[2] = 100.0;
+    _camera.setFarPlane(1000.0);
+    _camera.setNearPlane(0.01);
+    _camera.validateMatrix();
+
+    _rootItem = OsGraphicGroup("ROOT");
+    OsGraphicGroup grp = OsGraphicGroup("IMAGES");
+    grp.setParent(_rootItem);
+
+    _wimageGroup = WeakReference<OsGraphicGroup>(grp);
+
+    /*this._wannotationSet = null;
+    //_filter_type = 0;
+    //_target_ruler_font_size = 10.0;
+    //_printing_base_point = 0;
+    this._dicomAnnotationBoxes = new Array<OsGraphicDicomAnnotationBox>(8);
+    for (let i=0; i<this._dicomAnnotationBoxes.length; i++) this._dicomAnnotationBoxes[i] = new OsGraphicDicomAnnotationBox();
+    //this._dicomAnnotations = new Array<OsGraphicRenderer2dDicomAnnotations>(8);
+    //for (let i=0; i<this._dicom_annotations.length; i++) this._dicom_annotations[i] = new os_graphic_renderer_2d_dicom_annotations();
+    */
   }
 
-  /*protected _destroy():void {
-        super._destroy();
-        for (let i:number=0; i<this._warningMessages.length; i++) this._warningMessages[i].destroy();
-        this._warningMessages = [];
-        if (this._multiframePlayInfo) this._multiframePlayInfo.release();
-        this._multiframePlayInfo = null;
-        if (this._wtype) this._wtype.destroy();
-        this._wtype = null;
-        if (this._rootItem) this._rootItem.release();
-        //this._rootItem = null;
-        if (this._wannotationGroup) this._wannotationGroup.destroy();
-        this._wannotationGroup = null;
-        if (this._wimageGroup) this._wimageGroup.destroy();
-        this._wimageGroup = null;
-        if (this._wprimaryImg) this._wprimaryImg.destroy();
-        this._wprimaryImg = null;
-        if (this._wactiveImg) this._wactiveImg.destroy();
-        this._wactiveImg = null;
-        if (this._wannotationSet) this._wannotationSet.destroy();
-        this._wannotationSet = null;
-        if (this._camera) this._camera.release();
-        //this._camera = null;
-        this._info.destroy();
+  void setInitialized() {
+    _initialized = true;
+  }
 
-        for (let i=0; i<this._dicomAnnotationBoxes.length; i++) this._dicomAnnotationBoxes[i].reset();
-        this._dicomAnnotationBoxes = new Array<OsGraphicDicomAnnotationBox>(8);
-        //for (let i=0; i<this._dicom_annotations.length; i++) 
-            //this._dicom_annotations[i].will_destroy();
-        //this._dicom_annotations = new Array<os_graphic_renderer_2d_dicom_annotations>();
+  @override
+  bool isInitialized() {
+    return _initialized;
+  }
 
+  //-----------------------------------------------------------------------
+  //clone
+  //-----------------------------------------------------------------------
+  @override
+  OsRenderer? clone() {
+    OsRendererType? renderType = type;
+    if (renderType == null) return null;
+    OsRenderer2D? copy;
+    copy = OsRenderer2D(renderType);
+    /*for (let i=0; i<2; i++) {
+      copy._fontInfo[i].name = this._fontInfo[i].name;
+      copy._fontInfo[i].size = this._fontInfo[i].size;
+      copy._fontInfo[i].color = this._fontInfo[i].color;
     }*/
+    copy._camera.copyProperties(_camera);
 
-  /*public setInitialized():void {
-        this._initialized = true;
+    copy._backCol[0] = _backCol[0];
+    copy._backCol[1] = _backCol[1];
+    copy._backCol[2] = _backCol[2];
+    copy._backCol[3] = _backCol[3];
+
+    copy._selCol[0] = _selCol[0];
+    copy._selCol[1] = _selCol[1];
+    copy._selCol[2] = _selCol[2];
+    copy._selCol[3] = _selCol[3];
+
+    copy._keyCol[0] = _keyCol[0];
+    copy._keyCol[1] = _keyCol[1];
+    copy._keyCol[2] = _keyCol[2];
+    copy._keyCol[3] = _keyCol[3];
+
+    copy._selected = _selected;
+    copy._hidden = _hidden;
+
+    copy._isKey = _isKey;
+    copy._filterType = _filterType;
+    //copy._printing_base_point = _printing_base_point;
+    //copy._preloaded = this._preloaded;
+
+    copy._shouldAutoHideAnnotations = _shouldAutoHideAnnotations;
+    copy._shouldDisplayRuler = _shouldDisplayRuler;
+    copy._shouldDisplayGraphics = _shouldDisplayGraphics;
+    copy._shouldDisplayOverlays = _shouldDisplayOverlays;
+    copy._shouldDisplayDicom = _shouldDisplayDicom;
+    /*let set:OsDbAnnotationSet|null = null;
+    if(this._wannotationSet != null){
+        set = <OsDbAnnotationSet>this._wannotationSet.lock(false);
+        if (set != null){
+            if(copy._wannotationSet != null) copy._wannotationSet.destroy();
+            copy._wannotationSet = set.getWeakObject();
+        }
+    }*/
+    copy._playSpeed = _playSpeed;
+    //copy._play_offset = _play_offset;
+
+    List<OsGraphicItem> list = copy._rootItem.getChildren();
+    while (list.isNotEmpty) {
+      list[0].setParent(null);
     }
 
-    public isInitialized():boolean {
-        return this._initialized;
+    list = _rootItem.getChildren();
+
+    for (int i = 0; i < list.length; i++) {
+      OsGraphicItem? item2 = cloneItem(list[i]);
+      item2?.setParent(copy._rootItem);
     }
 
-    //-----------------------------------------------------------------------
-    //clone
-    //-----------------------------------------------------------------------
-    public clone():OsRenderer|null {
-    
-        let copy:OsRenderer2D|null = null;
-        let type:OsRendererType|null = this._wtype?<OsRendererType>this._wtype.lock(false):null;
-        if (type) {
-            copy = new OsRenderer2D(type);
-            for (let i=0; i<2; i++) {
-                copy._fontInfo[i].name = this._fontInfo[i].name;
-                copy._fontInfo[i].size = this._fontInfo[i].size;
-                copy._fontInfo[i].color = this._fontInfo[i].color;
-            }
-            copy._camera.copyProperties(this._camera);
-
-            copy._backCol[0] = this._backCol[0];
-            copy._backCol[1] = this._backCol[1];
-            copy._backCol[2] = this._backCol[2];
-            copy._backCol[3] = this._backCol[3];
-
-            copy._selCol[0] = this._selCol[0];
-            copy._selCol[1] = this._selCol[1];
-            copy._selCol[2] = this._selCol[2];
-            copy._selCol[3] = this._selCol[3];
-            
-            copy._keyCol[0] = this._keyCol[0];
-            copy._keyCol[1] = this._keyCol[1];
-            copy._keyCol[2] = this._keyCol[2];
-            copy._keyCol[3] = this._keyCol[3];
-
-            copy._selected = this._selected;
-            copy._hidden = this._hidden;	
-            //copy._non_image = _non_image;
-            copy._isKey = this._isKey;
-            copy._filterType = this._filterType;
-            //copy._printing_base_point = _printing_base_point;
-            //copy._preloaded = this._preloaded;
-
-            copy._shouldAutoHideAnnotations = this._shouldAutoHideAnnotations;
-            copy._shouldDisplayRuler = this._shouldDisplayRuler;
-            copy._shouldDisplayGraphics = this._shouldDisplayGraphics;
-            //copy._should_display_overlays = _should_display_overlays;
-            copy._shouldDisplayDicom = this._shouldDisplayDicom;
-            let set:OsDbAnnotationSet|null = null;
-            if(this._wannotationSet != null){
-                set = <OsDbAnnotationSet>this._wannotationSet.lock(false);
-                if (set != null){
-                    if(copy._wannotationSet != null) copy._wannotationSet.destroy();
-                    copy._wannotationSet = set.getWeakObject();
-                }
-            }
-            //copy._play_speed = _play_speed;
-            //copy._play_offset = _play_offset;
-
-            let list:OsGraphicItem[] = copy._rootItem.getChildren();
-            //for(let i = 0;i < list.length; i++){
-            while (list.length != 0) {
-
-                list[0].setParent(null);
-                //onis::graphics::item_ptr item = list->front();
-                //item->set_parent(onis::graphics::item_ptr());
-
-            }
-
-            list = this._rootItem.getChildren();
-            //onis::graphics::item_list::const_iterator it;
-            //for (it = list->begin(); it != list->end(); it++) {
-            for(let i = 0;i < list.length; i++){
-                let item2:OsGraphicItem|null = this.cloneItem(list[i]);
-                if (item2 != null){
-                     item2.setParent(copy._rootItem);
-                     item2.release();
-                }
-
-            }
-
-            let list1:OsGraphicItem[] = [];
-            let list2:OsGraphicItem[] = [];
-            this._rootItem.getChildrenByType(list1, OS_RENDERITEM_TYPE.OS_IMAGE_ITEM, false);
-            copy._rootItem.getChildrenByType(list2, OS_RENDERITEM_TYPE.OS_IMAGE_ITEM, false);
-            let viewer:Viewer|null = type?type.getViewer():null;
+    List<OsGraphicItem> list1 = [];
+    List<OsGraphicItem> list2 = [];
+    _rootItem.getChildrenByType(list1, OsRenderItemType.osImageItem, false);
+    _rootItem.getChildrenByType(list2, OsRenderItemType.osImageItem, false);
+    /* let viewer:Viewer|null = type?type.getViewer():null;
             if(viewer){
                 let manager:OsGraphicManager = viewer.getGraphicManager();
 
@@ -397,43 +337,22 @@ class OsRenderer2D extends OsRenderer {
             //copy._draw_target = _draw_target;
             //copy._draw_factor = _draw_factor;
             copy._saveFitCameraWidth = this._saveFitCameraWidth;
-            copy._saveFitCameraRot = this._saveFitCameraRot;
+            copy._saveFitCameraRot = this._saveFitCameraRot;*/
 
-        }
-        return copy;
+    return copy;
+  }
 
+  OsGraphicItem? cloneItem(OsGraphicItem from) {
+    OsGraphicItem? copy = from.clone();
+    List<OsGraphicItem> list = from.getChildren();
+    for (int i = 0; i < list.length; i++) {
+      OsGraphicItem? item2 = cloneItem(list[i]);
+      if (item2 != null) {
+        item2.setParent(copy);
+      }
     }
-
-    public cloneItem(from:OsGraphicItem):OsGraphicItem|null {
-
-        let copy:OsGraphicItem|null = from.clone();
-        let list:OsGraphicItem[] = from.getChildren();
-        if (list != null) {
-
-            for(let i = 0;i < list.length; i++) {
-            //onis::graphics::item_list::const_iterator it;
-            //for (it = list->begin(); it != list->end(); it++) {
-
-                let  item2:OsGraphicItem|null  = this.cloneItem(list[i]);
-                if (item2 != null){
-                     item2.setParent(copy);
-                     item2.release();
-                }
-
-            }
-
-        }
-        return copy;
-
-    }
-
-    //-----------------------------------------------------------------------
-    //type
-    //-----------------------------------------------------------------------
-
-    public getType():OsRendererType|null { 
-        return this._wtype ? <OsRendererType>this._wtype.lock(false) : null;
-    }*/
+    return copy;
+  }
 
   //-----------------------------------------------------------------------
   //visibility
@@ -473,378 +392,370 @@ class OsRenderer2D extends OsRenderer {
             this._fontInfo[target].size = size;
             this._fontInfo[target].color = color;
         }
-    }
-
-    //-----------------------------------------------------------------------
-    //key
-    //-----------------------------------------------------------------------
-
-    public isKey(status:[number]|null=null):boolean { 
-        if (status != null) status[0] = this._keyStatus;
-        return this._isKey; 
-    }
-    
-    public setKey(value:boolean, status:number = 1):void {
-        this._keyStatus = status;
-        this._isKey = value;
-    }
-
-    //-----------------------------------------------------------------------
-    //color lut
-    //-----------------------------------------------------------------------
-    public setColorLut(preset:OsDbColorLut|null):void {
-        let item:OsGraphicImage|null = this.getPrimaryImageItem(false);
-        if (item) item.setColorLut(preset);
-    }
-
-    public getColorLut():OsDbColorLut|null {
-        let item:OsGraphicImage|null = this.getPrimaryImageItem(false);
-        if (item) return item.getColorLut();
-        else return null;
-    }
-
-
-    //-----------------------------------------------------------------------
-    //opacity table
-    //-----------------------------------------------------------------------
-    public setOpacityTable(table:OsDbOpacityTable|null):void {
-        let item:OsGraphicImage|null = this.getPrimaryImageItem(false);
-        if (item) item.setOpacityTable(table);
-    }
-
-    public getOpacityTable():OsDbOpacityTable|null {
-        let item:OsGraphicImage|null = this.getPrimaryImageItem(false);
-        if (item) return item.getOpacityTable();
-        else return null;
-    }
-
-    //-----------------------------------------------------------------------
-    //window level
-    //-----------------------------------------------------------------------
-    public setWindowLevel(preset:OsDbWindowLevel|null, resetOriginal:boolean):void {
-        let item:OsGraphicImage|null = this.getPrimaryImageItem(false);
-        if (item) item.setWindowLevel(preset, resetOriginal);
-    }
-
-    public setWindowLevelValues(center:number, width:number):void {
-        let item:OsGraphicImage|null = this.getPrimaryImageItem(false);
-        if (item) item.setWindowLevelValues(center, width);
-    }
-
-    public getWindowLevel():OsDbWindowLevel|null {
-        let item:OsGraphicImage|null = this.getPrimaryImageItem(false);
-        if (item) return item.getWindowLevel();
-        else return null;
-    }
-
-    public getWindowLevelValues(values:[number, number]):boolean { //center, width
-        let item:OsGraphicImage|null = this.getPrimaryImageItem(false);
-        if (item) return item.getWindowLevelValues(values);
-        else return false;
-    }
-
-    //-----------------------------------------------------------------------
-    //convolution filter
-    //-----------------------------------------------------------------------
-    public setConvolutionFilter(preset:OsDbConvolutionFilter|null):void {
-        let item:OsGraphicImage|null = this.getPrimaryImageItem(false);
-        if (item) item.setConvolutionFilter(preset);
-    }
-
-    public getConvolutionFilter():OsDbConvolutionFilter|null {
-        let item:OsGraphicImage|null = this.getPrimaryImageItem(false);
-        if (item) return item.getConvolutionFilter();
-        return null;
-    }
-
-    //-----------------------------------------------------------------------
-    //camera
-    //-----------------------------------------------------------------------
-    public getCamera():OsGraphicCamera { 
-        return this._camera; 
-    }
-    
-    public fitCamera(cx:number, cy:number):boolean { 
-        let item:OsGraphicImage|null = this.getPrimaryImageItem(false);
-        if (item) {
-            let realSize:[number, number] = [0, 0];
-            if (this._calculateRealVisibleSizeAfterTransformation(item, realSize)) {
-                let size:[number, number] = [0, 0];
-                if (cx > cy) {
-                    //fit on Y Axis:
-                    size[1] = realSize[1];
-                    size[0] = (cx * size[1]) / cy;
-                    if (size[0] < realSize[0]) { //fit on X axis
-                        size[0] = realSize[0];
-                        size[1] = (cy * size[0]) / cx;
-                    }
-                }
-                else {
-                    //fit in X Axis:
-                    size[0] = realSize[0];
-                    size[1] = (cy * size[0]) / cx;
-                    if (size[1] < realSize[1]) { //fit on Y axis
-                        size[1] = realSize[1];
-                        size[0] = (cx * size[1]) / cy;
-                    }
-                }
-                this._camera.pos[0] = 0.0;
-                this._camera.pos[1] = 0.0;
-                this._camera.pos[2] = 100.0;
-                this._camera.rot[0] = 0.0;
-                this._camera.rot[1] = 0.0;
-                this._camera.validateMatrix();
-                this._camera.setOrthoWidth(size[0]);
-                this._saveFitCameraRot = this._camera.rot[2];
-                this._saveFitCameraWidth = this._camera.getOrthoWidth();
-                return true;
-            }
-            
-        }
-        return false; 
-    } 
-
-    public scaleCameraToOriginal(cx:number, cy:number):boolean { 
-        let item:OsGraphicImage|null = this.getPrimaryImageItem(false);
-        let image:OsOpenedImage|null = item ? item.getImage() : null;
-        let frame:OsDicomFrame|null = item ? item.getFrame(item.getCurrentFrame()):null;
-        if (image != null) {
-            let cameraValid:boolean = false;
-            let orthoWidth:number = 0;
-            //get the real size of the image:
-            let imageSize:[number, number] = [0, 0];
-            let realSize:[number, number] = [0, 0];
-            if (frame == null) image.getDimensions33(imageSize);
-            else frame.getDimensions(imageSize);
-            realSize[0] = imageSize[0];
-            realSize[1] = imageSize[1];
-            let region:OsImageRegion|null = null;
-            let regions:OsImageRegion[] = [];
-            if (frame == null) {
-                let regionInfo:OsImageRegionInfo|null = image.getRegionInfo();
-                if (regionInfo != null) {
-                    for (let i=0; i<regionInfo.regions.length; i++) 
-                        regions.push(regionInfo.regions[i]);
-                }
-            }
-            else image.getRegionsForFrame(frame, regions);
-            if (regions.length == 1) {
-                let tmp:OsImageRegion = regions[0];
-                if (tmp.x0 == 0 && tmp.y0 == 0 && tmp.x1 == imageSize[0]-1 && tmp.y1 == imageSize[1]-1) 
-                    if (tmp.spatialFormat == OS_RSF.TWO_DIM)
-                        if (tmp.calibratedUnit[0] == tmp.calibratedUnit[1])
-                            if (tmp.calibratedUnit[0] == OS_UNIT.CM || tmp.calibratedUnit[0] == OS_UNIT.NONE) 
-                                region = tmp;
-                                    
-            }
-            if (region != null) {
-                realSize[0] *= Math.abs(region.calibratedSpacing[0]);
-                realSize[1] *= Math.abs(region.calibratedSpacing[1]);
-            }
-            let pixelSpacing:[number, number] = [1, 1];
-            if (region != null) {
-                pixelSpacing[0] = realSize[0] / imageSize[0];
-                pixelSpacing[1] = realSize[1] / imageSize[1];
-            }
-            else {
-                pixelSpacing[0] = 1.0;
-                pixelSpacing[1] = 1.0;
-            }
-            if (pixelSpacing[0] >= pixelSpacing[1]) {
-                if (cx) {
-                    orthoWidth = cx * pixelSpacing[0];
-                    cameraValid = true;
-                }
-            }
-            else {
-                if (cy) {
-                    let tmp:number = cy*pixelSpacing[1];
-                    orthoWidth = cx*tmp/cy;
-                    cameraValid = true;
-                }
-            }
-            if (cameraValid) {
-                this._camera.pos[0] = 0.0;
-                this._camera.pos[1] = 0.0;
-                this._camera.pos[2] = 100.0;
-                this._camera.rot[0] = 0.0;
-                this._camera.rot[1] = 0.0;
-                this._camera.setOrthoWidth(orthoWidth);
-                this._camera.validateMatrix();
-                return true;
-            }
-        }
-        return false;    
-    }
-
-
-    public scaleCameraToRealSize(cm:number, cx:number, cy:number, reset:boolean):boolean { 
-        if (this._camera != null) {
-            if (reset) {
-                this._camera.pos[0] = this._camera.pos[1] = this._camera.pos[2] = 0;
-                this._camera.rot[0] = this._camera.rot[1] = this._camera.rot[2] = 0;
-                this._camera.sca[0] = this._camera.sca[1] = this._camera.sca[2] = 1.0;
-            }
-            this._camera.setOrthoWidth(cm);
-            this._camera.validateMatrix();
-            return true;
-        }
-        return false;
-    }
-
-    public isFitCamera():boolean { 
-        if (this._camera != null && this._saveFitCameraWidth != Number.MAX_VALUE) {
-            if (this.sameF64(this._camera.pos[0], 0.0) &&
-                this.sameF64(this._camera.pos[1], 0.0) &&
-                this.sameF64(this._camera.pos[2], 100.0) &&
-                this.sameF64(this._camera.rot[0], 0.0) &&
-                this.sameF64(this._camera.rot[1], 0.0) &&
-                this.sameF64(this._camera.rot[2], this._saveFitCameraRot) &&
-                this.sameF64(this._camera.getOrthoWidth(), this._saveFitCameraWidth)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    public resetCamera(cx:number, cy:number):boolean { 
-        if (this._camera != null) {
-            this._camera.rot[0] = this._camera.rot[1] = this._camera.rot[2] = 0;
-            this._camera.sca[0] = this._camera.sca[1] = this._camera.sca[2] = 1.0;
-            this._camera.validateMatrix();
-        }
-        return this.fitCamera(cx, cy);    
-    }
-
-    //-----------------------------------------------------------------------
-    //scope
-    //-----------------------------------------------------------------------
-    public showScope(x:number, y:number) {
-        this._showScope = true;
-	    this._scopeX = x;
-	    this._scopeY = y;
-    }
-
-    public hideScope():void {
-        this._showScope = false;
-    }
-
-    public isScopeHidden():boolean { 
-        return !this._showScope;
-    }
-
-    public setScopeFactor(factor:number):void {
-        this._scopeFactor = factor;
-    }
-
-    public getScopeFactor():number { 
-        return this._scopeFactor;
-    }
-
-    //-----------------------------------------------------------------------
-    //render items
-    //-----------------------------------------------------------------------
-    public getImageItems(list:Array<OsGraphicImage>):void { 
-        let grp:OsGraphicGroup|null = this.getImageGroupItem(false);
-	    if (grp) grp.getChildrenByType(list, OS_RENDERITEM_TYPE.OS_IMAGE_ITEM, true);
-        
-    }
-
-    public getActiveImageItem(retain:boolean):OsGraphicImage|null { 
-        return this._wactiveImg ? <OsGraphicImage>this._wactiveImg.lock(retain) : null;
-    }
-
-    public getPrimaryImageItem(retain:boolean):OsGraphicImage|null { 
-        return this._wprimaryImg ? <OsGraphicImage>this._wprimaryImg.lock(retain) : null;
-    }
-
-    public getRootItem(retain:boolean):OsGraphicGroup|null { 
-        if (retain && this._rootItem) this._rootItem.retain();
-        return this._rootItem;
-    }
-
-    public getImageGroupItem(retain:boolean):OsGraphicGroup|null { 
-        return this._wimageGroup ? <OsGraphicGroup>this._wimageGroup.lock(retain) : null;
-    }
-
-    public getAnnotationGroupItem(retain:boolean):OsGraphicGroup|null { 
-        return this._wannotationGroup ? <OsGraphicGroup>this._wannotationGroup.lock(retain) : null;
-    }
-
-    public setPrimaryImageItem(img:OsGraphicImage) {
-        if (this._wprimaryImg) this._wprimaryImg.destroy();
-        this._wprimaryImg = img ? img.getWeakObject() : null;
-//#ifdef OS_SHOW_RENDER2D_DOWNLOADING_INFO_WAIT
-//	_set_image_time = _app->get_time();
-//#endif
-    }
-
-    public setActiveImageItem(img:OsGraphicImage) {
-        if (this._wactiveImg) this._wactiveImg.destroy();
-        this._wactiveImg = img ? img.getWeakObject() : null;
-    }
-
-    //-----------------------------------------------------------------------
-    //loaded
-    //-----------------------------------------------------------------------
-
-    public setPreloaded(value:boolean):void {
-        this._preloaded = value;
-    }
-
-    public isPreloaded():boolean { 
-        return this._preloaded;
-    }
-
-    public checkPreloaded():boolean { 
-        let ret:boolean = false;
-        let img:OsGraphicImage|null = this.getPrimaryImageItem(false);
-        if (img) {
-            if (!img.getFrame(0)) {
-                if (this._preloaded) {
-                    this._preloaded = false;
-                    ret = true;
-                }
-            }
-            else {
-                if (!this._preloaded) {
-                    this._preloaded = true;
-                    ret = true;
-                }
-            }
-        }
-        return ret;
-    }
-
-    //-----------------------------------------------------------------------
-    //localizer
-    //-----------------------------------------------------------------------
-
-    public setShouldDrawLocalizer(draw:boolean, study:OsOpenedStudy|null, series:OsOpenedSeries|null, mat:OsMatrix|null, dimensions:number[]|null):boolean {
-        let ret:boolean = false;
-        if (this._drawLocalizer != draw) ret = true;
-        if (!ret && draw && mat) {
-            if (!this._wLocalizerStudy || this._wLocalizerStudy.lock(false) !== study) ret = true;
-            if (!this._wLocalizerSeries || this._wLocalizerSeries.lock(false) !== series) ret = true;
-            if (!this._localizerMat.isEqual(mat)) ret = true;
-            if (dimensions == null) ret = true;
-            else {
-                if (this._localizerSize[0] = dimensions[0]) ret = true;
-                if (this._localizerSize[1] = dimensions[1]) ret = true;
-            }
-        }
-        this._drawLocalizer = draw;
-        if (this._wLocalizerStudy) this._wLocalizerStudy.destroy();
-        this._wLocalizerStudy = study?study.getWeakObject():null;
-        if (this._wLocalizerSeries) this._wLocalizerSeries.destroy();
-        this._wLocalizerSeries = series?series.getWeakObject():null;
-        if (mat) this._localizerMat.copyFrom(mat);
-        if (dimensions != null) {
-            this._localizerSize[0] = dimensions[0];
-            this._localizerSize[1] = dimensions[1];
-        }
-        return ret;
     }*/
+
+  //-----------------------------------------------------------------------
+  //key
+  //-----------------------------------------------------------------------
+
+  bool isKey() {
+    return _isKey;
+  }
+
+  void setKey(bool value) {
+    _isKey = value;
+  }
+
+  //-----------------------------------------------------------------------
+  //color lut
+  //-----------------------------------------------------------------------
+
+  void setColorLut(ColorLut? preset) {
+    OsGraphicImage? item = getPrimaryImageItem();
+    item?.setColorLut(preset);
+  }
+
+  ColorLut? getColorLut() {
+    OsGraphicImage? item = getPrimaryImageItem();
+    return item?.getColorLut();
+  }
+
+  //-----------------------------------------------------------------------
+  //opacity table
+  //-----------------------------------------------------------------------
+
+  void setOpacityTable(OpacityTable? table) {
+    OsGraphicImage? item = getPrimaryImageItem();
+    item?.setOpacityTable(table);
+  }
+
+  OpacityTable? getOpacityTable() {
+    OsGraphicImage? item = getPrimaryImageItem();
+    return item?.getOpacityTable();
+  }
+
+  //-----------------------------------------------------------------------
+  //window level
+  //-----------------------------------------------------------------------
+
+  void setWindowLevel(WindowLevel? preset, bool resetOriginal) {
+    OsGraphicImage? item = getPrimaryImageItem();
+    item?.setWindowLevel(preset, resetOriginal);
+  }
+
+  void setWindowLevelValues(double center, double width) {
+    OsGraphicImage? item = getPrimaryImageItem();
+    item?.setWindowLevelValues(center, width);
+  }
+
+  WindowLevel? getWindowLevel() {
+    OsGraphicImage? item = getPrimaryImageItem();
+    return item?.getWindowLevel();
+  }
+
+  ({double center, double width})? getWindowLevelValues() {
+    OsGraphicImage? item = getPrimaryImageItem();
+    return item?.getWindowLevelValues();
+  }
+
+  //-----------------------------------------------------------------------
+  //convolution filter
+  //-----------------------------------------------------------------------
+
+  void setConvolutionFilter(ConvolutionFilter? preset) {
+    OsGraphicImage? item = getPrimaryImageItem();
+    item?.setConvolutionFilter(preset);
+  }
+
+  ConvolutionFilter? getConvolutionFilter() {
+    OsGraphicImage? item = getPrimaryImageItem();
+    return item?.getConvolutionFilter();
+  }
+
+  //-----------------------------------------------------------------------
+  //camera
+  //-----------------------------------------------------------------------
+
+  OsGraphicCamera getCamera() {
+    return _camera;
+  }
+
+  bool fitCamera(double cx, double cy) {
+    OsGraphicImage? item = getPrimaryImageItem();
+    if (item == null) return false;
+
+    final List<double> realSize = [0, 0];
+    if (!_calculateRealVisibleSizeAfterTransformation(item, realSize)) {
+      return false;
+    }
+    final List<double> size = [0, 0];
+    if (cx > cy) {
+      //fit on Y Axis:
+      size[1] = realSize[1];
+      size[0] = (cx * size[1]) / cy;
+      if (size[0] < realSize[0]) {
+        //fit on X axis
+        size[0] = realSize[0];
+        size[1] = (cy * size[0]) / cx;
+      }
+    } else {
+      //fit in X Axis:
+      size[0] = realSize[0];
+      size[1] = (cy * size[0]) / cx;
+      if (size[1] < realSize[1]) {
+        //fit on Y axis
+        size[1] = realSize[1];
+        size[0] = (cx * size[1]) / cy;
+      }
+    }
+    _camera.pos[0] = 0.0;
+    _camera.pos[1] = 0.0;
+    _camera.pos[2] = 100.0;
+    _camera.rot[0] = 0.0;
+    _camera.rot[1] = 0.0;
+    _camera.validateMatrix();
+    _camera.setOrthoWidth(size[0]);
+    _saveFitCameraRot = _camera.rot[2];
+    _saveFitCameraWidth = _camera.getOrthoWidth();
+    return true;
+  }
+
+  bool scaleCameraToOriginal(double cx, double cy) {
+    OsGraphicImage? item = getPrimaryImageItem();
+    entities.Image? image = item?.getImage();
+    DicomFrame? frame = item?.getFrame(item.getCurrentFrame());
+    if (image == null) return false;
+    bool cameraValid = false;
+    double orthoWidth = 0;
+    //get the real size of the image:
+    (int, int)? imageSize =
+        frame == null ? image.getDimensions33() : frame.getDimensions();
+    if (imageSize == null) return false;
+    (double, double) realSize =
+        (imageSize.$1.toDouble(), imageSize.$2.toDouble());
+
+    ImageRegion? region;
+    List<ImageRegion> regions = [];
+    if (frame == null) {
+      ImageRegionInfo? regionInfo = image.getRegionInfo();
+      if (regionInfo != null) {
+        for (ImageRegion region in regionInfo.regions) {
+          regions.add(region);
+        }
+      }
+    } else {
+      image.getRegionsForFrame(frame, regions);
+    }
+    if (regions.length == 1) {
+      ImageRegion tmp = regions[0];
+      if (tmp.x0 == 0 &&
+          tmp.y0 == 0 &&
+          tmp.x1 == imageSize.$1 - 1 &&
+          tmp.y1 == imageSize.$2 - 1 &&
+          tmp.spatialFormat == OsRsf.twoDim &&
+          tmp.calibratedUnit[0] == tmp.calibratedUnit[1]) {
+        if (tmp.calibratedUnit[0] == OsUnit.cm ||
+            tmp.calibratedUnit[0] == OsUnit.none) {
+          region = tmp;
+        }
+      }
+    }
+
+    if (region != null) {
+      realSize = (
+        realSize.$1 * region.calibratedSpacing[0].abs(),
+        realSize.$2 * region.calibratedSpacing[1].abs()
+      );
+    }
+
+    List<double> pixelSpacing = [1.0, 1.0];
+    if (region != null) {
+      pixelSpacing[0] = realSize.$1 / imageSize.$1;
+      pixelSpacing[1] = realSize.$2 / imageSize.$2;
+    } else {
+      pixelSpacing[0] = 1.0;
+      pixelSpacing[1] = 1.0;
+    }
+    if (pixelSpacing[0] >= pixelSpacing[1]) {
+      if (cx != 0) {
+        orthoWidth = cx * pixelSpacing[0];
+        cameraValid = true;
+      }
+    } else {
+      if (cy != 0) {
+        double tmp = cy * pixelSpacing[1];
+        orthoWidth = cx * tmp / cy;
+        cameraValid = true;
+      }
+    }
+    if (!cameraValid) return false;
+    _camera.pos[0] = 0.0;
+    _camera.pos[1] = 0.0;
+    _camera.pos[2] = 100.0;
+    _camera.rot[0] = 0.0;
+    _camera.rot[1] = 0.0;
+    _camera.setOrthoWidth(orthoWidth);
+    _camera.validateMatrix();
+    return true;
+  }
+
+  void scaleCameraToRealSize(double cm, double cx, double cy, bool reset) {
+    if (reset) {
+      _camera.pos[0] = _camera.pos[1] = _camera.pos[2] = 0;
+      _camera.rot[0] = _camera.rot[1] = _camera.rot[2] = 0;
+      _camera.sca[0] = _camera.sca[1] = _camera.sca[2] = 1.0;
+    }
+    _camera.setOrthoWidth(cm);
+    _camera.validateMatrix();
+  }
+
+  bool isFitCamera() {
+    if (_saveFitCameraWidth != double.infinity) {
+      if (sameF64(_camera.pos[0], 0.0) &&
+          sameF64(_camera.pos[1], 0.0) &&
+          sameF64(_camera.pos[2], 100.0) &&
+          sameF64(_camera.rot[0], 0.0) &&
+          sameF64(_camera.rot[1], 0.0) &&
+          sameF64(_camera.rot[2], _saveFitCameraRot) &&
+          sameF64(_camera.getOrthoWidth(), _saveFitCameraWidth)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  bool resetCamera(double cx, double cy) {
+    _camera.rot[0] = _camera.rot[1] = _camera.rot[2] = 0;
+    _camera.sca[0] = _camera.sca[1] = _camera.sca[2] = 1.0;
+    _camera.validateMatrix();
+    return fitCamera(cx, cy);
+  }
+
+  //-----------------------------------------------------------------------
+  //scope
+  //-----------------------------------------------------------------------
+
+  void showScope(double x, double y) {
+    _showScope = true;
+    _scopeX = x;
+    _scopeY = y;
+  }
+
+  void hideScope() {
+    _showScope = false;
+  }
+
+  bool isScopeHidden() {
+    return !_showScope;
+  }
+
+  void setScopeFactor(double factor) {
+    _scopeFactor = factor;
+  }
+
+  double getScopeFactor() {
+    return _scopeFactor;
+  }
+
+  //-----------------------------------------------------------------------
+  //render items
+  //-----------------------------------------------------------------------
+  void getImageItems(List<OsGraphicImage> list) {
+    OsGraphicGroup? grp = getImageGroupItem();
+    grp?.getChildrenByType(list, OsRenderItemType.osImageItem, true);
+  }
+
+  OsGraphicImage? getActiveImageItem() {
+    return _wactiveImg?.target;
+  }
+
+  @override
+  OsGraphicImage? getPrimaryImageItem() {
+    return _wprimaryImg?.target;
+  }
+
+  OsGraphicGroup getRootItem() {
+    return _rootItem;
+  }
+
+  OsGraphicGroup? getImageGroupItem() {
+    return _wimageGroup?.target;
+  }
+
+  OsGraphicGroup? getAnnotationGroupItem() {
+    return _wannotationGroup?.target;
+  }
+
+  void setPrimaryImageItem(OsGraphicImage? img) {
+    _wprimaryImg = img != null ? WeakReference<OsGraphicImage>(img) : null;
+  }
+
+  void setActiveImageItem(OsGraphicImage? img) {
+    _wactiveImg = img != null ? WeakReference<OsGraphicImage>(img) : null;
+  }
+
+  //-----------------------------------------------------------------------
+  //loaded
+  //-----------------------------------------------------------------------
+
+  void setPreloaded(bool value) {
+    _preloaded = value;
+  }
+
+  bool isPreloaded() {
+    return _preloaded;
+  }
+
+  bool checkPreloaded() {
+    bool ret = false;
+    OsGraphicImage? img = getPrimaryImageItem();
+    if (img != null) {
+      if (img.getFrame(0) == null) {
+        if (_preloaded) {
+          _preloaded = false;
+          ret = true;
+        }
+      } else {
+        if (!_preloaded) {
+          _preloaded = true;
+          ret = true;
+        }
+      }
+    }
+    return ret;
+  }
+
+  //-----------------------------------------------------------------------
+  //localizer
+  //-----------------------------------------------------------------------
+
+  bool setShouldDrawLocalizer(bool draw, entities.Study? study,
+      entities.Series? series, OsMatrix? mat, List<double>? dimensions) {
+    bool ret = false;
+    if (_drawLocalizer != draw) ret = true;
+    if (!ret && draw && mat != null) {
+      if (_wLocalizerStudy == null ||
+          _wLocalizerStudy?.target != study ||
+          _wLocalizerSeries == null ||
+          _wLocalizerSeries?.target != series ||
+          dimensions == null ||
+          _localizerSize[0] != dimensions[0] ||
+          _localizerSize[1] != dimensions[1]) {
+        ret = true;
+      }
+    }
+    _drawLocalizer = draw;
+    _wLocalizerStudy =
+        study != null ? WeakReference<entities.Study>(study) : null;
+    _wLocalizerSeries =
+        series != null ? WeakReference<entities.Series>(series) : null;
+    if (mat != null) _localizerMat.copyFrom(mat);
+    if (dimensions != null) {
+      _localizerSize[0] = dimensions[0];
+      _localizerSize[1] = dimensions[1];
+    }
+    return ret;
+  }
 
   //-----------------------------------------------------------------------
   //draw
@@ -852,32 +763,28 @@ class OsRenderer2D extends OsRenderer {
 
   @override
   void willDraw(OsWillDrawInfo info) {
-    /*if (!this._camera) return;
-        this._autoSizeHide = 0;
-        if (this._shouldAutoHideAnnotations) {
-          
-        }
-    
-        //if (image != null) image.showAllOverlays(this._shouldDisplayOverlays);
-
-        if (this._saveFitCameraWidth != Number.MAX_VALUE) {
-            if (this.sameF64(this._camera.pos[0], 0.0) &&
-                this.sameF64(this._camera.pos[1], 0.0) &&
-                this.sameF64(this._camera.pos[2], 100.0) &&
-                this.sameF64(this._camera.rot[0], 0.0) &&
-                this.sameF64(this._camera.rot[1], 0.0) &&
-                this.sameF64(this._camera.rot[2], this._saveFitCameraRot) &&
-                this.sameF64(this._camera.getOrthoWidth(), this._saveFitCameraWidth)) {
-                //we fit the camera!
-                this.fitCamera(info.viewport[2], info.viewport[3]);
-            }
-        }
-
-        this._info.render = this;
-        if (this._rootItem) this._rootItem.willDraw(info, true);
-
+    /*_autoSizeHide = 0;
+      if (_shouldAutoHideAnnotations) {
         
-        let imageItems:OsGraphicImage[] = [];
+      }*/
+
+    if (_saveFitCameraWidth != double.infinity) {
+      if (sameF64(_camera.pos[0], 0.0) &&
+          sameF64(_camera.pos[1], 0.0) &&
+          sameF64(_camera.pos[2], 100.0) &&
+          sameF64(_camera.rot[0], 0.0) &&
+          sameF64(_camera.rot[1], 0.0) &&
+          sameF64(_camera.rot[2], _saveFitCameraRot) &&
+          sameF64(_camera.getOrthoWidth(), _saveFitCameraWidth)) {
+        //we fit the camera!
+        fitCamera(info.viewport[2], info.viewport[3]);
+      }
+    }
+
+    _info.render = this;
+    _rootItem.willDraw(info, true);
+
+    /*let imageItems:OsGraphicImage[] = [];
         this.getImageItems(imageItems);
         
 
@@ -1019,83 +926,89 @@ class OsRenderer2D extends OsRenderer {
 
     
         //will_draw_streaming_information(info);
-        this.willDrawDicomAnnotations(info);
-        this.willDrawWarningMessages(info);
-        this.willDrawRuler(info);
-        this.willDrawMovieController(info);
-        
-        this._info.render = null*/
+        this.willDrawDicomAnnotations(info);*/
+    willDrawWarningMessages(info);
+    /*this.willDrawRuler(info);
+        this.willDrawMovieController(info);*/
+
+    _info.render = null;
   }
 
   /*public willDrawMovieController(info:OsWillDrawInfo):void {
         if (this._movieToolbar)
             if (this._movieToolbar.visible) 
                 this._movieToolbar.willDraw(info, true);
+    }*/
+
+  void willDrawWarningMessages(OsWillDrawInfo info) {
+    if (info.context == null) return;
+    OsGraphicImage? img = getPrimaryImageItem();
+    if (img != null) {
+      removeWarningMessage("", img);
+      OsResult result = img.getDrawStatus();
+      if (result.info.isNotEmpty) {
+        addWarningMessage(result.info, img);
+      } else {
+        if (result.status == ResultStatus.waiting ||
+            result.status == ResultStatus.pending) {
+          addWarningMessage('Downloading...', img);
+        } else if (result.status == ResultStatus.failure) {
+          addWarningMessage('Error ${result.reason}', img);
+        }
+      }
     }
 
-    public willDrawWarningMessages(info:OsWillDrawInfo):void {
-        let img:OsGraphicImage = this.getPrimaryImageItem(false);
-        if (img) {
-            this.removeWarningMessage(img, "");
-            let result:OsResult = img.getDrawStatus();
-            if (result.info.length > 0) this.addWarningMessage(img, result.info);
-            else {
-                if (result.status == RESULT.OSRSP_WAITING || result.status == RESULT.OSRSP_PENDING) this.addWarningMessage(img, 'Downloading...');
-                else if (result.status == RESULT.OSRSP_FAILURE) this.addWarningMessage(img, 'Error ' + result.reason.toString());
-            }
-        }
-        if (this._warningMessages.length == 0) return;
+    if (_warningMessages.isEmpty) return;
 
-        let type:OsRendererType|null = this.getType();
-        if (!type) return;
-        //let viewer:Viewer|null = type?type.getViewer():null;
-        //if (!viewer) return;
+    if (type == null) return;
 
-        let fontName:string = '';
-        let fontSize:number = 12;
-        let fontColor:string = '#ffffff';
-        let fontInfo:any = this.getFont(0);
-        if (fontInfo) {
-            fontSize = fontInfo.size;
-            fontName = fontInfo.name;
-            fontColor = fontInfo.color;
+    String fontName = '';
+    int fontSize = 12;
+    List<int> fontColor = [255, 255, 255];
+
+    /*let fontInfo:any = this.getFont(0);
+    if (fontInfo) {
+      fontSize = fontInfo.size;
+      fontName = fontInfo.name;
+      fontColor = fontInfo.color;
+    }*/
+    //let driver:OsDriver|null = info.context ? info.context.getDriver() : null;
+    //  if (driver) {
+
+    OsDriver? driver = info.context?.driver;
+    if (driver == null) return;
+
+    for (int i = 0; i < _warningMessages.length; i++) {
+      if (_warningMessages[i].haveData) {
+        if (_warningMessages[i].wdata?.target == null) {
+          _warningMessages.removeAt(i);
+          i--;
+          continue;
         }
-        let driver:OsDriver|null = info.context ? info.context.getDriver() : null;
-        if (driver) {
-            for (let i:number=0; i<this._warningMessages.length; i++) {
-                if (this._warningMessages[i].haveData) {
-                    if (this._warningMessages[i].wdata.lock(false) == null) {
-                        this._warningMessages[i].destroy();
-                        this._warningMessages.splice(i, 1);
-                        i--;
-                        continue;
-                    }
-                }
-                if (this._warningMessages[i].text.length > 0) {
-                    let dtext:OsDriverText|null = info.context?info.context.findText(type, this._warningMessages[i].text, fontName, fontSize, true):null;
-                    if (!dtext) {
-                        dtext = driver.createText(fontName, fontSize, "", false, null);
-                        if (dtext) {
-                            dtext.useAntialiasing(false);
-                            dtext.setText(this._warningMessages[i].text);
-                            let valid:boolean = info.context?info.context.registerText(dtext, type):false;
-                            if (!valid) {
-                                dtext.release();
-                                dtext = null;
-                            }
-                        }
-                        if (dtext) {
-                            dtext.setColor3h(fontInfo?fontInfo.color:'#ffffff');
-                            if (info.context) dtext.willDraw(info.context);
-                        }
-                        if (dtext) dtext.release();
-                    }
-                }
-            }
+      }
+      if (_warningMessages[i].text.isNotEmpty) {
+        OsDriverText? dtext = info.context
+            ?.findText(type!, _warningMessages[i].text, fontName, fontSize);
+        dtext ??=
+            driver.createText(fontName, fontSize.toDouble(), "", false, null);
+
+        if (dtext != null) {
+          dtext.antialiasing = false;
+          dtext.text = _warningMessages[i].text;
+          bool valid = info.context!.registerText(dtext, type!);
+          if (!valid) {
+            dtext = null;
+          }
+          if (dtext != null) {
+            dtext.setColor4i(255, 255, 255, 255);
+            dtext.willDraw(info.context!);
+          }
         }
+      }
     }
+  }
 
-    public willDrawRuler(info:OsWillDrawInfo):void {
+  /*public willDrawRuler(info:OsWillDrawInfo):void {
         let driver:OsDriver|null = null;
         if (info.context) driver = info.context.getDriver();
         if (!driver) return;
@@ -1261,7 +1174,7 @@ class OsRenderer2D extends OsRenderer {
     /*_wantRefreshAsSoonAsPossible = false;
         if (!this._camera) return;*/
 
-    //_info.render = this;
+    _info.render = this;
 
     //Get the viewport size:
     List<double> viewport = [0, 0, 0, 0];
@@ -1295,62 +1208,62 @@ class OsRenderer2D extends OsRenderer {
       }
     }
 
-    //if (this._isKey && this._drawTarget == OS_DRAW_TARGET_SCREEN) {
-    /*if (this._isKey) {
-            driver.setClearColor4i(this._keyCol[0], this._keyCol[1], this._keyCol[2], this._keyCol[3]);
-            driver.clearBuffers();
-            if (driver.isClippingEnabled()) {
-                let clipArea:[number, number, number, number] = [0, 0, 0, 0];
-                driver.getClipArea(clipArea)
-                clipArea[0] += 2.0;
-                clipArea[1] += 2.0;
-                clipArea[2] -= 4.0;
-                clipArea[3] -= 4.0;
-                driver.pushClipping(clipArea[0], clipArea[1], clipArea[2], clipArea[3]);
-            }
-            else driver.pushClipping(viewport[0]+1, viewport[1]+1, viewport[2]-2, viewport[3]-2);
-        }*/
+    if (_isKey && _drawTarget == OsContDrawTarget.osDrawTargetScreen) {
+      driver.setClearColor4i(_keyCol[0], _keyCol[1], _keyCol[2], _keyCol[3]);
+      driver.clearBuffers();
+      if (driver.isClippingEnabled()) {
+        List<double> clipArea = [0, 0, 0, 0];
+        driver.getClipArea(clipArea);
+        clipArea[0] += 2.0;
+        clipArea[1] += 2.0;
+        clipArea[2] -= 4.0;
+        clipArea[3] -= 4.0;
+        driver.pushClipping(clipArea[0], clipArea[1], clipArea[2], clipArea[3]);
+      } else {
+        driver.pushClipping(
+            viewport[0] + 1, viewport[1] + 1, viewport[2] - 2, viewport[3] - 2);
+      }
+    }
 
     //Clear the buffers:
     driver.setClearColor4i(_backCol[0], _backCol[1], _backCol[2], _backCol[3]);
     driver.clearBuffers();
 
-    /*if (cameraValid) {
+    if (cameraValid) {
+      //Set the projection matrix:
+      _info.projMat.copyFrom(_camera.getProjectionMatrix(ratio));
+      _camera.getWorldInvertMatrix(_info.viewMat, null);
 
-            //Set the projection matrix:
-            this._info.projMat.copyFrom(this._camera.getProjectionMatrix(ratio));
-            this._camera.getWorldInvertMatrix(this._info.viewMat, null);
-            
-            //refresh World, WordInv, etc...
-            this._updateWorldMatrices();
+      //refresh World, WordInv, etc...
+      _updateWorldMatrices();
 
-            //ok, we can draw the scene now:
-            if (this._rootItem) this._rootItem.draw(driver, this._info);
+      //ok, we can draw the scene now:
+      _rootItem.draw(driver, _info);
 
-            //draw the localizer:
-            this.drawLocalizer(driver, viewport);
+      //draw the localizer:
+      //this.drawLocalizer(driver, viewport);
 
-            //draw the ruler:
-            this.drawRulers(driver, viewport);
+      //draw the ruler:
+      //this.drawRulers(driver, viewport);
 
-            //draw the streaming information:
-            //draw_streaming_information(driver, viewport);
-                       //now we draw the image annotations:
-            if (this._shouldDisplayGraphics) {
+      //draw the streaming information:
+      //draw_streaming_information(driver, viewport);
+      //now we draw the image annotations:
+      /*if (this._shouldDisplayGraphics) {
                 let images:OsGraphicImage[] = [];
                 this.getImageItems(images);
                 for (let i=0; i<images.length; i++) 
                     images[i].drawAnnotations(driver, this._info);
-            }
-            
-            //Draw the dicom annotations:
-            this.drawDicomAnnotations(driver, viewport);
-            
-            //Draw the warning messages:
-            this.drawWarningMessages(driver, viewport);
+            }*/
 
-            //draw the movie controller:
-            this.drawMovieController(driver, viewport);
+      //Draw the dicom annotations:
+      //this.drawDicomAnnotations(driver, viewport);
+
+      //Draw the warning messages:
+      drawWarningMessages(driver, viewport);
+
+      //draw the movie controller:
+      /*this.drawMovieController(driver, viewport);
 
             if (this._showScope) {
                 driver.resetTransform();
@@ -1422,17 +1335,16 @@ class OsRenderer2D extends OsRenderer {
                     }
                     driver.popClipping();
                     driver.setViewport(prevViewport[0], prevViewport[1], prevViewport[2], prevViewport[3]);
-                }
-            }
-        }
-        this._info.render = null;
+                }*/
+    }
 
-        //if (this._isKey && this._drawTarget == OS_DRAW_TARGET_SCREEN) {
-          if (this._isKey) {
-            driver.popClipping();
-        }*/
+    _info.render = null;
 
-    if (_selected) {
+    /*if (isKey && _drawTarget == OsContDrawTarget.osDrawTargetScreen) {
+      driver.popClipping();
+    }*/
+
+    if (selected) {
       driver.popClipping();
     }
   }
@@ -1774,48 +1686,49 @@ class OsRenderer2D extends OsRenderer {
                 }
             }
         }
-    }
+    }*/
 
-    public drawWarningMessages(driver:OsDriver, viewport:[number, number, number, number]) {
-        if (this._warningMessages.length == 0) return;
-        let context:OsDriverContext|null = driver.getCurrentContext();
-        if (!context) return;
-        let type:OsRendererType|null = this.getType();
-        if (!type) return;
-        
-        let fontName:string = '';
-        let fontSize:number = 12;
-        let fontColor:string = '#ffffff';
+  void drawWarningMessages(OsDriver driver, List<double> viewport) {
+    if (_warningMessages.isEmpty) return;
+
+    OsRenderTypeManager manager = OVApi().renderTypes;
+
+    if (type == null) return;
+    OsDriverContext? context = driver.currentContext;
+    if (context == null) return;
+
+    String fontName = '';
+    int fontSize = 12;
+    /*let fontColor:string = '#ffffff';
         let fontInfo:any = this.getFont(0);
         if (fontInfo) {
             fontSize = fontInfo.size;
             fontName = fontInfo.name;
             fontColor = fontInfo.color;
-        }
-        let textInfo:OsMultiTextDrawInfo = new OsMultiTextDrawInfo();
-        for (let i:number=0; i<this._warningMessages.length; i++) {
-            if (this._warningMessages[i].text.length == 0) continue;
-            let dtext:OsDriverText = context.findText(type, this._warningMessages[i].text, fontName, fontSize, false);
-            if (dtext != null) textInfo.texts.push(dtext.getWeakObject());
-        }
-
-        let rinfo:OsRenderInfo = new OsRenderInfo(null);
-        rinfo.projMat.buildOrthographicProjectionMatrixRH(0, viewport[2], 0, viewport[3], -100, 100);
-
-        textInfo.drawBackground = true;
-        textInfo.setBackColor4i(0, 0, 0, 180);
-        textInfo.setTextColor3h(fontColor);
-        textInfo.alignment = OsAlign.center;
-        rinfo.worldMat.mat[12] = viewport[2]*0.5;
-        rinfo.worldMat.mat[13] = viewport[3]*0.5;
-        textInfo.calculateFrameSize(driver);
-        textInfo.draw(driver, rinfo);
-
-        rinfo.destroy();
-        textInfo.destroy();
+        }*/
+    OsMultiTextDrawInfo textInfo = OsMultiTextDrawInfo();
+    for (int i = 0; i < _warningMessages.length; i++) {
+      if (_warningMessages[i].text.isEmpty) continue;
+      OsDriverText? dtext =
+          context.findText(type!, _warningMessages[i].text, fontName, fontSize);
+      if (dtext != null) textInfo.texts.add(WeakReference(dtext));
     }
 
-    public drawRulers(driver:OsDriver, viewport:[number, number, number, number]):void {
+    OsRenderInfo rinfo = OsRenderInfo(null);
+    rinfo.projMat.buildOrthographicProjectionMatrixRH(
+        0, viewport[2], 0, viewport[3], -100, 100);
+
+    textInfo.drawBackground = true;
+    textInfo.setBackColor4i(0, 0, 0, 180);
+    textInfo.setTextColor4i(255, 255, 255, 255);
+    textInfo.alignment = OsDriverText.alignCenter;
+    rinfo.worldMat.mat[12] = viewport[2] * 0.5;
+    rinfo.worldMat.mat[13] = viewport[3] * 0.5;
+    textInfo.calculateFrameSize(driver);
+    textInfo.draw(driver, rinfo);
+  }
+
+  /*public drawRulers(driver:OsDriver, viewport:[number, number, number, number]):void {
         if (!this._shouldDisplayRuler) return;
         if (viewport[2] <= 0 || viewport[3] <= 0) return;
         if (viewport[2] < this._autoSizeHide || viewport[3] < this._autoSizeHide) 
@@ -2480,76 +2393,68 @@ class OsRenderer2D extends OsRenderer {
 
     public setShouldDisplayRuler(display =boolean) {
         this._shouldDisplayRuler = display;
+    }*/
+
+  //-----------------------------------------------------------------------
+  //warning messages
+  //-----------------------------------------------------------------------
+
+  void addWarningMessage(String text, Object? data) {
+    if (data == null || text.isEmpty) return;
+    for (int i = 0; i < _warningMessages.length; i++) {
+      if (_warningMessages[i].haveData) {
+        if (_warningMessages[i].wdata!.target == data &&
+            _warningMessages[i].text == text) {
+          return;
+        }
+      } else {
+        if (_warningMessages[i].text == text) {
+          return;
+        }
+      }
     }
+    OsRenderer2dWarningMessage message = OsRenderer2dWarningMessage(text, data);
+    _warningMessages.add(message);
+  }
 
-    //-----------------------------------------------------------------------
-    //warning messages
-    //-----------------------------------------------------------------------
-
-    public addWarningMessage(data =OsStrongObject|null, text =string):void {
-        if (!data || text.length == 0) return;
-        for (let iinnumber=0; i<this._warningMessages.length; i++) {
-            if (this._warningMessages[i].haveData) {
-                if (this._warningMessages[i].wdata.lock(false) === data && this._warningMessages[i].text === text) 
-                    return;
+  bool removeWarningMessage(String text, Object? data) {
+    bool ret = false;
+    if (data != null) {
+      for (int i = 0; i < _warningMessages.length; i++) {
+        if (_warningMessages[i].haveData &&
+            _warningMessages[i].wdata?.target == data) {
+          if (text.isEmpty || text == _warningMessages[i].text) {
+            ret = true;
+            _warningMessages.removeAt(i);
+            i--;
+            if (text.isNotEmpty) break;
+          }
+        }
+      }
+    } else {
+      if (text.isNotEmpty) {
+        for (int i = 0; i < _warningMessages.length; i++) {
+          if (!_warningMessages[i].haveData) {
+            if (text == _warningMessages[i].text) {
+              ret = true;
+              _warningMessages.removeAt(i);
+              i--;
+              break;
             }
-            else 
-            if (this._warningMessages[i].text === text) 
-                return;
+          }
         }
-        let message:OsRenderer2dWarningMessage = OsRenderer2dWarningMessage();
-        if (data) {
-            message.haveData = true;
-            message.wdata = data.getWeakObject();
-        }
-        message.text = text;
-        this._warningMessages.push(message);
+      } else {
+        ret = _warningMessages.isNotEmpty ? true : false;
+        _warningMessages.clear();
+      }
     }
+    return ret;
+  }
 
-    public removeWarningMessage(data =OsStrongObject|null, text =string):boolean {
-        let ret:boolean = false;
-        if (data) {
-            for (let iinnumber = 0; i < this._warningMessages.length; i++) {
-                if (this._warningMessages[i].haveData && this._warningMessages[i].wdata.lock(false) === data) {
-                    if (text.length == 0 || text === this._warningMessages[i].text) {
-                        ret = true;
-                        this._warningMessages[i].destroy();
-                        this._warningMessages.splice(i, 1);
-                        i--;
-                        if (text.length > 0) break;
-                    }
-                }
-            }
-        }
-        else {
-            if (text.length > 0) {
-                for (let iinnumber = 0; i < this._warningMessages.length; i++) {
-                    if (!this._warningMessages[i].haveData) {
-                        if (text === this._warningMessages[i].text) {
-                            ret = true;
-                            this._warningMessages[i].destroy();
-                            this._warningMessages.splice(i, 1);
-                            i--;
-                            break;
-                        }
-                    }
-                }
-            }
-            else {
-                ret = this._warningMessages.length > 0 ? true : false;
-                for (let iinnumber=0; i<this._warningMessages.length; i++) this._warningMessages[i].destroy();
-                this._warningMessages.splice(0, this._warningMessages.length);
-            }
-            
-        }
-        return ret;
-
-    }
-
-    //-----------------------------------------------------------------------
-    //memory
-    //-----------------------------------------------------------------------
-    public releaseMemory(level =number):void {
+  //-----------------------------------------------------------------------
+  //memory
+  //-----------------------------------------------------------------------
+  /*public releaseMemory(level =number):void {
         if (this._rootItem) this._rootItem.releaseMemory(this, level, true);
     }
     
@@ -3193,122 +3098,118 @@ class OsRenderer2D extends OsRenderer {
                 list.push(this._movieToolbar);
         }
         else list.push(this._movieToolbar);
-    }
-
-    //-----------------------------------------------------------------------
-    //utilities
-    //-----------------------------------------------------------------------
-
-    public sameF64(v1:number, v2:number):boolean {
-	    if (Math.abs(v1 - v2) < 0.000000001) return true;
-	    return false;
-    }
-    
-    private _updateWorldMatrices():void {
-
-        //set the view matrix:
-        this._info.viewInvMat.copyFrom(this._info.viewMat);
-        this._info.viewInvMat.invert();
-                    
-        //set the world matrix:
-        this._info.worldMat.identity();
-        this._info.worldInvMat.identity();
-        this._info.worldInvTransposeMat.identity();
-        
-        //set the world view matrix:
-        this._info.worldViewMat.copyFrom(this._info.viewMat);
-        this._info.worldViewInvMat.copyFrom(this._info.viewInvMat);
-            
-        //set the word view proj matrix:
-        this._info.worldViewProjMat.copyFrom(this._info.worldMat);
-        this._info.worldViewProjMat.postMultiply(this._info.viewMat);
-        this._info.worldViewProjMat.preMultiply(this._info.projMat);	
-
-    }
-
-    private _calculateRealVisibleSizeAfterTransformation(img:OsGraphicImage, realSize:[number, number]):boolean {
-        let image:OsOpenedImage|null = img.getImage();
-        //let frame:OsDicomFrame = img.getFrame(img.getCurrentFrame());
-        if (!image) return false;
-        let regions:OsImageRegion[] = [];
-        //if (!frame) {
-            let regionInfo:OsImageRegionInfo|null = image.getRegionInfo();
-            if (regionInfo) {
-                for (let i=0; i<regionInfo.regions.length; i++) 
-                    regions.push(regionInfo.regions[i]);
-            }
-        //}
-        //else image.getRegionsForFrame(frame, regions);
-        
-        //get the real size of the image:
-        let widthHeight:[number, number] = [0, 0];
-        //if (frame) frame.getDimensions(widthHeight);
-        /*else*/ image.getDimensions33(widthHeight);
-        let w:number = widthHeight[0];
-        let h:number = widthHeight[1];
-        if (regions.length == 1) {
-            let tmp:OsImageRegion = regions[0];
-            if (tmp.x0 == 0 && tmp.y0 == 0 && tmp.x1 == widthHeight[0]-1 && tmp.y1 == widthHeight[1]-1) 
-                if (tmp.spatialFormat == OS_RSF.TWO_DIM)
-                    if (tmp.calibratedUnit[0] == tmp.calibratedUnit[1])
-                        if (tmp.calibratedUnit[0] == OS_UNIT.CM || tmp.calibratedUnit[0] == OS_UNIT.NONE) {
-                            w = widthHeight[0] * Math.abs(tmp.calibratedSpacing[0]);
-                            h = widthHeight[1] * Math.abs(tmp.calibratedSpacing[1]);
-                        }
-        }
-        
-        //if (image->get_real_dimensions(&w, &h)) {
-
-            let rot:number = this._camera.rot[2];
-            let B:number[] = [0, 0, 0];
-            let C:number[] = [0, 0, 0];
-            let D:number[] = [0, 0, 0];
-
-            //apply the rotation (normalized):
-            B[0] = Math.cos(rot*Math.PI/180.0);
-            B[1] = Math.sin(rot*Math.PI/180.0);
-
-            //Normalize B:
-            let length:number = Math.sqrt(B[0]*B[0] + B[1]*B[1]);
-            if (length != 0) {
-                B[0] /= length;
-                B[1] /= length;
-            }
-        
-            //get our D point (vectorial product):
-            let z:number[] = [0.0, 0.0, 1.0];
-            D[0] = z[1] * B[2] - z[2] * B[1];
-            D[1] = z[2] * B[0] - z[0] * B[2];
-            D[2] = z[0] * B[1] - z[1] * B[0];
-
-            //Normalize D:
-            length = Math.sqrt(D[0]*D[0] + D[1]*D[1]);
-            if (length != 0) {
-                D[0] /= length;
-                D[1] /= length;
-            }
-
-            //apply the length:
-            B[0] *= w;
-            B[1] *= w;
-            D[0] *= h;
-            D[1] *= h;
-
-            //get our C point:
-            C[0] = B[0] + D[0];
-            C[1] = B[1] + D[1];
-
-            let xmin:number = Math.min(0, Math.min(B[0], Math.min(C[0], D[0])));
-            let ymin:number = Math.min(0, Math.min(B[1], Math.min(C[1], D[1])));
-            let xmax:number = Math.max(0, Math.max(B[0], Math.max(C[0], D[0])));
-            let ymax:number = Math.max(0, Math.max(B[1], Math.max(C[1], D[1])));
-        
-            realSize[0] = xmax - xmin;
-            realSize[1] = ymax - ymin;
-            return true;
-
-        //}
-        //else return OSFALSE;
-
     }*/
+
+  //-----------------------------------------------------------------------
+  //utilities
+  //-----------------------------------------------------------------------
+
+  bool sameF64(double v1, double v2) {
+    if (v1.abs() - v2.abs() < 0.000000001) return true;
+    return false;
+  }
+
+  void _updateWorldMatrices() {
+    //set the view matrix:
+    _info.viewInvMat.copyFrom(_info.viewMat);
+    _info.viewInvMat.invert();
+
+    //set the world matrix:
+    _info.worldMat.identity();
+    _info.worldInvMat.identity();
+    _info.worldInvTransposeMat.identity();
+
+    //set the world view matrix:
+    _info.worldViewMat.copyFrom(_info.viewMat);
+    _info.worldViewInvMat.copyFrom(_info.viewInvMat);
+
+    //set the word view proj matrix:
+    _info.worldViewProjMat.copyFrom(_info.worldMat);
+    _info.worldViewProjMat.postMultiply(_info.viewMat);
+    _info.worldViewProjMat.preMultiply(_info.projMat);
+  }
+
+  bool _calculateRealVisibleSizeAfterTransformation(
+      OsGraphicImage img, List<double> realSize) {
+    entities.Image? image = img.getImage();
+    if (image == null) return false;
+    List<ImageRegion> regions = [];
+    ImageRegionInfo? regionInfo = image.getRegionInfo();
+
+    if (regionInfo != null) {
+      for (int i = 0; i < regionInfo.regions.length; i++) {
+        regions.add(regionInfo.regions[i]);
+      }
+    }
+
+    //get the real size of the image:
+    (int width, int height)? widthHeight = image.getDimensions33();
+    if (widthHeight == null) return false;
+
+    double w = widthHeight.$1.toDouble();
+    double h = widthHeight.$2.toDouble();
+
+    if (regions.length == 1) {
+      ImageRegion tmp = regions[0];
+      if ((tmp.x0 == 0 &&
+              tmp.y0 == 0 &&
+              tmp.x1 == widthHeight.$1 - 1 &&
+              tmp.y1 == widthHeight.$2 - 1) &&
+          (tmp.spatialFormat == OsRsf.twoDim) &&
+          (tmp.calibratedUnit[0] == tmp.calibratedUnit[1]) &&
+          (tmp.calibratedUnit[0] == OsUnit.cm ||
+              tmp.calibratedUnit[0] == OsUnit.none)) {
+        w = widthHeight.$1 * tmp.calibratedSpacing[0].abs();
+        h = widthHeight.$2 * tmp.calibratedSpacing[1].abs();
+      }
+    }
+
+    double rot = _camera.rot[2];
+    List<double> B = [0, 0, 0];
+    List<double> C = [0, 0, 0];
+    List<double> D = [0, 0, 0];
+
+    //apply the rotation (normalized):
+    B[0] = math.cos(rot * math.pi / 180.0);
+    B[1] = math.sin(rot * math.pi / 180.0);
+
+    //Normalize B:
+    double length = math.sqrt(B[0] * B[0] + B[1] * B[1]);
+    if (length != 0) {
+      B[0] /= length;
+      B[1] /= length;
+    }
+
+    //get our D point (vectorial product):
+    List<double> z = [0.0, 0.0, 1.0];
+    D[0] = z[1] * B[2] - z[2] * B[1];
+    D[1] = z[2] * B[0] - z[0] * B[2];
+    D[2] = z[0] * B[1] - z[1] * B[0];
+
+    //Normalize D:
+    length = math.sqrt(D[0] * D[0] + D[1] * D[1]);
+    if (length != 0) {
+      D[0] /= length;
+      D[1] /= length;
+    }
+
+    //apply the length:
+    B[0] *= w;
+    B[1] *= w;
+    D[0] *= h;
+    D[1] *= h;
+
+    //get our C point:
+    C[0] = B[0] + D[0];
+    C[1] = B[1] + D[1];
+
+    double xmin = math.min(0, math.min(B[0], math.min(C[0], D[0])));
+    double ymin = math.min(0, math.min(B[1], math.min(C[1], D[1])));
+    double xmax = math.max(0, math.max(B[0], math.max(C[0], D[0])));
+    double ymax = math.max(0, math.max(B[1], math.max(C[1], D[1])));
+
+    realSize[0] = xmax - xmin;
+    realSize[1] = ymax - ymin;
+    return true;
+  }
 }

@@ -3,7 +3,7 @@
 #include <sstream>
 #include "../../include/database/items/db_user.hpp"
 #include "../../include/database/site_database.hpp"
-#include "../../include/exceptions/site_server_exceptions.hpp"
+#include "onis_kit/include/core/exception.hpp"
 #include "onis_kit/include/utilities/uuid.hpp"
 
 using onis::database::lock_mode;
@@ -148,7 +148,7 @@ void site_database::find_user_for_session(const std::string& site_seq,
   // execute the query:
   auto result = execute_query(query);
   if (!result->has_rows()) {
-    throw site_server_exception(1234, "User '" + login + "' not found");
+    throw onis::exception(1234, "User '" + login + "' not found");
   }
 
   // read the user record:

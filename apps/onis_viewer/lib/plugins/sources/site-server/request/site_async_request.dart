@@ -181,26 +181,48 @@ class SiteAsyncRequest implements AsyncRequest {
         return _createCancelledResponse();
       }
 
-      // Handle the response
-      if (response.statusCode >= 200 && response.statusCode < 300) {
-        // Success - parse the response data
-        final responseBody = await response.stream.bytesToString();
-        Map<String, dynamic>? responseData;
+      // Handle the response (JSON and binary).
+      final responseBytes = await response.stream.toBytes();
+      final contentType =
+          (response.headers['content-type'] ?? '').toLowerCase();
+      final isJsonResponse = contentType.contains('application/json');
 
-        try {
-          responseData = jsonDecode(responseBody) as Map<String, dynamic>?;
-        } catch (e) {
-          debugPrint(
-              'SiteAsyncRequest.send() - failed to parse JSON response: $e');
-          // If response is not JSON, return it as a simple message
-          responseData = {'message': responseBody};
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        Map<String, dynamic>? responseData;
+        Map<String, dynamic>? metadata;
+
+        if (isJsonResponse) {
+          final responseBody = utf8.decode(responseBytes);
+          try {
+            responseData = jsonDecode(responseBody) as Map<String, dynamic>?;
+          } catch (e) {
+            debugPrint(
+                'SiteAsyncRequest.send() - failed to parse JSON response: $e');
+            // Fallback: keep text content if server returned invalid JSON.
+            responseData = {'message': responseBody};
+          }
+        } else {
+          // Binary payload: expose bytes and response metadata to callers.
+          responseData = {'binary': responseBytes};
+          metadata = {
+            'contentType': contentType,
+            'headers': response.headers,
+            'contentLength': responseBytes.length,
+          };
         }
 
         debugPrint('SiteAsyncRequest.send() - returning success response');
-        return _createSuccessResponse(response.statusCode, responseData);
+        return _createSuccessResponse(response.statusCode, responseData,
+            metadata: metadata);
       } else {
-        // Error
-        final responseBody = await response.stream.bytesToString();
+        // Error: try UTF-8 body for diagnostics; fallback to generic message.
+        String responseBody;
+        try {
+          responseBody = utf8.decode(responseBytes);
+        } catch (_) {
+          responseBody =
+              'HTTP ${response.statusCode} (non-text error body, ${responseBytes.length} bytes)';
+        }
         debugPrint('SiteAsyncRequest.send() - returning error response');
         return _createErrorResponse(response.statusCode, responseBody);
       }
@@ -294,6 +316,10 @@ class SiteAsyncRequest implements AsyncRequest {
         return '$baseUrl/api/user/info';
       case RequestType.updateSettings:
         return '$baseUrl/api/user/settings';
+      case RequestType.initSeriesDownload:
+        return '$baseUrl/series/download';
+      case RequestType.downloadImages:
+        return '$baseUrl/images/download';
     }
   }
 
@@ -304,14 +330,14 @@ class SiteAsyncRequest implements AsyncRequest {
   }
 
   /// Create a success response
-  AsyncResponse _createSuccessResponse(
-      int statusCode, Map<String, dynamic>? data) {
+  AsyncResponse _createSuccessResponse(int statusCode, Map<String, dynamic>? data,
+      {Map<String, dynamic>? metadata}) {
     return _SiteAsyncResponse(
       isSuccess: true,
       statusCode: statusCode,
       data: data,
       errorMessage: null,
-      metadata: null,
+      metadata: metadata,
     );
   }
 

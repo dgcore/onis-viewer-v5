@@ -16,6 +16,9 @@ set(POSTGRESQL_LIBRARIES "pq")
 # Find SQLite3
 pkg_check_modules(SQLITE3 REQUIRED sqlite3)
 
+# Find libpng (e.g. brew install libpng)
+find_package(PNG REQUIRED)
+
 # Debug configuration
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
     set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -g -O0")
@@ -28,6 +31,9 @@ set(ONIS_KIT_SOURCES
     src/core/thread.cpp
     src/core/event.cpp
     src/core/date_time.cpp
+    src/core/file.cpp
+    src/core/bitmap.cpp
+    src/core/linux/bitmap_linux.cpp
     src/dicom/dicom.cpp
     src/database/postgresql/postgresql_connection.cpp
     src/database/postgresql/postgresql_query.cpp
@@ -99,6 +105,7 @@ target_compile_definitions(onis_kit PRIVATE
 target_link_libraries(onis_kit PRIVATE
     ${POSTGRESQL_LIBRARIES}
     ${SQLITE3_LIBRARIES}
+    PNG::PNG
     iconv  # Required for string conversion functions (built in libs/dicom/iconv)
 )
 

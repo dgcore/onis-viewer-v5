@@ -10,6 +10,36 @@ namespace onis::util::dicom {
 
 static std::vector<std::string> page_codes;
 
+static std::string first_ds_component(const std::string& s) {
+  std::size_t pos = s.find('\\');
+  if (pos == std::string::npos)
+    return s;
+  return s.substr(0, pos);
+}
+
+bool get_window_level(onis::dicom_base* dataset, double* center,
+                      double* width) {
+  if (dataset == nullptr || center == nullptr || width == nullptr)
+    return false;
+  std::string wc_str;
+  std::string ww_str;
+  if (!dataset->get_string_element(wc_str, TAG_WINDOW_CENTER, "DS"))
+    return false;
+  if (!dataset->get_string_element(ww_str, TAG_WINDOW_WIDTH, "DS"))
+    return false;
+  wc_str = first_ds_component(wc_str);
+  ww_str = first_ds_component(ww_str);
+  if (wc_str.empty() || ww_str.empty())
+    return false;
+  try {
+    *center = std::stod(wc_str);
+    *width = std::stod(ww_str);
+  } catch (const std::exception&) {
+    return false;
+  }
+  return true;
+}
+
 const std::vector<std::string>* get_list_of_page_codes() {
   return &page_codes;
 }
