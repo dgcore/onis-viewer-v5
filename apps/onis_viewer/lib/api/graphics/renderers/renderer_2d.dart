@@ -453,7 +453,7 @@ class OsRenderer2D extends OsRenderer {
     return item?.getWindowLevel();
   }
 
-  (double center, double width)? getWindowLevelValues() {
+  ({double center, double width})? getWindowLevelValues() {
     OsGraphicImage? item = getPrimaryImageItem();
     return item?.getWindowLevelValues();
   }
@@ -669,6 +669,7 @@ class OsRenderer2D extends OsRenderer {
     return _wactiveImg?.target;
   }
 
+  @override
   OsGraphicImage? getPrimaryImageItem() {
     return _wprimaryImg?.target;
   }
@@ -1237,7 +1238,7 @@ class OsRenderer2D extends OsRenderer {
       _updateWorldMatrices();
 
       //ok, we can draw the scene now:
-      //if (this._rootItem) this._rootItem.draw(driver, this._info);
+      _rootItem.draw(driver, _info);
 
       //draw the localizer:
       //this.drawLocalizer(driver, viewport);

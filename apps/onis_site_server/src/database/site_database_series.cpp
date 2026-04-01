@@ -249,7 +249,7 @@ void site_database::find_series_by_seq(const std::string& seq,
     auto row = result->get_next_row();
     create_series_item(*row, flags, for_client, nullptr, study_seq, output);
   } else {
-    throw site_server_exception(EOS_NOT_FOUND, "Series not found");
+    throw onis::exception(EOS_NOT_FOUND, "Series not found");
   }
 }
 

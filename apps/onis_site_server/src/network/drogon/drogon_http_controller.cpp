@@ -183,9 +183,29 @@ void http_drogon_controller::treat_post_request(
     // INSERT_YOUR_CODE
     data->read_output([&](const Json::Value& output,
                           const std::vector<std::uint8_t>& binary_output) {
-      resp = drogon::HttpResponse::newHttpJsonResponse(output);
+      // resp = drogon::HttpResponse::newHttpJsonResponse(output);
+      if (!binary_output.empty()) {
+        resp = drogon::HttpResponse::newHttpResponse();
+        resp->setStatusCode(drogon::HttpStatusCode::k200OK);
+        // Send raw bytes
+        resp->setBody(
+            std::string(reinterpret_cast<const char*>(binary_output.data()),
+                        binary_output.size()));
+        // Choose proper MIME type for your payload
+        resp->setContentTypeCode(drogon::CT_APPLICATION_OCTET_STREAM);
+        // Optional metadata from JSON
+        /*if (output.isMember("mime")) {
+          resp->addHeader("X-Content-Mime", output["mime"].asString());
+        }
+        if (output.isMember("name")) {
+          resp->addHeader("X-File-Name", output["name"].asString());
+        }*/
+      } else {
+        resp = drogon::HttpResponse::newHttpJsonResponse(output);
+        resp->setStatusCode(drogon::HttpStatusCode::k200OK);
+      }
     });
-    resp->setStatusCode(drogon::HttpStatusCode::k200OK);
+    // resp->setStatusCode(drogon::HttpStatusCode::k200OK);
   } else {
     resp = drogon::HttpResponse::newHttpResponse();
     resp->setStatusCode(drogon::HttpStatusCode::k400BadRequest);

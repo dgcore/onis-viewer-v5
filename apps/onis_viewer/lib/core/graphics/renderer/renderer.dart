@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:onis_viewer/core/graphics/drivers/driver.dart';
+import 'package:onis_viewer/core/graphics/renderer/items/image.dart';
 import 'package:onis_viewer/core/math/matrix.dart';
 
 ///////////////////////////////////////////////////////////////////////
@@ -152,8 +153,7 @@ class OsRenderInfo {
   }
 
   void popMatrix() {
-    OsPushedMatrix info = _pushedMatrices[_pushedMatrices.length - 1];
-    _pushedMatrices.clear();
+    OsPushedMatrix info = _pushedMatrices.removeLast();
     worldMat.copyFrom(info.worldMat);
     worldInvMat.copyFrom(info.worldInvMat);
     worldViewMat.copyFrom(info.worldViewMat);
@@ -257,7 +257,9 @@ abstract class OsRenderer {
   //render items:
   //void getImageItems(List<OsGraphicImage> list) {}
   //OsGraphicImage? getActiveImageItem(bool retain) { return null; }
-  //OsGraphicImage? getPrimaryImageItem(bool retain) { return null; }
+  OsGraphicImage? getPrimaryImageItem() {
+    return null;
+  }
   //OsGraphicGroup? getRootItem(bool retain) { return null; }
   //OsGraphicGroup? getImageGroupItem(bool retain) { return null; }
   //OsGraphicGroup? getAnnotationGroupItem(bool retain) { return null; }

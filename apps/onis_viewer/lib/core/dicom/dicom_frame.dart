@@ -24,12 +24,10 @@ class DicomFrame {
   double rescaleSlope = 1.0;
   double intercept = 0.0;
   VoiLutFunction voiLutFunction = VoiLutFunction.linear;
-  double _windowCenter = 128;
-  double _windowWidth = 256;
+  ({double center, double width}) _windowLevel = (center: 128, width: 256);
   bool _windowLevelValid = false;
-  double _originalWindowCenter = 128;
-  double _originalWindowWidth = 256;
-
+  ({double center, double width}) _originalWindowLevel =
+      (center: 128, width: 256);
   WeakReference<ConvolutionFilter>? _wconvolutionFilter;
   WeakReference<OpacityTable>? _wopacityTable;
   WeakReference<ColorLut>? _wcolorLut;
@@ -94,45 +92,45 @@ class DicomFrame {
   //window level
   //-----------------------------------------------------------------------
 
-  void setWindowLevel(double center, double width) {
-    _windowCenter = center;
-    _windowWidth = width;
+  void setWindowLevel(({double center, double width}) wl) {
+    _windowLevel = wl;
     _windowLevelValid = true;
   }
 
-  (double center, double width)? get windowLevel {
+  ({double center, double width})? get windowLevel {
     if (_windowLevelValid) {
-      return (_windowCenter, _windowWidth);
+      return _windowLevel;
     }
     return null;
   }
 
-  void setOriginalWindowLevel(double center, double width) {
-    _originalWindowCenter = center;
-    _originalWindowWidth = width;
+  void setOriginalWindowLevel(({double center, double width}) wl) {
+    _originalWindowLevel = wl;
   }
 
-  (double center, double width) getOriginalWindowLevel() {
-    return (_originalWindowCenter, _originalWindowWidth);
+  ({double center, double width}) getOriginalWindowLevel() {
+    return _originalWindowLevel;
   }
 
-  void interToDisplayWindowLevel(double center, double width) {
-    double left = center - width * 0.5;
-    double right = center + width * 0.5;
+  ({double center, double width}) interToDisplayWindowLevel(
+      ({double center, double width}) wl) {
+    double left = wl.center - wl.width * 0.5;
+    double right = wl.center + wl.width * 0.5;
     left = left * rescaleSlope + intercept;
     right = right * rescaleSlope + intercept;
-    center = (left + right) * 0.5;
-    width = (right - left);
+    return (center: (left + right) * 0.5, width: (right - left));
   }
 
-  void displayToInterWindowLevel(double center, double width) {
+  ({double center, double width}) displayToInterWindowLevel(
+      ({double center, double width}) wl) {
     if (rescaleSlope != 0) {
-      double left = center - width * 0.5;
-      double right = center + width * 0.5;
+      double left = wl.center - wl.width * 0.5;
+      double right = wl.center + wl.width * 0.5;
       left = (left - intercept) / rescaleSlope;
       right = (right - intercept) / rescaleSlope;
-      center = (left + right) * 0.5;
-      width = (right - left);
+      return (center: (left + right) * 0.5, width: (right - left));
+    } else {
+      return wl;
     }
   }
 
@@ -235,8 +233,8 @@ class DicomFrame {
     //Calculate the Left and Right positions of the window level:
     double left, right;
     double center, width;
-    final centerWidth = windowLevel;
-    if (centerWidth == null) {
+    ({double center, double width})? wl = windowLevel;
+    if (wl == null) {
       // Normally, we should never come here.
       final minMax = getMinMaxValues(true);
       if (minMax != null) {
@@ -253,9 +251,9 @@ class DicomFrame {
       }
     } else {
       // Adjust the values with the scale and intercept values.
-      displayToInterWindowLevel(centerWidth.$1, centerWidth.$2);
-      center = centerWidth.$1;
-      width = centerWidth.$2;
+      wl = displayToInterWindowLevel(wl);
+      center = wl.center;
+      width = wl.width;
     }
     if (width < 1.0) width = 1.0;
     left = center - width * 0.5;
@@ -354,12 +352,12 @@ class DicomFrame {
       throw ArgumentError('LUT must have at least 256 elements.');
     }
 
-    final centerWidth = windowLevel;
+    final wl = windowLevel;
     double center = 128.0;
     double width = 255.0;
-    if (centerWidth != null) {
-      center = centerWidth.$1;
-      width = centerWidth.$2;
+    if (wl != null) {
+      center = wl.center;
+      width = wl.width;
     }
 
     // If default → identity LUT

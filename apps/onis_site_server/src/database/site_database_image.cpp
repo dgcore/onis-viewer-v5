@@ -355,7 +355,7 @@ void site_database::find_image_by_seq(const std::string& seq,
     auto row = result->get_next_row();
     create_image_item(*row, flags, for_client, nullptr, series_seq, output);
   } else {
-    throw site_server_exception(EOS_NOT_FOUND, "Image not found");
+    throw onis::exception(EOS_NOT_FOUND, "Image not found");
   }
 }
 

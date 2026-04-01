@@ -11,11 +11,13 @@ class DownloadCandidates {
   final List<entities.Image> images =
       []; //list of images we want to download the pixel data
   final List<entities.Series> series =
-      []; //list of series that need to initiate a download
+      []; //list of series that need to initiate a download (no image yet for those series)
   final List<List<int>> pendingRanges = [];
-  final int _maxLength = 20;
-  final List<entities.Image> _imageCandidates = [];
-  final List<entities.Series> _seriesCandidates = [];
+  final int _maxLength = 20; //max number of images to download
+  final List<entities.Image> _imageCandidates =
+      []; //list of potential images to download
+  final List<entities.Series> _seriesCandidates =
+      []; //list of potential series to download (no image yet for those series)
   final List<entities.Image> _imageMemo = []; //use to prevent duplicates
   final bool _full = false;
   //public srRequest:AsyncHttpRequest|null = null;

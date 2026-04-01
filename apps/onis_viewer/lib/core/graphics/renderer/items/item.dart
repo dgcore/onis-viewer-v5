@@ -258,8 +258,8 @@ class OsGraphicItem {
   void draw(OsDriver driver, OsRenderInfo info) {
     info.pushMatrix();
     info.applyWorldTransformation(localMatrix);
-    for (final c in _children) {
-      c.draw(driver, info);
+    for (final child in _children) {
+      child.draw(driver, info);
     }
     info.popMatrix();
   }

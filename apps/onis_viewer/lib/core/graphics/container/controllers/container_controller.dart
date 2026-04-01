@@ -9,7 +9,7 @@ class OsContainerController {
 
   OsContainerController();
 
-  OsContainerWnd? get container => _wcontainer?.target;
+  OsContainerWnd? getContainer() => _wcontainer?.target;
   set container(OsContainerWnd? container) {
     if (_wcontainer != null) {
       throw OnisException(

@@ -35,7 +35,7 @@ void site_database::find_download_image_by_index(
     const std::string& download_seq, std::int32_t index,
     onis::database::lock_mode lock_mode, Json::Value& output) {
   const auto columns = get_download_image_columns(false);
-  const std::string from = "pacs_download_image";
+  const std::string from = "pacs_download_images";
 
   std::string clause = "series_id=? AND num=?";
   auto query = create_and_prepare_query(columns, from, clause, lock_mode);
@@ -49,7 +49,7 @@ void site_database::find_download_image_by_index(
     auto row = result->get_next_row();
     create_download_image_item(*row, output);
   } else {
-    throw site_server_exception(EOS_NOT_FOUND, "Download image not found");
+    throw onis::exception(EOS_NOT_FOUND, "Download image not found");
   }
 }
 

@@ -41,6 +41,9 @@ enum RequestType {
 
   /// Init series download
   initSeriesDownload,
+
+  /// Download images
+  downloadImages,
 }
 
 /// Interface for asynchronous request responses

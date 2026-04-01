@@ -1,6 +1,6 @@
 #include "../../../include/services/requests/request_entity_access_info.hpp"
 #include "../../../include/database/items/db_item.hpp"
-#include "../../../include/exceptions/site_server_exceptions.hpp"
+#include "onis_kit/include/core/exception.hpp"
 
 ////////////////////////////////////////////////////////////////////////////////
 // site_database_entity_access_info class
@@ -74,19 +74,19 @@ void site_database_entity_access_info::find(const request_database& db,
 
   // patient seq is mandatory
   if (_patient_seq.empty())
-    throw site_server_exception(EOS_PARAM, "Patient seq is mandatory");
+    throw onis::exception(EOS_PARAM, "Patient seq is mandatory");
 
   // if the study seq is provided, the patient seq must also be provided:
   if (!_study_seq.empty() && _patient_seq.empty())
-    throw site_server_exception(EOS_PARAM, "Study seq is mandatory");
+    throw onis::exception(EOS_PARAM, "Study seq is mandatory");
 
   // if the series seq is provided, the study seq must also be provided:
   if (!_series_seq.empty() && _study_seq.empty())
-    throw site_server_exception(EOS_PARAM, "Series seq is mandatory");
+    throw onis::exception(EOS_PARAM, "Series seq is mandatory");
 
   // if the image seq is provided, the series seq must also be provided:
   if (!_image_seq.empty() && _series_seq.empty())
-    throw site_server_exception(EOS_PARAM, "Image seq is mandatory");
+    throw onis::exception(EOS_PARAM, "Image seq is mandatory");
 
   // now, we search the items from the database:
 
@@ -166,7 +166,7 @@ void site_database_entity_access_info::find(const request_database& db,
              (*patient)[BASE_UID_KEY].asString() != _patient_id)
       valid = false;
     if (!valid) {
-      throw site_server_exception(EOS_PARAM, "Invalid entity access info");
+      throw onis::exception(EOS_PARAM, "Invalid entity access info");
     }
   } else {
     // data comes from an album.

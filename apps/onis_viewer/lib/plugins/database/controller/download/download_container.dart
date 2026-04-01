@@ -7,5 +7,5 @@ class DownloadContainer {
   DownloadContainer(OsContainerWnd container)
       : _wcontainer = WeakReference<OsContainerWnd>(container);
 
-  OsContainerWnd? get container => _wcontainer?.target;
+  OsContainerWnd? getContainer() => _wcontainer?.target;
 }

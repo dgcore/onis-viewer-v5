@@ -84,7 +84,7 @@ void request_service::process_init_series_download_request(
       db->find_images(series_seq, onis::database::info_all, false,
                       onis::database::lock_mode::NO_LOCK, images);
       if (images.size() == 0) {
-        throw site_server_exception(EOS_NO_IMAGE, "No image found for series");
+        throw onis::exception(EOS_NO_IMAGE, "No image found for series");
       }
 
       // record the download process in the database:

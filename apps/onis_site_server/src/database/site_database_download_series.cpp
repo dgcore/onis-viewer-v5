@@ -103,7 +103,7 @@ void site_database::find_download_series_by_seq(const std::string& seq,
     auto row = result->get_next_row();
     create_download_series_item(*row, nullptr, output);
   } else {
-    throw site_server_exception(EOS_NOT_FOUND, "Download series not found");
+    throw onis::exception(EOS_NOT_FOUND, "Download series not found");
   }
 }
 

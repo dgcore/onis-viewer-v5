@@ -1,3 +1,4 @@
+import 'package:onis_viewer/core/dicom/dicom_frame.dart';
 import 'package:onis_viewer/core/graphics/renderer/renderer.dart';
 
 ///////////////////////////////////////////////////////////////////////
@@ -154,6 +155,8 @@ abstract class OsDriver {
 ///////////////////////////////////////////////////////////////////////
 
 abstract class OsDriverImage {
+  bool initWithFrame(DicomFrame frame);
+
   //public initWithFrame(frame =OsDicomFrame):void;
   //public initWithPixels(width =number, height =number, pixelFormat =number, pixels =Uint8ClampedArray):boolean { return false; }
   //public initFromImageData(data =ImageData):boolean { return false; }

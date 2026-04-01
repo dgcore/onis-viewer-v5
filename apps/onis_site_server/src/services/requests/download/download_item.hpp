@@ -1,9 +1,9 @@
 #pragma once
 
-#include "../../../../include/exceptions/site_server_exceptions.hpp"
 #include "../../../../include/services/requests/request_database.hpp"
 #include "../../../../include/services/requests/request_service.hpp"
 #include "../../../../include/site_api.hpp"
+#include "onis_kit/include/core/exception.hpp"
 #include "onis_kit/include/core/result.hpp"
 #include "onis_kit/include/dicom/dicom.hpp"
 
@@ -63,7 +63,7 @@ struct DlItem {
     try {
       db->find_download_image_by_index(
           dlseq, index, onis::database::lock_mode::NO_LOCK, image);
-    } catch (const site_server_exception& e) {
+    } catch (const onis::exception& e) {
       res.set(OSRSP_FAILURE, e.get_code(), e.what(), false);
       return;
     } catch (...) {
@@ -96,14 +96,23 @@ struct DlItem {
         palette[i] = dcm->get_raw_palette(i);
 
       // try to extract the required frame:
-      frame = dcm->extract_frame(0);
+      try {
+        frame = dcm->extract_frame(0);
+      } catch (const onis::exception& e) {
+        res.set(OSRSP_FAILURE, e.get_code(), e.what(), false);
+        return;
+      } catch (...) {
+        res.set(OSRSP_FAILURE, EOS_UNKNOWN, "Unknown error", false);
+        return;
+      }
+
       if (frame == nullptr) {
         res.set(OSRSP_FAILURE, EOS_FAILED_TO_EXTRACT_IMAGE,
                 "Failed to extract the frame", false);
         return;
       }
 
-      std::int32_t count;
+      std::size_t count;
       if (frame->get_intermediate_pixel_data(&count) == nullptr)
         res.set(OSRSP_FAILURE, EOS_FAILED_TO_EXTRACT_IMAGE, "", false);
 
@@ -203,9 +212,9 @@ struct DlItem {
     if (type == 1) {
       if (frame != nullptr) {
         new_res = 0;
-        std::int32_t count = 0;
+        std::size_t count = 0;
         frame->get_intermediate_pixel_data(&count);
-        return count >= 0 ? count : 0;
+        return static_cast<std::int32_t>(count);
       }
 
     } else if (type == 2) {

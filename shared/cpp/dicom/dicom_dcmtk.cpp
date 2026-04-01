@@ -1,4 +1,7 @@
 #include "./dicom_dcmtk.hpp"
+#include <png.h>
+#include <cstdlib>
+#include <cstring>
 #include <ctime>
 #include <iomanip>
 #include <random>
@@ -7,6 +10,33 @@
 #include "../../../libs/onis_kit/include/utilities/dicom.hpp"
 #include "../../../libs/onis_kit/include/utilities/filesystem.hpp"
 #include "../../../libs/onis_kit/include/utilities/string.hpp"
+#include "onis_kit/include/core/exception.hpp"
+
+namespace {
+
+struct PngMemOutput {
+  std::uint32_t len;
+  std::uint8_t* data;
+};
+
+void dcmtk_png_write_data(png_structp png_ptr, png_bytep data,
+                          png_size_t length) {
+  auto* output = static_cast<PngMemOutput*>(png_get_io_ptr(png_ptr));
+  std::size_t nsize =
+      static_cast<std::size_t>(output->len) + static_cast<std::size_t>(length);
+  if (output->data)
+    output->data = static_cast<std::uint8_t*>(realloc(output->data, nsize));
+  else
+    output->data = static_cast<std::uint8_t*>(malloc(nsize));
+  if (!output->data)
+    png_error(png_ptr, "Write Error");
+  std::memcpy(output->data + output->len, data, length);
+  output->len += static_cast<std::uint32_t>(length);
+}
+
+void dcmtk_png_flush(png_structp) {}
+
+}  // namespace
 
 void dcmtk_init() {
   OFBool opt_huffmanOptimize = OFTrue;
@@ -2138,22 +2168,19 @@ onis::dicom_raw_palette* dicom_dcmtk_file::get_raw_palette(
 // frames
 //-----------------------------------------------------------------------
 onis::dicom_frame_ptr dicom_dcmtk_file::extract_frame(std::int32_t index) {
-  onis::dicom_frame_ptr image;
-  /*onis::aresult res1;
-  _mutex.lock();
+  dcmtk_dicom_frame_ptr image;
+  onis::result res1;
+  std::lock_guard<std::recursive_mutex> lock(_mutex);
 
   // the dicom file must exist:
   if (_file == nullptr) {
-    res1.status = OSRSP_FAILURE;
-    res1.reason = EOS_NO_FILE;
-
+    res1.set(OSRSP_FAILURE, EOS_NO_FILE, "No file", false);
   } else {
     // create an image:
-    image = std::static_pointer_cast<odicom_frame>(odicom_frame::create(_app));
+    image = std::static_pointer_cast<dcmtk_dicom_frame>(
+        dcmtk_dicom_frame::create());
     if (image == nullptr) {
-      res1.status = OSRSP_FAILURE;
-      res1.reason = EOS_MEMORY;
-
+      res1.set(OSRSP_FAILURE, EOS_MEMORY, "", false);
     } else {
       // is it a mpeg file?
       std::string transfer_syntax;
@@ -2166,10 +2193,10 @@ onis::dicom_frame_ptr dicom_dcmtk_file::extract_frame(std::int32_t index) {
         // we prepare a bitmap to receive the pixel data:
         std::string tmp;
         get_string_element(tmp, TAG_ROWS, "US");
-        u16 height = (u16)onis::util::string::convert_to_u32(tmp);
+        std::uint16_t height = static_cast<std::uint16_t>(std::stoul(tmp));
         get_string_element(tmp, TAG_COLUMNS, "US");
-        u16 width = (u16)onis::util::string::convert_to_u32(tmp);
-        if (width <= 8192 && height <= 8192) {
+        std::uint16_t width = static_cast<std::uint16_t>(std::stoul(tmp));
+        /*if (width <= 8192 && height <= 8192) {
           // try to extract the bitmap:
           if (_mpeg_bmp == nullptr) {
             std::uint64_t start, stop;
@@ -2201,7 +2228,8 @@ onis::dicom_frame_ptr dicom_dcmtk_file::extract_frame(std::int32_t index) {
         } else {
           res1.status = OSRSP_FAILURE;
           res1.reason = EOS_INVALID_IMAGE;
-        }
+        }*/
+        res1.set(OSRSP_FAILURE, EOS_INVALID_IMAGE, "Invalid image", false);
 
       } else {
         // read the photometric information:
@@ -2237,10 +2265,27 @@ onis::dicom_frame_ptr dicom_dcmtk_file::extract_frame(std::int32_t index) {
         std::string intercept, slope;
         get_string_element(intercept, TAG_RESCALE_INTERCEPT, "DS");
         get_string_element(slope, TAG_RESCALE_SLOPE, "DS");
-        if ((!intercept.empty()) && (!slope.empty()))
-          image->set_rescale_and_intercept(
-              onis::util::string::convert_to_f64(slope),
-              onis::util::string::convert_to_f64(intercept));
+
+        if ((!intercept.empty()) && (!slope.empty())) {
+          double intercept_value = 0.0;
+          double slope_value = 1.0;
+          if (!intercept.empty()) {
+            try {
+              intercept_value = std::stod(intercept);
+            } catch (...) {
+              intercept_value = 0.0;
+            }
+          }
+          if (!slope.empty()) {
+            try {
+              slope_value = std::stod(slope);
+            } catch (...) {
+              slope_value = 1.0;
+            }
+          }
+          image->set_rescale_and_intercept(slope_value, intercept_value);
+        }
+
         E_TransferSyntax xfer = _file->getDataset()->getOriginalXfer();
         DcmFileFormat* tmp = nullptr;
 
@@ -2248,10 +2293,8 @@ onis::dicom_frame_ptr dicom_dcmtk_file::extract_frame(std::int32_t index) {
           tmp = (DcmFileFormat*)_file->clone();
 
         } catch (...) {
-          res1.status = OSRSP_FAILURE;
-          res1.reason = EOS_MEMORY;
-          if (tmp)
-            delete tmp;
+          res1.set(OSRSP_FAILURE, EOS_MEMORY, "", false);
+          delete tmp;
           tmp = nullptr;
           image.reset();
         }
@@ -2274,15 +2317,12 @@ onis::dicom_frame_ptr dicom_dcmtk_file::extract_frame(std::int32_t index) {
               image->_image = toto->createDicomImage(0, 1);
 
             } catch (...) {
-              res1.status = OSRSP_FAILURE;
-              res1.reason = EOS_MEMORY;
-              if (tmp)
-                delete tmp;
+              res1.set(OSRSP_FAILURE, EOS_MEMORY, "", false);
+              delete tmp;
               tmp = nullptr;
               image.reset();
             }
-            if (toto)
-              delete toto;
+            delete toto;
 
           } else {
             try {
@@ -2304,7 +2344,8 @@ onis::dicom_frame_ptr dicom_dcmtk_file::extract_frame(std::int32_t index) {
                         image->_overlays[k].show = false;
                         image->_overlays[k].width = width;
                         image->_overlays[k].height = height;
-                        image->_overlays[k].data = new u8[width * height];
+                        image->_overlays[k].data =
+                            new std::uint8_t[width * height];
                         memcpy(image->_overlays[k].data, pixels,
                                width * height);
                         image->_image->deleteOverlayData();
@@ -2315,10 +2356,8 @@ onis::dicom_frame_ptr dicom_dcmtk_file::extract_frame(std::int32_t index) {
               }
 
             } catch (...) {
-              res1.status = OSRSP_FAILURE;
-              res1.reason = EOS_MEMORY;
-              if (tmp)
-                delete tmp;
+              res1.set(OSRSP_FAILURE, EOS_MEMORY, "", false);
+              delete tmp;
               tmp = nullptr;
               image.reset();
             }
@@ -2344,19 +2383,19 @@ onis::dicom_frame_ptr dicom_dcmtk_file::extract_frame(std::int32_t index) {
                 std::int32_t tag_data = 0;
                 switch (i) {
                   case 0:
-                    palette = image->get_palette(OSRED);
+                    palette = image->get_palette(0);
                     tag_descriptor =
                         TAG_RED_PALETTE_COLOR_LOOKUP_TABLE_DESCRIPTOR;
                     tag_data = TAG_RED_PALETTE_COLOR_LOOKUP_TABLE_DATA;
                     break;
                   case 1:
-                    palette = image->get_palette(OSGREEN);
+                    palette = image->get_palette(1);
                     tag_descriptor =
                         TAG_GREEN_PALETTE_COLOR_LOOKUP_TABLE_DESCRIPTOR;
                     tag_data = TAG_GREEN_PALETTE_COLOR_LOOKUP_TABLE_DATA;
                     break;
                   case 2:
-                    palette = image->get_palette(OSBLUE);
+                    palette = image->get_palette(2);
                     tag_descriptor =
                         TAG_BLUE_PALETTE_COLOR_LOOKUP_TABLE_DESCRIPTOR;
                     tag_data = TAG_BLUE_PALETTE_COLOR_LOOKUP_TABLE_DATA;
@@ -2372,7 +2411,11 @@ onis::dicom_frame_ptr dicom_dcmtk_file::extract_frame(std::int32_t index) {
                   else {
                     std::string left = descriptor.substr(pos);
                     std::string right = descriptor.substr(pos + 1);
-                    palette->count = onis::util::string::convert_to_s32(left);
+                    try {
+                      palette->count = std::stoi(left);
+                    } catch (...) {
+                      palette->count = 0;
+                    }
                     if (palette->count == 0)
                       palette->count = 65536;
                     std::size_t pos = (std::int32_t)right.find("\\");
@@ -2394,7 +2437,7 @@ onis::dicom_frame_ptr dicom_dcmtk_file::extract_frame(std::int32_t index) {
                 if (palette_ok) {
                   // we need to read the palette data:
                   std::int32_t length = 0;
-                  u8* data = nullptr;
+                  std::uint8_t* data = nullptr;
                   std::string new_tranfer_syntax = "1.2.840.10008.1.2.1";
 
                   // copy the character set:
@@ -2422,9 +2465,9 @@ onis::dicom_frame_ptr dicom_dcmtk_file::extract_frame(std::int32_t index) {
                         // the number of entry in the palette must correspond:
                         if (length == 512) {
                           // reduce the palette to 8 bits:
-                          u8* palette_data = nullptr;
+                          std::uint8_t* palette_data = nullptr;
                           try {
-                            palette_data = new u8[256];
+                            palette_data = new std::uint8_t[256];
 
                           } catch (...) {
                             res1.status = OSRSP_FAILURE;
@@ -2437,7 +2480,8 @@ onis::dicom_frame_ptr dicom_dcmtk_file::extract_frame(std::int32_t index) {
 
                           if (palette_data) {
                             for (std::int32_t z = 0; z < 256; z++)
-                              palette_data[z] = (((u16*)data)[z] * 255) / 65535;
+                              palette_data[z] =
+                                  (((std::uint16_t*)data)[z] * 255) / 65535;
                             palette->data = palette_data;
                             delete[] data;
                             data = nullptr;
@@ -2445,13 +2489,12 @@ onis::dicom_frame_ptr dicom_dcmtk_file::extract_frame(std::int32_t index) {
 
                         } else {
                           std::int32_t length_h = length / 2;
-                          u8* palette_data = nullptr;
+                          std::uint8_t* palette_data = nullptr;
                           try {
-                            palette_data = new u8[256];
+                            palette_data = new std::uint8_t[256];
 
                           } catch (...) {
-                            res1.status = OSRSP_FAILURE;
-                            res1.reason = EOS_MEMORY;
+                            res1.set(OSRSP_FAILURE, EOS_MEMORY, "", false);
                             if (palette_data)
                               delete[] palette_data;
                             palette_data = nullptr;
@@ -2463,17 +2506,17 @@ onis::dicom_frame_ptr dicom_dcmtk_file::extract_frame(std::int32_t index) {
                               memset(palette_data, 0, 256);
                               for (int z = 0; z < length_h; z++)
                                 palette_data[z] =
-                                    (((u16*)data)[z] * 255) / 65535;
+                                    (((std::uint16_t*)data)[z] * 255) / 65535;
 
                             } else {
                               for (int z = 0; z < 256; z++) {
                                 std::int32_t data_index =
                                     (z * (length_h - 1)) / 255;
                                 palette_data[z] =
-                                    (((u16*)data)[data_index] * 255) / 65535;
+                                    (((std::uint16_t*)data)[data_index] * 255) /
+                                    65535;
                               }
                             }
-
                             palette->data = palette_data;
                             delete[] data;
                             data = nullptr;
@@ -2511,8 +2554,7 @@ onis::dicom_frame_ptr dicom_dcmtk_file::extract_frame(std::int32_t index) {
 
               if (!palette_ok) {
                 if (res1.status == OSRSP_SUCCESS) {
-                  res1.status = OSRSP_FAILURE;
-                  res1.reason = EOS_INVALID_PALETTE;
+                  res1.set(OSRSP_FAILURE, EOS_INVALID_PALETTE, "", false);
                 }
                 image.reset();
               }
@@ -2522,8 +2564,7 @@ onis::dicom_frame_ptr dicom_dcmtk_file::extract_frame(std::int32_t index) {
               EI_Status u_status = image->_image->getStatus();
               if (u_status != EIS_Normal) {
                 if (res1.status == OSRSP_SUCCESS) {
-                  res1.status = OSRSP_FAILURE;
-                  res1.reason = EOS_INVALID_IMAGE;
+                  res1.set(OSRSP_FAILURE, EOS_INVALID_IMAGE, "", false);
                 }
                 image.reset();
               }
@@ -2531,8 +2572,7 @@ onis::dicom_frame_ptr dicom_dcmtk_file::extract_frame(std::int32_t index) {
 
           } else {
             if (res1.status == OSRSP_SUCCESS) {
-              res1.status = OSRSP_FAILURE;
-              res1.reason = EOS_FAILED_TO_EXTRACT_IMAGE;
+              res1.set(OSRSP_FAILURE, EOS_FAILED_TO_EXTRACT_IMAGE, "", false);
             }
             image.reset();
           }
@@ -2557,12 +2597,12 @@ onis::dicom_frame_ptr dicom_dcmtk_file::extract_frame(std::int32_t index) {
               image->set_original_window_level(128.0, 255.0);
 
             } else {
-              f64 min_value, max_value;
+              double min_value, max_value;
               image->_image->getMinMaxValues(min_value, max_value);
               image->set_min_max_values(min_value, max_value, true);
 
               // set the original window level:
-              f64 width, center;
+              double width, center;
               bool valid =
                   onis::util::dicom::get_window_level(this, &center, &width);
               if (!valid) {
@@ -2601,16 +2641,15 @@ onis::dicom_frame_ptr dicom_dcmtk_file::extract_frame(std::int32_t index) {
           }
 
           // lock the dicom file as well:
-          image->set_dicom_file(
-              std::static_pointer_cast<odicom_file>(shared_from_this()));
+          /*image->set_dicom_file(
+              std::static_pointer_cast<odicom_file>(shared_from_this()));*/
         }
       }
     }
   }
-
-  if (res)
-    *res = res1;
-  _mutex.unlock();*/
+  if (!res1.good()) {
+    throw onis::exception(res1.reason, res1.info);
+  }
   return image;
 }
 
@@ -2794,7 +2833,8 @@ onis::dicom_frame_offsets* dicom_dcmtk_file::get_pixel_data_positions(
                           offsets[0].offsets[j * 2] =
                               offsets[0].offsets[(j - 1) * 2 + 1];
                           offsets[0].offsets[j * 2 + 1] =
-                              offsets[0].offsets[j * 2] + 8 + item->getLength();
+                              offsets[0].offsets[j * 2] + 8 +
+  item->getLength();
 
                         } else {
                           valid = false;
@@ -3035,11 +3075,11 @@ bool dicom_dcmtk_file::set_image(onis::dicom_image_info* info) {
         elt = _file->getDataset()->remove(DCM_RedPaletteColorLookupTableData);
         if (elt)
           delete elt;
-        elt = _file->getDataset()->remove(DCM_GreenPaletteColorLookupTableData);
-        if (elt)
+        elt =
+  _file->getDataset()->remove(DCM_GreenPaletteColorLookupTableData); if (elt)
           delete elt;
-        elt = _file->getDataset()->remove(DCM_BluePaletteColorLookupTableData);
-        if (elt)
+        elt =
+  _file->getDataset()->remove(DCM_BluePaletteColorLookupTableData); if (elt)
           delete elt;
         elt = _file->getDataset()->remove(
             DCM_SegmentedRedPaletteColorLookupTableData);
@@ -3058,9 +3098,9 @@ bool dicom_dcmtk_file::set_image(onis::dicom_image_info* info) {
         if (info->flags & IMGINFO_BITS) {
           set_us_element(TAG_BITS_ALLOCATED, info->bits_alloc);
           set_us_element(TAG_BITS_STORED, info->bits_stored);
-          set_us_element(TAG_PIXEL_REPRESENTATION, info->pixel_representation);
-          set_us_element(TAG_SAMPLES_PER_PIXEL, info->sample_per_pixel);
-          set_us_element(TAG_HIGH_BIT, info->high_bit);
+          set_us_element(TAG_PIXEL_REPRESENTATION,
+  info->pixel_representation); set_us_element(TAG_SAMPLES_PER_PIXEL,
+  info->sample_per_pixel); set_us_element(TAG_HIGH_BIT, info->high_bit);
         }
 
         if (info->flags & IMGINFO_RESCALE) {
@@ -3135,7 +3175,8 @@ bool dicom_dcmtk_file::set_image(onis::dicom_image_info* info) {
               else {
                 std::string left = descriptor.substr(0, pos);
                 std::string right = descriptor.substr(pos + 1);
-                descriptor_value[0] = onis::util::string::convert_to_u32(left);
+                descriptor_value[0] =
+  onis::util::string::convert_to_u32(left);
 
                 std::size_t pos = right.find("\\");
                 if (pos == std::string::npos)
@@ -3186,7 +3227,7 @@ bool dicom_dcmtk_file::set_image(onis::dicom_image_info* info) {
 bool dicom_dcmtk_file::modify_transfer_syntax(
     E_TransferSyntax new_transfer_syntax) {
   bool ret = false;
-  _mutex.lock();
+  std::lock_guard<std::recursive_mutex> lock(_mutex);
   if (_file != nullptr) {
     std::string current_transfer;
     get_string_element(current_transfer, TAG_TRANSFER_SYNTAX_UID, "UI");
@@ -3197,11 +3238,9 @@ bool dicom_dcmtk_file::modify_transfer_syntax(
     E_TransferSyntax dcmtk_transfer =
         get_transfer_syntax_from_name(current_transfer, &compression);
     if (dcmtk_transfer == -1) {
-      _mutex.unlock();
       return false;
     }
     if (dcmtk_transfer == new_transfer_syntax) {
-      _mutex.unlock();
       return true;
     }
 
@@ -3242,9 +3281,9 @@ bool dicom_dcmtk_file::modify_transfer_syntax(
 
       if (ret) {
         if (written)
-          streamout
-              .flush();  // flush stream including embedded compression codec.
-                         // get buffer and its length, assign to local variable
+          streamout.flush();  // flush stream including embedded compression
+                              // codec. get buffer and its length, assign to
+                              // local variable
         offile_off_t length;
         void* full_buf = nullptr;
         streamout.flushBuffer(full_buf, length);
@@ -3308,7 +3347,6 @@ bool dicom_dcmtk_file::modify_transfer_syntax(
       delete *it;
     list_copy.clear();
   }
-  _mutex.unlock();
   return ret;
 }
 
@@ -3468,10 +3506,8 @@ void dicom_dcmtk_file::get_streaming_status() {
 // mpeg frame
 //-----------------------------------------------------------------------
 bool dicom_dcmtk_file::is_mpeg_frame() {
-  _mutex.lock();
-  bool ret = is_mpeg_frame_;
-  _mutex.unlock();
-  return ret;
+  std::lock_guard<std::recursive_mutex> lock(_mutex);
+  return is_mpeg_frame_;
 }
 
 /*onis::bitmap_ptr odicom_file::update_mpeg_frame(const onis::bitmap_ptr& bmp,
@@ -3606,6 +3642,1800 @@ E_TransferSyntax dicom_dcmtk_file::get_transfer_syntax_from_name(
     return EXS_MPEG4BDcompatibleHighProfileLevel4_1;
   } else
     return EXS_Unknown;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// dcmtk_dicom_frame
+////////////////////////////////////////////////////////////////////////////////
+
+//-----------------------------------------------------------------------------
+// static creator
+//-----------------------------------------------------------------------------
+
+onis::dicom_frame_ptr dcmtk_dicom_frame::create() {
+  return std::make_shared<dcmtk_dicom_frame>();
+}
+
+//-----------------------------------------------------------------------------
+// destructor
+//-----------------------------------------------------------------------------
+
+dcmtk_dicom_frame::~dcmtk_dicom_frame() {
+  delete _image;
+}
+
+//-----------------------------------------------------------------------------
+// dicom file
+//-----------------------------------------------------------------------------
+
+/*bool dcmtk_dicom_frame::set_dicom_file(const onis::dicom_file_ptr& file) {
+
+
+}
+onis::dicom_file_ptr dcmtk_dicom_frame::get_dicom_file() {}*/
+
+//-----------------------------------------------------------------------------
+// frame
+//-----------------------------------------------------------------------------
+
+void dcmtk_dicom_frame::set_frame_index(std::int32_t index) {
+  std::lock_guard<std::recursive_mutex> lock(_mutex);
+  _frame_index = index;
+}
+
+std::int32_t dcmtk_dicom_frame::get_frame_index() {
+  std::lock_guard<std::recursive_mutex> lock(_mutex);
+  return _frame_index;
+}
+
+//-----------------------------------------------------------------------------
+// properties
+//-----------------------------------------------------------------------------
+
+bool dcmtk_dicom_frame::is_monochrome() const {
+  std::lock_guard<std::recursive_mutex> lock(_mutex);
+  return _image == nullptr ? false : _image->isMonochrome() == 0 ? false : true;
+}
+
+bool dcmtk_dicom_frame::get_dimensions(std::size_t* width,
+                                       std::size_t* height) const {
+  std::lock_guard<std::recursive_mutex> lock(_mutex);
+  if (_image != nullptr) {
+    if (width != nullptr)
+      *width = static_cast<std::size_t>(_image->getWidth());
+    if (height != nullptr)
+      *height = static_cast<std::size_t>(_image->getHeight());
+    return true;
+  }
+  if (_mpeg_bmp != nullptr) {
+    if (width != nullptr)
+      *width = _mpeg_bmp->get_width();
+    if (height != nullptr)
+      *height = _mpeg_bmp->get_height();
+    return true;
+  }
+  return false;
+}
+
+std::int32_t dcmtk_dicom_frame::get_bits_per_pixel() const {
+  std::lock_guard<std::recursive_mutex> lock(_mutex);
+  if (_image != nullptr && _image->getStatus() == EIS_Normal) {
+    int plane_count = 0;
+    const DiPixel* inter = _image->getInterData();
+    if (inter != NULL)
+      plane_count = inter->getPlanes();
+    int depth = _image->getDepth();
+    return plane_count * depth;
+  }
+  if (_mpeg_bmp != nullptr) {
+    return 24;
+  }
+  return 0;
+}
+
+//-----------------------------------------------------------------------------
+// window Level
+//-----------------------------------------------------------------------------
+
+void dcmtk_dicom_frame::set_window_level(double center, double width) {
+  std::lock_guard<std::recursive_mutex> lock(_mutex);
+  _window_center = center;
+  _window_width = width;
+  _window_level_valid = true;
+}
+
+bool dcmtk_dicom_frame::get_window_level(double* center, double* width) const {
+  std::lock_guard<std::recursive_mutex> lock(_mutex);
+  if (_window_level_valid)
+    return false;
+  *center = _window_center;
+  *width = _window_width;
+  return true;
+}
+
+void dcmtk_dicom_frame::set_original_window_level(double center, double width) {
+  std::lock_guard<std::recursive_mutex> lock(_mutex);
+  _original_window_center = center;
+  _original_window_width = width;
+}
+
+void dcmtk_dicom_frame::get_original_window_level(double* center,
+                                                  double* width) const {
+  std::lock_guard<std::recursive_mutex> lock(_mutex);
+  *center = _original_window_center;
+  *width = _original_window_width;
+}
+
+//-----------------------------------------------------------------------------
+// voi lut
+//-----------------------------------------------------------------------------
+
+void dcmtk_dicom_frame::set_voi_lut_function(std::int32_t mode) {
+  std::lock_guard<std::recursive_mutex> lock(_mutex);
+  _voi_lut_function = mode;
+}
+
+std::int32_t dcmtk_dicom_frame::get_voi_lut_function() const {
+  std::lock_guard<std::recursive_mutex> lock(_mutex);
+  return _voi_lut_function;
+}
+
+//-----------------------------------------------------------------------------
+// palette
+//-----------------------------------------------------------------------------
+onis::dicom_palette* dcmtk_dicom_frame::get_palette(std::int32_t channel) {
+  std::lock_guard<std::recursive_mutex> lock(_mutex);
+  return &_palette[channel];
+}
+
+bool dcmtk_dicom_frame::have_palette() const {
+  std::lock_guard<std::recursive_mutex> lock(_mutex);
+  if (_image != nullptr)
+    return _palette[0].data != nullptr;
+  return false;
+}
+
+void dcmtk_dicom_frame::dcmtk_dicom_frame::reconstruct_palette_image(
+    std::uint8_t* red, std::uint8_t* green, std::uint8_t* blue) {
+  std::size_t byte_count;
+  std::uint8_t* pixel_data =
+      (std::uint8_t*)get_intermediate_pixel_data(&byte_count);
+  std::size_t cx = static_cast<std::size_t>(_image->getWidth());
+  std::size_t cy = static_cast<std::size_t>(_image->getHeight());
+
+  // double intercept = _intercept;
+  // double slope = _rescale_slope;
+  bool signed_data;
+  std::int32_t representation = get_representation(&signed_data);
+
+  if (representation == 32) {
+  } else if (representation == 16) {
+    std::size_t source_stride = cx * 2;
+    if (signed_data) {
+      for (std::size_t j = 0; j < cy; j++) {
+        std::uint8_t* red_target = &red[(cy - j - 1) * cx];
+        std::uint8_t* green_target = &green[(cy - j - 1) * cx];
+        std::uint8_t* blue_target = &blue[(cy - j - 1) * cx];
+        std::uint8_t* source_pos = &pixel_data[(cy - j - 1) * source_stride];
+        std::int16_t* tmp_pix_from = (std::int16_t*)source_pos;
+
+        for (std::size_t i = 0; i < cx; i++) {
+          std::int32_t index = *tmp_pix_from;
+          if (index < 0)
+            index = 0;
+
+          // check the red:
+          std::int32_t index1 = index;
+          if (index1 > _palette[0].count)
+            index1 = _palette[0].count - 1;
+          std::uint16_t val = ((std::uint16_t*)_palette[0].data)[index1];
+          *red_target = (std::uint8_t)((val * 255) / 65535);
+
+          // check the green:
+          index1 = index;
+          if (index1 > _palette[1].count)
+            index1 = _palette[1].count - 1;
+          val = ((std::uint16_t*)_palette[1].data)[index1];
+          *green_target = (std::uint8_t)((val * 255) / 65535);
+
+          // check the blue:
+          index1 = index;
+          if (index1 > _palette[2].count)
+            index1 = _palette[2].count - 1;
+          val = ((std::uint16_t*)_palette[2].data)[index1];
+          *blue_target = (std::uint8_t)((val * 255) / 65535);
+
+          red_target++;
+          green_target++;
+          blue_target++;
+          tmp_pix_from++;
+        }
+      }
+    } else {
+      for (size_t j = 0; j < cy; j++) {
+        std::uint8_t* red_target = &red[(cy - j - 1) * cx];
+        std::uint8_t* green_target = &green[(cy - j - 1) * cx];
+        std::uint8_t* blue_target = &blue[(cy - j - 1) * cx];
+        std::uint8_t* source_pos = &pixel_data[(cy - j - 1) * source_stride];
+        std::uint16_t* tmp_pix_from = (std::uint16_t*)source_pos;
+
+        for (size_t i = 0; i < cx; i++) {
+          std::int32_t index = *tmp_pix_from;
+          if (index < 0)
+            index = 0;
+
+          // check the red:
+          std::int32_t index1 = index;
+          if (index1 > _palette[0].count)
+            index1 = _palette[0].count - 1;
+          std::uint16_t val = ((std::uint16_t*)_palette[0].data)[index1];
+          *red_target = (std::uint8_t)((val * 255) / 65535);
+
+          // check the green:
+          index1 = index;
+          if (index1 > _palette[1].count)
+            index1 = _palette[1].count - 1;
+          val = ((std::uint16_t*)_palette[1].data)[index1];
+          *green_target = (std::uint8_t)((val * 255) / 65535);
+
+          // check the blue:
+          index1 = index;
+          if (index1 > _palette[2].count)
+            index1 = _palette[2].count - 1;
+          val = ((std::uint16_t*)_palette[2].data)[index1];
+          *blue_target = (std::uint8_t)((val * 255) / 65535);
+
+          red_target++;
+          green_target++;
+          blue_target++;
+          tmp_pix_from++;
+        }
+      }
+    }
+  } else if (representation == 8) {
+    std::size_t source_stride = cx;
+
+    if (signed_data) {
+      for (std::size_t j = 0; j < cy; j++) {
+        std::uint8_t* red_target = &red[(cy - j - 1) * cx];
+        std::uint8_t* green_target = &green[(cy - j - 1) * cx];
+        std::uint8_t* blue_target = &blue[(cy - j - 1) * cx];
+        std::uint8_t* source_pos = &pixel_data[(cy - j - 1) * source_stride];
+        std::int8_t* tmp_pix_from = (std::int8_t*)source_pos;
+
+        for (std::size_t i = 0; i < cx; i++) {
+          std::int32_t index = *tmp_pix_from;
+          if (index < 0)
+            index = 0;
+
+          // check the red:
+          std::int32_t index1 = index;
+          if (index1 > _palette[0].count)
+            index1 = _palette[0].count - 1;
+          *red_target = ((std::uint8_t*)_palette[0].data)[index1];
+
+          // check the green:
+          index1 = index;
+          if (index1 > _palette[1].count)
+            index1 = _palette[1].count - 1;
+          *green_target = ((std::uint8_t*)_palette[1].data)[index1];
+
+          // check the blue:
+          index1 = index;
+          if (index1 > _palette[2].count)
+            index1 = _palette[2].count - 1;
+          *blue_target = ((std::uint8_t*)_palette[2].data)[index1];
+
+          red_target++;
+          green_target++;
+          blue_target++;
+          tmp_pix_from++;
+        }
+      }
+    } else {
+      for (std::size_t j = 0; j < cy; j++) {
+        std::uint8_t* red_target = &red[(cy - j - 1) * cx];
+        std::uint8_t* green_target = &green[(cy - j - 1) * cx];
+        std::uint8_t* blue_target = &blue[(cy - j - 1) * cx];
+        std::uint8_t* source_pos = &pixel_data[(cy - j - 1) * source_stride];
+        std::uint8_t* tmp_pix_from = (std::uint8_t*)source_pos;
+
+        for (std::size_t i = 0; i < cx; i++) {
+          std::int32_t index = *tmp_pix_from;
+          if (index < 0)
+            index = 0;
+
+          // check the red:
+          std::int32_t index1 = index;
+          if (index1 > _palette[0].count)
+            index1 = _palette[0].count - 1;
+          *red_target = ((std::uint8_t*)_palette[0].data)[index1];
+
+          // check the green:
+          index1 = index;
+          if (index1 > _palette[1].count)
+            index1 = _palette[1].count - 1;
+          *green_target = ((std::uint8_t*)_palette[1].data)[index1];
+
+          // check the blue:
+          index1 = index;
+          if (index1 > _palette[2].count)
+            index1 = _palette[2].count - 1;
+          *blue_target = ((std::uint8_t*)_palette[2].data)[index1];
+
+          red_target++;
+          green_target++;
+          blue_target++;
+          tmp_pix_from++;
+        }
+      }
+    }
+  }
+}
+
+//-----------------------------------------------------------------------------
+// internal data
+//-----------------------------------------------------------------------------
+
+const void* dcmtk_dicom_frame::get_intermediate_pixel_data(
+    std::size_t* count) const {
+  std::lock_guard<std::recursive_mutex> lock(_mutex);
+  if (count)
+    *count = 0;
+  const void* ret = nullptr;
+
+  bool ok = false;
+  if (_image != nullptr)
+    if (_image->getStatus() == EIS_Normal)
+      ok = true;
+
+  if (ok) {
+    std::size_t cnt = 0;
+    const DiPixel* inter = _image->getInterData();
+    if (inter != nullptr) {
+      ret = inter->getData();
+      EP_Representation format = inter->getRepresentation();
+      cnt = static_cast<std::size_t>(inter->getInputCount());
+      if (format == EPR_Uint16 || format == EPR_Sint16)
+        cnt *= 2;
+      else if (format == EPR_Uint32 || format == EPR_Sint32)
+        cnt *= 3;
+      if (count)
+        *count = cnt;
+    }
+  }
+  return ret;
+}
+
+std::int32_t dcmtk_dicom_frame::get_representation(bool* signed_data) const {
+  std::int32_t ret = 0;
+  std::lock_guard<std::recursive_mutex> lock(_mutex);
+  bool ok = false;
+  if (_image)
+    if (_image->getStatus() == EIS_Normal)
+      ok = true;
+
+  if (ok) {
+    const DiPixel* inter = _image->getInterData();
+    if (inter != nullptr) {
+      EP_Representation format = inter->getRepresentation();
+      switch (format) {
+        case EPR_Uint8:
+          *signed_data = false;
+          ret = 8;
+          break;
+        case EPR_Sint8:
+          *signed_data = true;
+          ret = 8;
+          break;
+        case EPR_Uint16:
+          *signed_data = false;
+          ret = 16;
+          break;
+        case EPR_Sint16:
+          *signed_data = true;
+          ret = 16;
+          break;
+        case EPR_Uint32:
+          *signed_data = false;
+          ret = 32;
+          break;
+        case EPR_Sint32:
+          *signed_data = true;
+          ret = 32;
+          break;
+        default:
+          break;
+      };
+    }
+  }
+  return ret;
+}
+
+//-----------------------------------------------------------------------------
+// min-max values
+//-----------------------------------------------------------------------------
+bool dcmtk_dicom_frame::get_min_max_values(double* min_val, double* max_val,
+                                           bool intermediate) const {
+  std::lock_guard<std::recursive_mutex> lock(_mutex);
+  bool ok = false;
+  if (_image)
+    if (_image->getStatus() == EIS_Normal)
+      ok = true;
+  if (ok) {
+    if (intermediate) {
+      *min_val = _min_value;
+      *max_val = _max_value;
+
+    } else {
+      *min_val = _min_value * _rescale_slope + _intercept;
+      *max_val = _max_value * _rescale_slope + _intercept;
+    }
+  }
+  return ok;
+}
+
+bool dcmtk_dicom_frame::set_min_max_values(double min_val, double max_val,
+                                           bool intermediate) {
+  std::lock_guard<std::recursive_mutex> lock(_mutex);
+  _min_value = min_val;
+  _max_value = max_val;
+  if (!intermediate)
+    display_to_inter_window_level(&_min_value, &_max_value);
+  return true;
+}
+
+//-----------------------------------------------------------------------------
+// rescale/intercept
+//-----------------------------------------------------------------------------
+
+bool dcmtk_dicom_frame::get_rescale_and_intercept(double* rescale,
+                                                  double* intercept) {
+  std::lock_guard<std::recursive_mutex> lock(_mutex);
+  *rescale = _rescale_slope;
+  *intercept = _intercept;
+  return true;
+}
+
+bool dcmtk_dicom_frame::set_rescale_and_intercept(double rescale,
+                                                  double intercept) {
+  std::lock_guard<std::recursive_mutex> lock(_mutex);
+  _rescale_slope = rescale;
+  _intercept = intercept;
+  return true;
+}
+
+//-----------------------------------------------------------------------------
+// mpeg frame
+//-----------------------------------------------------------------------------
+
+bool dcmtk_dicom_frame::is_mpeg_frame() {
+  std::lock_guard<std::recursive_mutex> lock(_mutex);
+  return _is_mpeg_frame;
+}
+
+//-----------------------------------------------------------------------
+// utilities
+//-----------------------------------------------------------------------
+
+void dcmtk_dicom_frame::inter_to_display_window_level(double* center,
+                                                      double* width) {
+  double left = (*center) - (*width) * 0.5;
+  double right = (*center) + (*width) * 0.5;
+  left = left * _rescale_slope + _intercept;
+  right = right * _rescale_slope + _intercept;
+  *center = (left + right) * 0.5;
+  *width = (right - left);
+}
+
+void dcmtk_dicom_frame::display_to_inter_window_level(double* center,
+                                                      double* width) {
+  if (_rescale_slope != 0) {
+    double left = (*center) - (*width) * 0.5;
+    double right = (*center) + (*width) * 0.5;
+    left = (left - _intercept) / _rescale_slope;
+    right = (right - _intercept) / _rescale_slope;
+    *center = (left + right) * 0.5;
+    *width = (right - left);
+  }
+}
+
+//-----------------------------------------------------------------------
+// extract bitmap
+//-----------------------------------------------------------------------
+
+onis::core::bitmap_ptr dcmtk_dicom_frame::create_bitmap(
+    std::int32_t bits, bool inverse_color,
+    onis::core::bitmap_ptr use_this_bitmap) {
+  std::lock_guard<std::recursive_mutex> lock(_mutex);
+  onis::core::bitmap_ptr bmp;
+
+  std::size_t width = 0;
+  std::size_t height = 0;
+  std::uint8_t* output = nullptr;
+
+  if (get_dimensions(&width, &height)) {
+    // Prepare the output buffer to receive the pixel data:
+    /*std::size_t factor = (bits == 24) ? 3 : 4;
+    std::size_t stride = width * factor;
+    if (factor == 3)
+      stride += width % 4;*/
+
+    // shall we use existing bitmap?
+    if (use_this_bitmap != nullptr) {
+      bool valid = false;
+      // check for the bit depth:
+      if (bits == 32)
+        if (use_this_bitmap->get_pixel_format() !=
+            onis::core::PixelFormat::Argb32)
+          valid = false;
+      if (bits == 24)
+        if (use_this_bitmap->get_pixel_format() !=
+            onis::core::PixelFormat::Rgb24)
+          valid = false;
+      // check for the size:
+      if (valid) {
+        if (width != use_this_bitmap->get_width())
+          valid = false;
+        else if (height != use_this_bitmap->get_height())
+          valid = false;
+      }
+      if (!valid) {
+        if (bits == 32)
+          bmp = onis::core::bitmap::create(width, height,
+                                           onis::core::PixelFormat::Argb32);
+        else
+          bmp = onis::core::bitmap::create(width, height,
+                                           onis::core::PixelFormat::Rgb24);
+      } else
+        bmp = use_this_bitmap;
+    } else {
+      if (bits == 32)
+        bmp = onis::core::bitmap::create(width, height,
+                                         onis::core::PixelFormat::Argb32);
+      else
+        bmp = onis::core::bitmap::create(width, height,
+                                         onis::core::PixelFormat::Rgb24);
+    }
+
+    if (bmp != nullptr) {
+      bmp->lock_bits();
+      output = bmp->get_bytes();
+      calculate_pixel_data(bits, inverse_color, width, height, output);
+      bmp->unlock_bits();
+    }
+
+    return bmp;
+  }
+
+  return nullptr;
+}
+
+std::uint8_t* dcmtk_dicom_frame::get_png_data(std::size_t* len) const {
+  std::uint8_t* data = nullptr;
+  *len = 0;
+
+  std::size_t count = 0;
+  const void* pixels = get_intermediate_pixel_data(&count);
+  std::size_t width, height;
+  if (pixels == nullptr || !get_dimensions(&width, &height))
+    return nullptr;
+
+  png_structp png_ptr =
+      png_create_write_struct(PNG_LIBPNG_VER_STRING, NULL, NULL, NULL);
+  if (png_ptr != nullptr) {
+    png_infop info_ptr = png_create_info_struct(png_ptr);
+    if (info_ptr != nullptr) {
+      if (!setjmp(png_jmpbuf(png_ptr))) {
+        png_bytep* row_pointers = new png_bytep[height];
+
+        PngMemOutput output;
+        output.data = nullptr;
+        output.len = 0;
+
+        if (is_monochrome()) {
+          std::int32_t bpp = get_bits_per_pixel();
+          if (bpp <= 8) {
+            std::uint8_t* data = (std::uint8_t*)pixels;
+            for (std::size_t i = 0; i < height; i++)
+              row_pointers[i] = (png_bytep)&data[width * i];
+            png_set_write_fn(png_ptr, &output, dcmtk_png_write_data,
+                             dcmtk_png_flush);
+            png_set_IHDR(png_ptr, info_ptr, width, height, 8,
+                         PNG_COLOR_TYPE_GRAY, PNG_INTERLACE_NONE,
+                         PNG_COMPRESSION_TYPE_DEFAULT, PNG_FILTER_TYPE_DEFAULT);
+            png_set_rows(png_ptr, info_ptr, row_pointers);
+            png_write_png(png_ptr, info_ptr, PNG_TRANSFORM_IDENTITY, nullptr);
+
+          } else if (bpp <= 16) {
+            std::uint16_t* data = (std::uint16_t*)pixels;
+            for (std::size_t i = 0; i < height; i++)
+              row_pointers[i] = (png_bytep)&data[width * i];
+            png_set_write_fn(png_ptr, &output, dcmtk_png_write_data,
+                             dcmtk_png_flush);
+            png_set_IHDR(png_ptr, info_ptr, width, height, 16,
+                         PNG_COLOR_TYPE_GRAY, PNG_INTERLACE_NONE,
+                         PNG_COMPRESSION_TYPE_DEFAULT, PNG_FILTER_TYPE_DEFAULT);
+            png_set_rows(png_ptr, info_ptr, row_pointers);
+            png_write_png(png_ptr, info_ptr, PNG_TRANSFORM_IDENTITY, nullptr);
+          }
+
+        } else {
+          // reconstruct the rgb data:
+          std::uint8_t* rgb = new std::uint8_t[width * height * 3];
+          std::uint8_t* source[3];
+          source[0] = ((std::uint8_t**)pixels)[0];
+          source[1] = ((std::uint8_t**)pixels)[1];
+          source[2] = ((std::uint8_t**)pixels)[2];
+          std::int32_t offset = 0;
+          for (std::size_t i = 0; i < height; i++) {
+            std::int32_t k = width * i;
+            for (std::size_t j = 0; j < width; j++) {
+              rgb[offset] = source[0][k + j];
+              offset++;
+              rgb[offset] = source[1][k + j];
+              offset++;
+              rgb[offset] = source[2][k + j];
+              offset++;
+            }
+            row_pointers[i] = (png_bytep)&rgb[width * 3 * i];
+          }
+          png_set_write_fn(png_ptr, &output, dcmtk_png_write_data,
+                           dcmtk_png_flush);
+          png_set_IHDR(png_ptr, info_ptr, width, height, 8, PNG_COLOR_TYPE_RGB,
+                       PNG_INTERLACE_NONE, PNG_COMPRESSION_TYPE_DEFAULT,
+                       PNG_FILTER_TYPE_DEFAULT);
+          png_set_rows(png_ptr, info_ptr, row_pointers);
+          png_write_png(png_ptr, info_ptr, PNG_TRANSFORM_IDENTITY, nullptr);
+          delete[] rgb;
+        }
+        delete[] row_pointers;
+        if (output.len) {
+          data = output.data;
+          *len = output.len;
+        }
+      }
+      png_destroy_info_struct(png_ptr, &info_ptr);
+    }
+    png_destroy_write_struct(&png_ptr, (png_infopp)NULL);
+  }
+  return data;
+}
+
+void* dcmtk_dicom_frame::merge_intermediate_pixel_data_with_overlays(
+    std::size_t* count) const {
+  const void* intermediate = get_intermediate_pixel_data(count);
+  if (intermediate == nullptr)
+    return nullptr;
+  if (!is_monochrome() || have_palette())
+    return nullptr;
+
+  std::size_t width = 0;
+  std::size_t height = 0;
+  get_dimensions(&width, &height);
+  if (width == 0 || height == 0)
+    return nullptr;
+
+  bool is_signed = false;
+  std::int32_t representation = get_representation(&is_signed);
+  if (representation != 8 && representation != 16)
+    return nullptr;
+
+  void* merged = nullptr;
+  for (std::int32_t k = 0; k < 16; k++) {
+    if (_overlays[k].show && _overlays[k].data) {
+      // prepare output:
+      if (merged == nullptr) {
+        merged = new std::uint8_t[*count];
+        for (std::size_t i = 0; i < *count; i++)
+          ((std::uint8_t*)merged)[i] = ((std::uint8_t*)intermediate)[i];
+      }
+
+      // merge:
+      std::int32_t oxmin, oxmax;
+      oxmin = _overlays[k].x >= 0 ? 0 : -_overlays[k].x;
+      oxmax = _overlays[k].width - 1;
+      if (oxmax + _overlays[k].x > width - 1)
+        oxmax = width - 1 - _overlays[k].x;
+      else if (oxmax + _overlays[k].x < 0)
+        oxmax = 0;
+
+      std::int32_t oymin, oymax;
+      oymin = _overlays[k].y >= 0 ? 0 : -_overlays[k].y;
+      oymax = _overlays[k].height - 1;
+      if (oymax + _overlays[k].y > height - 1)
+        oymax = height - 1 - _overlays[k].y;
+      else if (oymax + _overlays[k].y < 0)
+        oymax = 0;
+
+      if (representation == 16) {
+        if (is_signed) {
+          std::int16_t* dest = (std::int16_t*)merged;
+          // std::size_t dest_stride = width;
+          // std::size_t src_stride = _overlays[k].height;
+          for (std::int32_t j = oymin; j <= oymax; j++)
+            for (std::int32_t i = oxmin; i <= oxmax; i++)
+              if (_overlays[k].data[j * _overlays[k].width + i] != 0)
+                dest[(_overlays[k].y + j) * width + _overlays[k].x + i] = 32767;
+
+        } else {
+          std::uint16_t* dest = (std::uint16_t*)merged;
+          // std::size_t dest_stride = width;
+          // std::size_t src_stride = _overlays[k].height;
+          for (std::int32_t j = oymin; j <= oymax; j++)
+            for (std::int32_t i = oxmin; i <= oxmax; i++)
+              if (_overlays[k].data[j * _overlays[k].width + i] != 0)
+                dest[(_overlays[k].y + j) * width + _overlays[k].x + i] =
+                    0xFFFF;
+        }
+      } else if (representation == 8) {
+        if (is_signed) {
+          std::int8_t* dest = (std::int8_t*)merged;
+          // std::size_t dest_stride = width;
+          // std::size_t src_stride = _overlays[k].height;
+          for (std::int32_t j = oymin; j <= oymax; j++)
+            for (std::int32_t i = oxmin; i <= oxmax; i++)
+              if (_overlays[k].data[j * _overlays[k].width + i] != 0)
+                dest[(_overlays[k].y + j) * width + _overlays[k].x + i] = 127;
+        } else {
+          std::uint8_t* dest = (std::uint8_t*)merged;
+          // std::size_t dest_stride = width;
+          // std::size_t src_stride = _overlays[k].height;
+          for (std::int32_t j = oymin; j <= oymax; j++)
+            for (std::int32_t i = oxmin; i <= oxmax; i++)
+              if (_overlays[k].data[j * _overlays[k].width + i] != 0)
+                dest[(_overlays[k].y + j) * width + _overlays[k].x + i] = 0xFF;
+        }
+      }
+    }
+  }
+  return merged;
+}
+
+void dcmtk_dicom_frame::calculate_pixel_data(std::int32_t bits,
+                                             bool inverse_color,
+                                             std::size_t width,
+                                             std::size_t height,
+                                             std::uint8_t* output) {
+  // True monochrome images:
+  if (is_monochrome() && !have_palette()) {
+    bool is_copy = false;
+    std::size_t byte_cnt;
+    bool is_signed;
+
+    std::uint8_t* pixels =
+        (std::uint8_t*)merge_intermediate_pixel_data_with_overlays(&byte_cnt);
+    if (pixels != nullptr)
+      is_copy = true;
+    else
+      pixels = (std::uint8_t*)get_intermediate_pixel_data(&byte_cnt);
+    // double intercept = _intercept;
+    // double slope = _rescale_slope;
+    std::int32_t representation = get_representation(&is_signed);
+
+    // Apply the convolution filter:
+    /*onis::db::convolution_filter *up_ConvolutionFilter =
+    get_convolution_filter().get(); if (up_ConvolutionFilter &&
+    i_Representation > 0 && (i_Representation == 16 || i_Representation == 8))
+    {
+
+    //make sure that the size of the image is compatible with the filter
+    dimension: s32 i_Tmp =
+    i_Representation*up_ConvolutionFilter->get_dimension(); if (b_Signed)
+    i_Tmp = -i_Tmp;
+
+    b32 b_Compatible = (pi_Width < i_Tmp || pi_Height < i_Tmp) ? OSFALSE :
+    OSTRUE;
+
+    if (b_Compatible) {
+
+    //we have a convolution filter.
+    //we will use a modified copy of up_Pixel that will take in account the
+    convolution filter!
+
+    s32 i_outputstride = pi_Width*4;
+    u8 *up_Copy = new u8[pi_Height*i_outputstride];
+
+    switch(i_Tmp) {
+    case  48: ProcessConvolutionFilter3x3ForMonochrome(up_ConvolutionFilter,
+    pi_Width, pi_Height, (u16 *)up_Pixels, (s32 *)up_Copy); break; case -48:
+    ProcessConvolutionFilter3x3ForMonochrome(up_ConvolutionFilter, pi_Width,
+    pi_Height, (s16 *)up_Pixels, (s32 *)up_Copy); break; case  80:
+    ProcessConvolutionFilter5x5ForMonochrome(up_ConvolutionFilter, pi_Width,
+    pi_Height, (u16 *)up_Pixels, (s32 *)up_Copy); break; case -80:
+    ProcessConvolutionFilter5x5ForMonochrome(up_ConvolutionFilter, pi_Width,
+    pi_Height, (s16 *)up_Pixels, (s32 *)up_Copy); break; case  24:
+    ProcessConvolutionFilter3x3ForMonochrome(up_ConvolutionFilter, pi_Width,
+    pi_Height, (u8 *)up_Pixels, (s32 *)up_Copy); break; case -24:
+    ProcessConvolutionFilter3x3ForMonochrome(up_ConvolutionFilter, pi_Width,
+    pi_Height, (s8 *)up_Pixels, (s32 *)up_Copy); break; case  40:
+    ProcessConvolutionFilter5x5ForMonochrome(up_ConvolutionFilter, pi_Width,
+    pi_Height, (u8 *)up_Pixels, (s32 *)up_Copy); break; case -40:
+    ProcessConvolutionFilter5x5ForMonochrome(up_ConvolutionFilter, pi_Width,
+    pi_Height, (s8 *)up_Pixels, (s32 *)up_Copy); break; default: break;
+    };
+
+    if (b_IsCopy) delete[] up_Pixels;
+    else b_IsCopy = OSTRUE;
+    up_Pixels = up_Copy;
+    i_Representation = 32;
+    b_Signed = OSTRUE;
+
+    }
+
+    }*/
+
+    // Create our window level lut:
+    std::uint8_t window_level_lut[65536];
+    bool should_inverse_color = _is_monochrome1;
+    if (inverse_color)
+      should_inverse_color = !should_inverse_color;
+    create_window_level_lut(window_level_lut, representation, is_signed,
+                            should_inverse_color);
+
+    // Do we have an opacity table to apply?
+    // onis::db::opacity_table *up_OpacityTable = get_opacity_table().get();
+
+    // Do we have a color LUT to apply:
+    // onis::db::color_lut *up_ColorLut = get_color_lut().get();
+
+    if (representation == 32) {
+      if (is_signed) {
+        /*if (up_ColorLut) {
+        if (up_OpacityTable)
+        CalculatePixelDataForSignedIntDataWithColorLutAndOpacityTable(pi_Bits,
+        pup_Output, pi_Width, pi_Height, up_Pixels, up_WindowLevelLut,
+        up_ColorLut, up_OpacityTable); else
+        CalculatePixelDataForSignedIntDataWithColorLut(pi_Bits, pup_Output,
+        pi_Width, pi_Height, up_Pixels, up_WindowLevelLut, up_ColorLut);
+        }
+        else {
+        if (up_OpacityTable)
+        CalculatePixelDataForSignedIntDataWithOpacityTable(pi_Bits,
+        pup_Output, pi_Width, pi_Height, up_Pixels, up_WindowLevelLut,
+        up_OpacityTable); else*/
+        calculate_pixel_data_for_signed_int_data(bits, output, width, height,
+                                                 pixels, window_level_lut);
+        //}
+      } else {
+        /*if (up_ColorLut) {
+        if (up_OpacityTable)
+        CalculatePixelDataForUnsignedIntDataWithColorLutAndOpacityTable(pi_Bits,
+        pup_Output, pi_Width, pi_Height, up_Pixels, up_WindowLevelLut,
+        up_ColorLut, up_OpacityTable); else
+        CalculatePixelDataForUnsignedIntDataWithColorLut(pi_Bits, pup_Output,
+        pi_Width, pi_Height, up_Pixels, up_WindowLevelLut, up_ColorLut);
+        }
+        else {
+        if (up_OpacityTable)
+        CalculatePixelDataForUnsignedIntDataWithOpacityTable(pi_Bits,
+        pup_Output, pi_Width, pi_Height, up_Pixels, up_WindowLevelLut,
+        up_OpacityTable); else*/
+        calculate_pixel_data_for_unsigned_int_data(bits, output, width, height,
+                                                   pixels, window_level_lut);
+        //}
+      }
+    } else if (representation == 16) {
+      if (is_signed) {
+        /*if (up_ColorLut) {
+        if (up_OpacityTable)
+        CalculatePixelDataForSignedShortDataWithColorLutAndOpacityTable(pi_Bits,
+        pup_Output, pi_Width, pi_Height, up_Pixels, up_WindowLevelLut,
+        up_ColorLut, up_OpacityTable); else
+        CalculatePixelDataForSignedShortDataWithColorLut(pi_Bits, pup_Output,
+        pi_Width, pi_Height, up_Pixels, up_WindowLevelLut, up_ColorLut);
+        }
+        else {
+        if (up_OpacityTable)
+        CalculatePixelDataForSignedShortDataWithOpacityTable(pi_Bits,
+        pup_Output, pi_Width, pi_Height, up_Pixels, up_WindowLevelLut,
+        up_OpacityTable); else*/
+        calculate_pixel_data_for_signed_short_data(bits, output, width, height,
+                                                   pixels, window_level_lut);
+        //}
+      } else {
+        /*if (up_ColorLut) {
+        if (up_OpacityTable)
+        CalculatePixelDataForUnsignedShortDataWithColorLutAndOpacityTable(pi_Bits,
+        pup_Output, pi_Width, pi_Height, up_Pixels, up_WindowLevelLut,
+        up_ColorLut, up_OpacityTable); else
+        CalculatePixelDataForUnsignedShortDataWithColorLut(pi_Bits,
+        pup_Output, pi_Width, pi_Height, up_Pixels, up_WindowLevelLut,
+        up_ColorLut);
+        }
+        else {
+        if (up_OpacityTable)
+        CalculatePixelDataForUnsignedShortDataWithOpacityTable(pi_Bits,
+        pup_Output, pi_Width, pi_Height, up_Pixels, up_WindowLevelLut,
+        up_OpacityTable); else*/
+        calculate_pixel_data_for_unsigned_short_data(
+            bits, output, width, height, pixels, window_level_lut);
+        //}
+      }
+    } else if (representation == 8) {
+      if (is_signed) {
+        /*if (up_ColorLut) {
+        if (up_OpacityTable)
+        CalculatePixelDataForSignedByteDataWithColorLutAndOpacityTable(pi_Bits,
+        pup_Output, pi_Width, pi_Height, up_Pixels, up_WindowLevelLut,
+        up_ColorLut, up_OpacityTable); else
+        CalculatePixelDataForSignedByteDataWithColorLut(pi_Bits, pup_Output,
+        pi_Width, pi_Height, up_Pixels, up_WindowLevelLut, up_ColorLut);
+        }
+        else {
+        if (up_OpacityTable)
+        CalculatePixelDataForSignedByteDataWithOpacityTable(pi_Bits,
+        pup_Output, pi_Width, pi_Height, up_Pixels, up_WindowLevelLut,
+        up_OpacityTable); else*/
+        calculate_pixel_data_for_signed_byte_data(bits, output, width, height,
+                                                  pixels, window_level_lut);
+        //}
+      } else {
+        /*if (up_ColorLut) {
+        if (up_OpacityTable)
+        CalculatePixelDataForUnsignedByteDataWithColorLutAndOpacityTable(pi_Bits,
+        pup_Output, pi_Width, pi_Height, up_Pixels, up_WindowLevelLut,
+        up_ColorLut, up_OpacityTable); else
+        CalculatePixelDataForUnsignedByteDataWithColorLut(pi_Bits, pup_Output,
+        pi_Width, pi_Height, up_Pixels, up_WindowLevelLut, up_ColorLut);
+        }
+        else {
+        if (up_OpacityTable)
+        CalculatePixelDataForUnsignedByteDataWithOpacityTable(pi_Bits,
+        pup_Output, pi_Width, pi_Height, up_Pixels, up_WindowLevelLut,
+        up_OpacityTable); else*/
+        calculate_pixel_data_for_unsigned_byte_data(bits, output, width, height,
+                                                    pixels, window_level_lut);
+        //}
+      }
+    }
+
+    if (is_copy)
+      delete[] pixels;
+
+  } else {
+    // Treat the rgb image here:
+    bool is_having_palette = have_palette();
+    std::int32_t bits_per_pixel =
+        (is_having_palette) ? 24 : get_bits_per_pixel();
+    if (bits_per_pixel == 24 || bits_per_pixel == 32) {
+      // Do we have an opacity table to apply?
+      // onis::db::opacity_table *up_OpacityTable = get_opacity_table().get();
+
+      // Do we have a color LUT to apply:
+      // onis::db::color_lut *up_ColorLut = get_color_lut().get();
+
+      // Create our window level lut:
+      std::uint8_t window_level_lut[256];
+      create_window_level_lut_for_RGB_image(window_level_lut, inverse_color);
+
+      if (is_mpeg_frame()) {
+        if (_mpeg_bmp != NULL) {
+          if (_mpeg_bmp->lock_bits()) {
+            bool delete_source = false;
+            std::uint8_t* source = _mpeg_bmp->get_bytes();
+
+            // Apply the convolution filter:
+            /*onis::db::convolution_filter *up_ConvolutionFilter =
+            get_convolution_filter().get(); if (up_ConvolutionFilter) {
+
+            s32 i_FilterDimension = up_ConvolutionFilter->get_dimension();
+            b32 b_Compatible = (pi_Width < i_FilterDimension || pi_Height <
+            i_FilterDimension) ? OSFALSE : OSTRUE; if (b_Compatible) {
+
+            s32 stride = _mpeg_bmp->get_bytes_per_row();
+            u8 *copy = new u8[stride*pi_Height];
+            switch(up_ConvolutionFilter->get_dimension()) {
+            case 3:
+            ProcessConvolutionFilter3x3ForRGBData_MPEG(up_ConvolutionFilter,
+            stride, pi_Width, pi_Height, source, copy); break; case 5:
+            ProcessConvolutionFilter5x5ForRGBData_MPEG(up_ConvolutionFilter,
+            stride, pi_Width, pi_Height, source, copy); break; default: break;
+            };
+
+            delete_source = OSTRUE;
+            source = copy;
+
+            }
+
+            }*/
+
+            // the source pixels are in rgb order
+            /*if (up_ColorLut) {
+
+            if (up_OpacityTable)
+            CalculatePixelDataFor24BitsRGBData_MPEG_WithColorLutAndOpacityTable(pi_Bits,
+            pup_Output, pi_Width, pi_Height, source, up_WindowLevelLut,
+            up_ColorLut, up_OpacityTable); else
+            CalculatePixelDataFor24BitsRGBData_MPEG_WithColorLut(pi_Bits,
+            pup_Output, pi_Width, pi_Height, source, up_WindowLevelLut,
+            up_ColorLut);
+
+            }
+            else {
+
+            if (up_OpacityTable)
+            CalculatePixelDataFor24BitsRGBData_MPEG_WithOpacityTable(pi_Bits,
+            pup_Output, pi_Width, pi_Height, source, up_WindowLevelLut,
+            up_OpacityTable); else*/
+            calculate_pixel_data_for_24_bits_rgb_data_mpeg(
+                bits, output, width, height, source, window_level_lut);
+
+            //}
+
+            if (delete_source)
+              delete[] source;
+            _mpeg_bmp->unlock_bits();
+          }
+        }
+
+      } else {
+        // Get the intermediate pixels:
+        std::size_t byte_cnt;
+        std::uint8_t* pixels =
+            (std::uint8_t*)get_intermediate_pixel_data(&byte_cnt);
+
+        // Get the RGB pixels:
+        std::uint8_t* source[3];
+        bool delete_source = false;
+
+        if (is_having_palette) {
+          delete_source = true;
+          source[0] = new std::uint8_t[width * height];
+          source[1] = new std::uint8_t[width * height];
+          source[2] = new std::uint8_t[width * height];
+          reconstruct_palette_image(source[0], source[1], source[2]);
+        } else {
+          source[0] = ((std::uint8_t**)pixels)[0];
+          source[1] = ((std::uint8_t**)pixels)[1];
+          source[2] = ((std::uint8_t**)pixels)[2];
+        }
+
+        // Apply the convolution filter:
+        /*onis::db::convolution_filter *up_ConvolutionFilter =
+        get_convolution_filter().get(); if (up_ConvolutionFilter) {
+
+        s32 i_FilterDimension = up_ConvolutionFilter->get_dimension();
+        b32 b_Compatible = (pi_Width < i_FilterDimension || pi_Height <
+        i_FilterDimension) ? OSFALSE : OSTRUE; if (b_Compatible) {
+
+        u8 *up_Copy[3];
+        up_Copy[0] = new u8[pi_Width*pi_Height];
+        up_Copy[1] = new u8[pi_Width*pi_Height];
+        up_Copy[2] = new u8[pi_Width*pi_Height];
+
+        switch(up_ConvolutionFilter->get_dimension()) {
+        case 3: ProcessConvolutionFilter3x3ForRGBData(up_ConvolutionFilter,
+        pi_Width, pi_Height, up_Source, up_Copy); break; case 5:
+        ProcessConvolutionFilter5x5ForRGBData(up_ConvolutionFilter, pi_Width,
+        pi_Height, up_Source, up_Copy); break; default: break;
+        };
+
+        if (b_DeleteSource) {
+        delete[] up_Source[0];
+        delete[] up_Source[1];
+        delete[] up_Source[2];
+        }
+
+        b_DeleteSource = OSTRUE;
+
+        up_Source[0] = up_Copy[0];
+        up_Source[1] = up_Copy[1];
+        up_Source[2] = up_Copy[2];
+
+        }
+        }*/
+
+        if (bits_per_pixel == 24) {
+          /*if (up_ColorLut) {
+          if (up_OpacityTable)
+          CalculatePixelDataFor24BitsRGBDataWithColorLutAndOpacityTable(pi_Bits,
+          pup_Output, pi_Width, pi_Height, up_Source, up_WindowLevelLut,
+          up_ColorLut, up_OpacityTable); else
+          CalculatePixelDataFor24BitsRGBDataWithColorLut(pi_Bits, pup_Output,
+          pi_Width, pi_Height, up_Source, up_WindowLevelLut, up_ColorLut);
+          }
+          else {
+          if (up_OpacityTable)
+          CalculatePixelDataFor24BitsRGBDataWithOpacityTable(pi_Bits,
+          pup_Output, pi_Width, pi_Height, up_Source, up_WindowLevelLut,
+          up_OpacityTable); else*/
+          calculate_pixel_data_for_24_bits_rgb_data(bits, output, width, height,
+                                                    source, window_level_lut);
+          //}
+
+        } else {
+          /*if (up_ColorLut) {
+          if (up_OpacityTable)
+          CalculatePixelDataFor32BitsRGBDataWithColorLutAndOpacityTable(pi_Bits,
+          pup_Output, pi_Width, pi_Height, up_Source, up_WindowLevelLut,
+          up_ColorLut, up_OpacityTable); else
+          CalculatePixelDataFor32BitsRGBDataWithColorLut(pi_Bits, pup_Output,
+          pi_Width, pi_Height, up_Source, up_WindowLevelLut, up_ColorLut);
+          }
+          else {
+          if (up_OpacityTable)
+          CalculatePixelDataFor32BitsRGBDataWithOpacityTable(pi_Bits,
+          pup_Output, pi_Width, pi_Height, up_Source, up_WindowLevelLut,
+          up_OpacityTable); else*/
+          calculate_pixel_data_for_32_bits_rgb_data(bits, output, width, height,
+                                                    source, window_level_lut);
+          //}
+        }
+
+        if (delete_source) {
+          if (source[0])
+            delete[] source[0];
+          if (source[1])
+            delete[] source[1];
+          if (source[2])
+            delete[] source[2];
+        }
+      }
+    }
+  }
+}
+
+void dcmtk_dicom_frame::calculate_pixel_data_for_signed_int_data(
+    std::int32_t output_bits, std::uint8_t* output, std::size_t width,
+    std::size_t height, std::uint8_t* pixels, std::uint8_t* window_level_lut) {
+  // Calculate the output stride:
+  std::int32_t factor = (output_bits == 24) ? 3 : 4;
+  std::int32_t output_stride = width * factor;
+  if (factor == 3)
+    output_stride += width % 4;
+
+  // Calculate the source stride:
+  std::int32_t source_stride = width * 4;
+
+  if (output_bits == 32) {
+    for (std::size_t j = 0; j < height; j++) {
+      std::uint8_t* tmp_pix_to = &output[(height - j - 1) * output_stride];
+      std::int32_t* tmp_pix_from =
+          (std::int32_t*)&pixels[(height - j - 1) * source_stride];
+      std::int32_t index;
+      std::uint8_t byte;
+
+      for (std::size_t i = 0; i < width; i++) {
+        index = *tmp_pix_from + 32768;
+        index = std::max<std::int32_t>(0, index);
+        index = std::min<std::int32_t>(index, 65535);
+
+        byte = window_level_lut[index];
+        tmp_pix_to[0] = byte;
+        tmp_pix_to[1] = byte;
+        tmp_pix_to[2] = byte;
+        tmp_pix_to[3] = 255;
+
+        tmp_pix_to += 4;
+        tmp_pix_from++;
+      }
+    }
+
+  } else {
+    for (std::size_t j = 0; j < height; j++) {
+      std::uint8_t* tmp_pix_to = &output[(height - j - 1) * output_stride];
+      std::int32_t* tmp_pix_from =
+          (std::int32_t*)&pixels[(height - j - 1) * source_stride];
+      std::int32_t index;
+      std::uint8_t byte;
+
+      for (std::size_t i = 0; i < width; i++) {
+        index = *tmp_pix_from + 32768;
+        index = std::max<std::int32_t>(0, index);
+        index = std::min<std::int32_t>(index, 65535);
+
+        byte = window_level_lut[index];
+
+        tmp_pix_to[0] = byte;
+        tmp_pix_to[1] = byte;
+        tmp_pix_to[2] = byte;
+
+        tmp_pix_to += 3;
+        tmp_pix_from++;
+      }
+    }
+  }
+}
+
+void dcmtk_dicom_frame::calculate_pixel_data_for_unsigned_int_data(
+    std::int32_t output_bits, std::uint8_t* output, std::size_t width,
+    std::size_t height, std::uint8_t* pixels, std::uint8_t* window_level_lut) {
+  // Calculate the output stride:
+  std::int32_t factor = (output_bits == 24) ? 3 : 4;
+  std::int32_t output_stride = width * factor;
+  if (factor == 3)
+    output_stride += width % 4;
+
+  // Calculate the source stride:
+  std::int32_t source_stride = width * 4;
+
+  if (output_bits == 32) {
+    for (std::size_t j = 0; j < height; j++) {
+      std::uint8_t* tmp_pix_to = &output[(height - j - 1) * output_stride];
+      std::uint32_t* tmp_pix_from =
+          (std::uint32_t*)&pixels[(height - j - 1) * source_stride];
+      std::uint32_t index;
+      std::uint8_t byte;
+
+      for (std::size_t i = 0; i < width; i++) {
+        index = *tmp_pix_from;
+        index = std::min<std::uint32_t>(index, 65535);
+
+        byte = window_level_lut[index];
+        tmp_pix_to[0] = byte;
+        tmp_pix_to[1] = byte;
+        tmp_pix_to[2] = byte;
+        tmp_pix_to[3] = 255;
+
+        tmp_pix_to += 4;
+        tmp_pix_from++;
+      }
+    }
+
+  } else {
+    for (std::size_t j = 0; j < height; j++) {
+      std::uint8_t* tmp_pix_to = &output[(height - j - 1) * output_stride];
+      std::uint32_t* tmp_pix_from =
+          (std::uint32_t*)&pixels[(height - j - 1) * source_stride];
+      std::uint32_t index;
+      std::uint8_t byte;
+
+      for (std::size_t i = 0; i < width; i++) {
+        index = *tmp_pix_from;
+        index = std::min<std::uint32_t>(index, 65535);
+
+        byte = window_level_lut[index];
+        tmp_pix_to[0] = byte;
+        tmp_pix_to[1] = byte;
+        tmp_pix_to[2] = byte;
+
+        tmp_pix_to += 3;
+        tmp_pix_from++;
+      }
+    }
+  }
+}
+
+void dcmtk_dicom_frame::calculate_pixel_data_for_signed_short_data(
+    std::int32_t output_bits, std::uint8_t* output, std::size_t width,
+    std::size_t height, std::uint8_t* pixels, std::uint8_t* window_level_lut) {
+  // Calculate the output stride:
+  std::int32_t factor = (output_bits == 24) ? 3 : 4;
+  std::size_t output_stride = width * factor;
+  if (factor == 3)
+    output_stride += width % 4;
+
+  // Calculate the source stride:
+  std::size_t source_stride = width * 2;
+
+  std::int32_t index;
+  std::uint8_t byte;
+
+  if (output_bits == 32) {
+    for (std::size_t j = 0; j < height; j++) {
+      std::uint8_t* tmp_pix_to = &output[(height - j - 1) * output_stride];
+      std::int16_t* tmp_pix_from =
+          (std::int16_t*)&pixels[(height - j - 1) * source_stride];
+
+      for (std::size_t i = 0; i < width; i++) {
+        index = *tmp_pix_from + 32768;
+        byte = window_level_lut[index];
+
+        tmp_pix_to[0] = byte;
+        tmp_pix_to[1] = byte;
+        tmp_pix_to[2] = byte;
+        tmp_pix_to[3] = 255;
+
+        tmp_pix_to += 4;
+        tmp_pix_from++;
+      }
+    }
+
+  } else {
+    for (std::size_t j = 0; j < height; j++) {
+      std::uint8_t* tmp_pix_to = &output[(height - j - 1) * output_stride];
+      std::int16_t* tmp_pix_from =
+          (std::int16_t*)&pixels[(height - j - 1) * source_stride];
+
+      for (std::size_t i = 0; i < width; i++) {
+        index = *tmp_pix_from + 32768;
+        byte = window_level_lut[index];
+
+        tmp_pix_to[0] = byte;
+        tmp_pix_to[1] = byte;
+        tmp_pix_to[2] = byte;
+
+        tmp_pix_to += 3;
+        tmp_pix_from++;
+      }
+    }
+  }
+}
+
+void dcmtk_dicom_frame::calculate_pixel_data_for_unsigned_short_data(
+    std::int32_t output_bits, std::uint8_t* output, std::size_t width,
+    std::size_t height, std::uint8_t* pixels, std::uint8_t* window_level_lut) {
+  // Calculate the output stride:
+  std::size_t factor = (output_bits == 24) ? 3 : 4;
+  std::size_t output_stride = width * factor;
+  if (factor == 3)
+    output_stride += width % 4;
+
+  // Calculate the source stride:
+  std::int32_t source_stride = width * 2;
+
+  std::int32_t index;
+  std::uint8_t byte;
+
+  if (output_bits == 32) {
+    for (std::size_t j = 0; j < height; j++) {
+      std::uint8_t* tmp_pix_to = &output[(height - j - 1) * output_stride];
+      std::uint16_t* tmp_pix_from =
+          (std::uint16_t*)&pixels[(height - j - 1) * source_stride];
+
+      for (std::size_t i = 0; i < width; i++) {
+        index = *tmp_pix_from;
+        byte = window_level_lut[index];
+
+        tmp_pix_to[0] = byte;
+        tmp_pix_to[1] = byte;
+        tmp_pix_to[2] = byte;
+        tmp_pix_to[3] = 255;
+
+        tmp_pix_to += 4;
+        tmp_pix_from++;
+      }
+    }
+
+  } else {
+    for (std::size_t j = 0; j < height; j++) {
+      std::uint8_t* tmp_pix_to = &output[(height - j - 1) * output_stride];
+      std::uint16_t* tmp_pix_from =
+          (std::uint16_t*)&pixels[(height - j - 1) * source_stride];
+
+      for (std::size_t i = 0; i < width; i++) {
+        index = *tmp_pix_from;
+        byte = window_level_lut[index];
+
+        tmp_pix_to[0] = byte;
+        tmp_pix_to[1] = byte;
+        tmp_pix_to[2] = byte;
+
+        tmp_pix_to += 3;
+        tmp_pix_from++;
+      }
+    }
+  }
+}
+
+void dcmtk_dicom_frame::calculate_pixel_data_for_signed_byte_data(
+    std::int32_t output_bits, std::uint8_t* output, std::size_t width,
+    std::size_t height, std::uint8_t* pixels, std::uint8_t* window_level_lut) {
+  // Calculate the output stride:
+  std::size_t factor = (output_bits == 24) ? 3 : 4;
+  std::size_t output_stride = width * factor;
+  if (factor == 3)
+    output_stride += width % 4;
+
+  // Calculate the source stride:
+  std::size_t source_stride = width;
+
+  std::int32_t index;
+  std::uint8_t byte;
+
+  if (output_bits == 32) {
+    for (std::size_t j = 0; j < height; j++) {
+      std::uint8_t* tmp_pix_to = &output[(height - j - 1) * output_stride];
+      std::int8_t* tmp_pix_from =
+          (std::int8_t*)&pixels[(height - j - 1) * source_stride];
+
+      for (std::size_t i = 0; i < width; i++) {
+        index = *tmp_pix_from + 128;
+        byte = window_level_lut[index];
+
+        tmp_pix_to[0] = byte;
+        tmp_pix_to[1] = byte;
+        tmp_pix_to[2] = byte;
+        tmp_pix_to[3] = 255;
+
+        tmp_pix_to += 4;
+        tmp_pix_from++;
+      }
+    }
+
+  } else {
+    for (std::size_t j = 0; j < height; j++) {
+      std::uint8_t* tmp_pix_to = &output[(height - j - 1) * output_stride];
+      std::int8_t* tmp_pix_from =
+          (std::int8_t*)&pixels[(height - j - 1) * source_stride];
+
+      for (std::size_t i = 0; i < width; i++) {
+        index = *tmp_pix_from + 128;
+        byte = window_level_lut[index];
+
+        tmp_pix_to[0] = byte;
+        tmp_pix_to[1] = byte;
+        tmp_pix_to[2] = byte;
+
+        tmp_pix_to += 3;
+        tmp_pix_from++;
+      }
+    }
+  }
+}
+
+void dcmtk_dicom_frame::calculate_pixel_data_for_unsigned_byte_data(
+    std::int32_t output_bits, std::uint8_t* output, std::size_t width,
+    std::size_t height, std::uint8_t* pixels, std::uint8_t* window_level_lut) {
+  // Calculate the output stride:
+  std::size_t factor = (output_bits == 24) ? 3 : 4;
+  std::size_t output_stride = width * factor;
+  if (factor == 3)
+    output_stride += width % 4;
+
+  // Calculate the source stride:
+  std::size_t source_stride = width;
+
+  std::int32_t index;
+  std::uint8_t byte;
+
+  if (output_bits == 32) {
+    for (std::size_t j = 0; j < height; j++) {
+      std::uint8_t* tmp_pix_to = &output[(height - j - 1) * output_stride];
+      std::uint8_t* tmp_pix_from =
+          (std::uint8_t*)&pixels[(height - j - 1) * source_stride];
+
+      for (std::size_t i = 0; i < width; i++) {
+        index = *tmp_pix_from;
+        byte = window_level_lut[index];
+
+        tmp_pix_to[0] = byte;
+        tmp_pix_to[1] = byte;
+        tmp_pix_to[2] = byte;
+        tmp_pix_to[3] = 255;
+
+        tmp_pix_to += 4;
+        tmp_pix_from++;
+      }
+    }
+
+  } else {
+    for (std::size_t j = 0; j < height; j++) {
+      std::uint8_t* tmp_pix_to = &output[(height - j - 1) * output_stride];
+      std::uint8_t* tmp_pix_from =
+          (std::uint8_t*)&pixels[(height - j - 1) * source_stride];
+
+      for (std::size_t i = 0; i < width; i++) {
+        index = *tmp_pix_from;
+        byte = window_level_lut[index];
+
+        tmp_pix_to[0] = byte;
+        tmp_pix_to[1] = byte;
+        tmp_pix_to[2] = byte;
+
+        tmp_pix_to += 3;
+        tmp_pix_from++;
+      }
+    }
+  }
+}
+
+void dcmtk_dicom_frame::calculate_pixel_data_for_24_bits_rgb_data(
+    std::int32_t output_bits, std::uint8_t* output, std::size_t width,
+    std::size_t height, std::uint8_t* pixels[3],
+    std::uint8_t* window_level_lut) {
+  // Calculate the output stride:
+  std::size_t factor = (output_bits == 24) ? 3 : 4;
+  std::size_t output_stride = width * factor;
+  if (factor == 3)
+    output_stride += width % 4;
+
+  // Calculate the source stride:
+  std::size_t source_stride = width;
+
+  if (output_bits == 32) {
+    for (std::size_t j = 0; j < height; j++) {
+      std::uint8_t* tmp_pix_to = &output[(height - j - 1) * output_stride];
+      std::uint8_t* tmp_pix_from1 =
+          &pixels[0][(height - j - 1) * source_stride];
+      std::uint8_t* tmp_pix_from2 =
+          &pixels[1][(height - j - 1) * source_stride];
+      std::uint8_t* tmp_pix_from3 =
+          &pixels[2][(height - j - 1) * source_stride];
+
+      for (std::size_t i = 0; i < width; i++) {
+        tmp_pix_to[0] = window_level_lut[*tmp_pix_from3];
+        tmp_pix_to[1] = window_level_lut[*tmp_pix_from2];
+        tmp_pix_to[2] = window_level_lut[*tmp_pix_from1];
+        tmp_pix_to[3] = 255;
+
+        tmp_pix_to += 4;
+        tmp_pix_from1++;
+        tmp_pix_from2++;
+        tmp_pix_from3++;
+      }
+    }
+
+  } else {
+    for (std::size_t j = 0; j < height; j++) {
+      std::uint8_t* tmp_pix_to = &output[(height - j - 1) * output_stride];
+      std::uint8_t* tmp_pix_from1 =
+          &pixels[0][(height - j - 1) * source_stride];
+      std::uint8_t* tmp_pix_from2 =
+          &pixels[1][(height - j - 1) * source_stride];
+      std::uint8_t* tmp_pix_from3 =
+          &pixels[2][(height - j - 1) * source_stride];
+
+      for (std::size_t i = 0; i < width; i++) {
+        tmp_pix_to[0] = window_level_lut[*tmp_pix_from3];
+        tmp_pix_to[1] = window_level_lut[*tmp_pix_from2];
+        tmp_pix_to[2] = window_level_lut[*tmp_pix_from1];
+
+        tmp_pix_to += 3;
+        tmp_pix_from1++;
+        tmp_pix_from2++;
+        tmp_pix_from3++;
+      }
+    }
+  }
+}
+
+void dcmtk_dicom_frame::calculate_pixel_data_for_32_bits_rgb_data(
+    std::int32_t output_bits, std::uint8_t* output, std::size_t width,
+    std::size_t height, std::uint8_t* pixels[3],
+    std::uint8_t* window_level_lut) {
+  calculate_pixel_data_for_24_bits_rgb_data(output_bits, output, width, height,
+                                            pixels, window_level_lut);
+}
+
+void dcmtk_dicom_frame::calculate_pixel_data_for_24_bits_rgb_data_mpeg(
+    std::int32_t output_bits, std::uint8_t* output, std::size_t width,
+    std::size_t height, std::uint8_t* pixels, std::uint8_t* window_level_lut) {
+  // Calculate the output stride:
+  std::size_t factor = (output_bits == 24) ? 3 : 4;
+  std::size_t output_stride = width * factor;
+  if (factor == 3)
+    output_stride += width % 4;
+
+  // Calculate the source stride:
+  std::size_t source_stride = width * 3;
+  if (factor == 3)
+    source_stride += width % 4;
+
+  if (output_bits == 32) {
+    if (window_level_lut == NULL) {
+      for (std::size_t j = 0; j < height; j++) {
+        std::uint8_t* tmp_pix_to = &output[(height - j - 1) * output_stride];
+        std::uint8_t* tmp_pix_from = &pixels[(height - j - 1) * source_stride];
+        for (std::size_t i = 0; i < width; i++) {
+          tmp_pix_to[0] = *tmp_pix_from;
+          tmp_pix_to[1] = *(tmp_pix_from + 1);
+          tmp_pix_to[2] = *(tmp_pix_from + 2);
+          tmp_pix_to[3] = 255;
+          tmp_pix_to += 4;
+          tmp_pix_from += 3;
+        }
+      }
+
+    } else {
+      for (std::size_t j = 0; j < height; j++) {
+        std::uint8_t* tmp_pix_to = &output[(height - j - 1) * output_stride];
+        std::uint8_t* tmp_pix_from = &pixels[(height - j - 1) * source_stride];
+        for (std::size_t i = 0; i < width; i++) {
+          tmp_pix_to[0] = window_level_lut[*tmp_pix_from];
+          tmp_pix_to[1] = window_level_lut[*(tmp_pix_from + 1)];
+          tmp_pix_to[2] = window_level_lut[*(tmp_pix_from + 2)];
+          tmp_pix_to[3] = 255;
+
+          tmp_pix_to += 4;
+          tmp_pix_from += 3;
+        }
+      }
+    }
+
+  } else {
+    if (window_level_lut == NULL) {
+      memcpy(output, pixels, source_stride * height);
+
+    } else {
+      for (std::size_t j = 0; j < height; j++) {
+        std::uint8_t* tmp_pix_to = &output[(height - j - 1) * output_stride];
+        std::uint8_t* tmp_pix_from = &pixels[(height - j - 1) * source_stride];
+        for (std::size_t i = 0; i < width; i++) {
+          tmp_pix_to[0] = window_level_lut[*tmp_pix_from];
+          tmp_pix_to[1] = window_level_lut[*(tmp_pix_from + 1)];
+          tmp_pix_to[2] = window_level_lut[*(tmp_pix_from + 2)];
+          tmp_pix_to += 3;
+          tmp_pix_from += 3;
+        }
+      }
+    }
+  }
+}
+
+void dcmtk_dicom_frame::create_window_level_lut(std::uint8_t* lut,
+                                                std::int32_t representation,
+                                                bool is_signed, bool inverse) {
+  if (representation != 8 && representation != 16 && representation != 32)
+    return;
+
+  // Calculate the Left and Right positions of the window level:
+  double left, right;
+  double center, width;
+
+  if (!get_window_level(&center, &width)) {
+    // normally, we should never come here!
+    double min_val, max_val;
+    if (get_min_max_values(&min_val, &max_val, true)) {
+      width = max_val - min_val;
+      center = (min_val + max_val) / 2.0;
+    } else {
+      if (representation == 32 || representation == 16) {
+        width = 65536;
+        if (is_signed)
+          center = 0;
+        else
+          center = 32768;
+      } else {
+        width = 256;
+        if (is_signed)
+          center = 0;
+        else
+          center = 128;
+      }
+    }
+
+  } else {
+    // adjust the values with the scale and intercept values:
+    display_to_inter_window_level(&center, &width);
+  }
+
+  if (width < 1.0)
+    width = 1.0;
+  left = center - width * 0.5;
+  right = center + width * 0.5;
+
+  std::int32_t min_val, max_val, signed_offset, max_bound;
+  if (representation == 32) {
+    signed_offset = 32768;
+    max_bound = 65535;
+  } else if (representation == 16) {
+    signed_offset = 32768;
+    max_bound = 65535;
+  } else {
+    signed_offset = 128;
+    max_bound = 255;
+  }
+
+  if (is_signed) {
+    left += signed_offset;
+    right += signed_offset;
+    center += signed_offset;
+  }
+  min_val = std::max<std::int32_t>(0, std::int32_t(left));
+  min_val = std::min<std::int32_t>(min_val, max_bound);
+  max_val = std::min<std::int32_t>(max_val, std::int32_t(right) + 1);
+  max_val = std::max<std::int32_t>(max_val, 0);
+
+  if (_voi_lut_function == 1) {
+    // SIGMOID TABLE:
+    double val_double;
+    std::int32_t value_int;
+    if (inverse) {
+      for (std::int32_t i = 0; i <= max_bound; i++) {
+        val_double = 255.0 / (1 + exp(-4 * (i - center) / width));
+        value_int = static_cast<std::int32_t>(val_double);
+        if (val_double - std::floor(val_double) >= 0.5)
+          value_int++;
+        value_int = std::min<std::int32_t>(value_int, 255);
+        value_int = std::max<std::int32_t>(value_int, 0);
+        lut[i] = 255 - value_int;
+      }
+
+    } else {
+      for (std::int32_t i = 0; i <= max_bound; i++) {
+        val_double = 255.0 / (1 + exp(-4 * (i - center) / width));
+        value_int = static_cast<std::int32_t>(val_double);
+        if (val_double - std::floor(val_double) >= 0.5)
+          value_int++;
+        value_int = std::min<std::int32_t>(value_int, 255);
+        value_int = std::max<std::int32_t>(value_int, 0);
+        lut[i] = value_int;
+      }
+    }
+
+  } else {
+    // LINEAR TABLE:
+    double val_double;
+    std::int32_t value_int;
+    double factor = 255.0 / (right - left);
+
+    if (inverse) {
+      for (std::int32_t i = 0; i < min_val; i++)
+        lut[i] = 255;
+      for (std::int32_t i = min_val; i <= max_val; i++) {
+        val_double = (double(i) - left) * factor;
+        value_int = static_cast<std::int32_t>(val_double);
+        value_int = std::min<std::int32_t>(value_int, 255);
+        value_int = std::max<std::int32_t>(value_int, 0);
+        lut[i] = 255 - value_int;
+      }
+      for (std::int32_t i = max_val + 1; i <= max_bound; i++)
+        lut[i] = 0;
+    } else {
+      for (std::int32_t i = 0; i < min_val; i++)
+        lut[i] = 0;
+      for (std::int32_t i = min_val; i <= max_val; i++) {
+        val_double = (double(i) - left) * factor;
+        value_int = static_cast<std::int32_t>(val_double);
+        value_int = std::min<std::int32_t>(value_int, 255);
+        value_int = std::max<std::int32_t>(value_int, 0);
+        lut[i] = value_int;
+      }
+      for (std::int32_t i = max_val + 1; i <= max_bound; i++)
+        lut[i] = 255;
+    }
+  }
+}
+
+void dcmtk_dicom_frame::create_window_level_lut_for_RGB_image(std::uint8_t* lut,
+                                                              bool inverse) {
+  double contrast = 0.0;
+  double brightness = 0.0;
+
+  if (!get_window_level(&brightness, &contrast)) {
+    contrast = 255.0;
+    brightness = 128.0;
+  }
+
+  if ((contrast != 255.0) || (brightness != 128.0)) {
+    // double tmp1 = brightness;
+    brightness = -(brightness - 128.0) / 128.0;
+
+    if (brightness < -1.0)
+      brightness = -1.0;
+    if (brightness > 1.0)
+      brightness = 1.0;
+
+    contrast = 255.0 - (contrast - 255.0);
+    contrast /= 255.0;
+    if (contrast < 0.0)
+      contrast = 0.0;
+    if (contrast > 3.0)
+      contrast = 3.0;
+    double trans = (1.0 - contrast) / 2.0;
+
+    std::int32_t value_int;
+
+    if (inverse) {
+      for (std::int32_t i = 0; i < 256; i++) {
+        double val = (double(i) / 255.0) * contrast + trans + brightness;
+        val *= 255.0;
+        value_int = static_cast<std::int32_t>(val);
+        value_int = std::min<std::int32_t>(value_int, 255);
+        value_int = std::max<std::int32_t>(value_int, 0);
+        lut[i] = 255 - value_int;
+      }
+    } else {
+      for (std::int32_t i = 0; i < 256; i++) {
+        double val = (double(i) / 255.0) * contrast + trans + brightness;
+        val *= 255.0;
+        value_int = static_cast<std::int32_t>(val);
+        value_int = std::min<std::int32_t>(value_int, 255);
+        value_int = std::max<std::int32_t>(value_int, 0);
+        lut[i] = value_int;
+      }
+    }
+  } else {
+    if (inverse) {
+      for (std::int32_t i = 0; i < 256; i++)
+        lut[i] = 255 - i;
+    } else {
+      for (std::int32_t i = 0; i < 256; i++)
+        lut[i] = i;
+    }
+  }
 }
 
 ///////////////////////////////////////////////////////////////////////

@@ -1,7 +1,10 @@
 import 'package:onis_viewer/core/dicom/dicom_frame.dart';
+import 'package:onis_viewer/core/dicom/image_region.dart';
+import 'package:onis_viewer/core/error_codes.dart';
 import 'package:onis_viewer/core/graphics/drivers/driver.dart';
 import 'package:onis_viewer/core/graphics/renderer/items/item.dart';
 import 'package:onis_viewer/core/graphics/renderer/items/responder.dart';
+import 'package:onis_viewer/core/graphics/renderer/renderer.dart';
 import 'package:onis_viewer/core/models/database/color_lut.dart';
 import 'package:onis_viewer/core/models/database/convolution_filter.dart';
 import 'package:onis_viewer/core/models/database/opacity_table.dart';
@@ -138,18 +141,17 @@ class OsGraphicImage extends OsGraphicResponder {
     }
   }
 
-  /*@override
-  void willDraw(OsWillDrawInfo info, bool propagate) {
+  @override
+  void willDraw(OsWillDrawInfo info, [bool propagate = false]) {
     if (info.context == null) {
       return;
     }
-
     if (info.render != null) {
-      setFilterType(info.render!.getFilterType());
+      setFilterType(info.render!.filterType);
     }
 
     if (_texture == null) {
-      final driver = info.context!.getDriver();
+      final driver = info.context!.driver;
       if (driver != null) {
         _texture = driver.createImage();
       }
@@ -158,9 +160,9 @@ class OsGraphicImage extends OsGraphicResponder {
     final loadStatus = getLoadStatus();
 
     if (_texture != null &&
-        (loadStatus.status == RESULT.osrspSuccess ||
-            loadStatus.status == RESULT.osrspStreaming)) {
-      _texture!.setFilterType(getFilterType());
+        (loadStatus.status == ResultStatus.success ||
+            loadStatus.status == ResultStatus.streaming)) {
+      _texture!.filterType = getFilterType();
 
       bool regenerate = _isDirty;
       if (_texture!.willDraw(info.context!)) {
@@ -171,9 +173,9 @@ class OsGraphicImage extends OsGraphicResponder {
       final image = getImage();
 
       if (image != null) {
-        OsDicomFrame? frame = getFrame(_currentFrame);
+        DicomFrame? frame = getFrame(_currentFrame);
 
-        if (frame != null) {
+        /*if (frame != null) {
           final dcm1 = image.getDicomFile();
           if (dcm1 != null &&
               frame.getIntermediatePixelData() !=
@@ -190,19 +192,18 @@ class OsGraphicImage extends OsGraphicResponder {
               regenerate = true;
             }
           }
-        }
+        }*/
 
         if (frame == null) {
           for (int i = 0; i < 2; i++) {
             frame = image.extractFrame(_currentFrame, loadStatus);
             if (frame != null) {
               setFrame(_currentFrame, frame);
-              frame.release();
               frame = getFrame(_currentFrame);
               regenerate = true;
               break;
             } else {
-              if (loadStatus.reason == RESULT.eosMemory && i == 0) {
+              if (loadStatus.reason == OnisErrorCodes.memory && i == 0) {
                 if (info.render == null) {
                   break;
                 }
@@ -218,30 +219,35 @@ class OsGraphicImage extends OsGraphicResponder {
         _drawStatus.info = loadStatus.info;
 
         if (frame != null && regenerate) {
-          frame.setColorLut(getColorLut());
-          frame.setConvolutionFilter(getConvolutionFilter());
-          frame.setOpacityTable(getOpacityTable());
+          frame.colorLut = getColorLut();
+          frame.convolutionFilter = getConvolutionFilter();
+          frame.opacityTable = getOpacityTable();
           frame.showAllOverlays(_showAllOverlays);
 
-          if (_windowWidth == VALUE.f64Max || _windowCenter == VALUE.f64Max) {
-            final centerWidth = <double>[0, 0];
-            frame.getOriginalWindowLevel(centerWidth);
-            frame.setWindowLevel(centerWidth[0], centerWidth[1]);
-            _windowWidth = centerWidth[1];
-            _windowCenter = centerWidth[0];
+          if (_windowWidth == double.infinity ||
+              _windowCenter == double.infinity) {
+            //final centerWidth = <double>[0, 0];
+            final wl = frame.getOriginalWindowLevel();
+            frame.setWindowLevel(wl);
+            _windowWidth = wl.width;
+            _windowCenter = wl.center;
           } else {
-            frame.setWindowLevel(_windowCenter, _windowWidth);
+            frame.setWindowLevel((center: _windowCenter, width: _windowWidth));
           }
 
           _texture!.initWithFrame(frame);
         }
 
         if (frame != null) {
-          frame.getDimensions(imageSize);
+          final dims = frame.getDimensions();
+          if (dims != null) {
+            imageSize[0] = dims.$1.toDouble();
+            imageSize[1] = dims.$2.toDouble();
+          }
 
-          OsImageRegion? region;
-          final regions = <OsImageRegion>[];
-          final deleteRegions = image.getRegionsForFrame(frame, regions);
+          ImageRegion? region;
+          final regions = <ImageRegion>[];
+          image.getRegionsForFrame(frame, regions);
 
           if (regions.length == 1) {
             final tmp = regions[0];
@@ -249,10 +255,10 @@ class OsGraphicImage extends OsGraphicResponder {
                 tmp.y0 == 0 &&
                 tmp.x1 == imageSize[0] - 1 &&
                 tmp.y1 == imageSize[1] - 1) {
-              if (tmp.spatialFormat == OS_RSF.twoDim) {
+              if (tmp.spatialFormat == OsRsf.twoDim) {
                 if (tmp.calibratedUnit[0] == tmp.calibratedUnit[1]) {
-                  if (tmp.calibratedUnit[0] == OS_UNIT.cm ||
-                      tmp.calibratedUnit[0] == OS_UNIT.none) {
+                  if (tmp.calibratedUnit[0] == OsUnit.cm ||
+                      tmp.calibratedUnit[0] == OsUnit.none) {
                     region = tmp;
                   }
                 }
@@ -267,12 +273,6 @@ class OsGraphicImage extends OsGraphicResponder {
             sca[0] = imageSize[0];
             sca[1] = imageSize[1];
           }
-
-          if (deleteRegions) {
-            for (final region in regions) {
-              region.destroy();
-            }
-          }
         }
 
         validateMatrix();
@@ -282,10 +282,10 @@ class OsGraphicImage extends OsGraphicResponder {
       _isDirty = true;
     }
 
-    if (_drawStatus.status == RESULT.osrspSuccess) {
-      for (final annot in _annotations) {
+    if (_drawStatus.status == ResultStatus.success) {
+      /*for (final annot in _annotations) {
         annot.willDraw(info, propagate);
-      }
+      }*/
     }
 
     super.willDraw(info, propagate);
@@ -294,12 +294,11 @@ class OsGraphicImage extends OsGraphicResponder {
   @override
   void draw(OsDriver driver, OsRenderInfo info) {
     info.pushMatrix();
-
     if (_texture != null &&
-        (_drawStatus.status == RESULT.osrspSuccess ||
-            _drawStatus.status == RESULT.osrspStreaming)) {
-      final filterType = info.render != null ? info.render!.getFilterType() : 0;
-      _texture!.setFilterType(filterType);
+        (_drawStatus.status == ResultStatus.success ||
+            _drawStatus.status == ResultStatus.streaming)) {
+      final filterType = info.render != null ? info.render!.filterType : 0;
+      _texture!.filterType = filterType;
       info.applyWorldTransformation(localMatrix);
 
       if (visible) {
@@ -309,7 +308,7 @@ class OsGraphicImage extends OsGraphicResponder {
 
     super.draw(driver, info);
     info.popMatrix();
-  }*/
+  }
 
   /*void drawAnnotations(OsDriver driver, OsRenderInfo info) {
     for (final annot in _annotations) {
@@ -409,7 +408,7 @@ class OsGraphicImage extends OsGraphicResponder {
     _isDirty = true;
   }
 
-  (double center, double width)? getWindowLevelValues() {
+  ({double center, double width})? getWindowLevelValues() {
     if (_windowCenter == double.infinity || _windowWidth == double.infinity) {
       final image = getImage();
       if (image != null) {
@@ -419,7 +418,7 @@ class OsGraphicImage extends OsGraphicResponder {
         } else {
           final file = image.dicomFile;
           if (file != null) {
-            (double, double)? windowLevel = file.windowLevel;
+            ({double center, double width})? windowLevel = file.windowLevel;
             if (windowLevel != null) {
               frame = file.extractFrame(0, null);
               if (frame != null) {
@@ -435,7 +434,7 @@ class OsGraphicImage extends OsGraphicResponder {
       }
       return null;
     } else {
-      return (_windowCenter, _windowWidth);
+      return (center: _windowCenter, width: _windowWidth);
     }
   }
 

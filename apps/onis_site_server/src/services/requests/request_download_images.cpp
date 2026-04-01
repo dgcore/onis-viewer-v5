@@ -1,6 +1,12 @@
 #include <png.h>
+#include <algorithm>
 #include <cstdlib>
 #include <cstring>
+#include <fstream>
+#include <iomanip>
+#include <limits>
+#include <sstream>
+#include <vector>
 
 #include "../../../include/database/items/db_download_image.hpp"
 #include "../../../include/database/items/db_download_series.hpp"
@@ -35,6 +41,214 @@ void my_png_write_data(png_structp png_ptr, png_bytep data, png_size_t length) {
 
 void my_png_flush(png_structp png_ptr) {}
 
+/*void dump_bytes_as_hex(const std::uint8_t* data, std::size_t len,
+                       const std::string& label,
+                       const std::string& file_name = "pngData.txt") {
+  if (data == nullptr || len == 0)
+    return;
+  const char* home = std::getenv("HOME");
+  std::string path =
+      home ? std::string(home) + "/Documents/" + file_name : file_name;
+  std::ofstream out(path, std::ios::out | std::ios::app);
+  if (!out.is_open())
+    return;
+
+  out << "==== " << label << " len=" << len << " ====\n";
+  if (len >= 2) {
+    std::int16_t min_s16 = std::numeric_limits<std::int16_t>::max();
+    std::int16_t max_s16 = std::numeric_limits<std::int16_t>::min();
+    for (std::size_t i = 0; i + 1 < len; i += 2) {
+      // Read as signed short (little-endian byte order).
+      const std::uint16_t raw = static_cast<std::uint16_t>(data[i]) |
+                                (static_cast<std::uint16_t>(data[i + 1]) << 8);
+      const std::int16_t v = static_cast<std::int16_t>(raw);
+      if (v < min_s16)
+        min_s16 = v;
+      if (v > max_s16)
+        max_s16 = v;
+    }
+    out << "s16_min=" << min_s16 << " s16_max=" << max_s16 << "\n";
+  }
+  const std::size_t bytes_per_line = 32;
+  for (std::size_t i = 0; i < len; i += bytes_per_line) {
+    const std::size_t end = std::min(i + bytes_per_line, len);
+    out << std::hex << std::setw(8) << std::setfill('0') << i << ": ";
+    for (std::size_t j = i; j < end; ++j) {
+      out << std::hex << std::setw(2) << std::setfill('0')
+          << static_cast<std::int32_t>(data[j]);
+      if (j + 1 < end)
+        out << ' ';
+    }
+    out << '\n';
+  }
+  out << std::dec << '\n';
+}
+
+struct png_mem_reader {
+  const std::uint8_t* data;
+  std::size_t size;
+  std::size_t offset;
+};
+
+void png_read_from_mem(png_structp png_ptr, png_bytep outBytes,
+                       png_size_t byteCountToRead) {
+  png_mem_reader* reader =
+      static_cast<png_mem_reader*>(png_get_io_ptr(png_ptr));
+  if (!reader || reader->offset + byteCountToRead > reader->size) {
+    png_error(png_ptr, "png_read_from_mem: read beyond end of buffer");
+    return;
+  }
+  std::memcpy(outBytes, reader->data + reader->offset, byteCountToRead);
+  reader->offset += byteCountToRead;
+}
+
+void dump_png_decoded_as_hex(
+    const std::uint8_t* data, std::size_t len, const std::string& label,
+    const std::uint8_t* original_data = nullptr, std::size_t original_len = 0) {
+  if (data == nullptr || len == 0)
+    return;
+
+  png_mem_reader reader{data, len, 0};
+
+  png_structp png_ptr =
+      png_create_read_struct(PNG_LIBPNG_VER_STRING, nullptr, nullptr, nullptr);
+  if (!png_ptr)
+    return;
+
+  png_infop info_ptr = png_create_info_struct(png_ptr);
+  if (!info_ptr) {
+    png_destroy_read_struct(&png_ptr, nullptr, nullptr);
+    return;
+  }
+
+  if (setjmp(png_jmpbuf(png_ptr))) {
+    png_destroy_read_struct(&png_ptr, &info_ptr, nullptr);
+    return;
+  }
+
+  png_set_read_fn(png_ptr, &reader, png_read_from_mem);
+  png_read_info(png_ptr, info_ptr);
+
+  png_uint_32 width = 0, height = 0;
+  int bit_depth = 0, color_type = 0;
+  png_get_IHDR(png_ptr, info_ptr, &width, &height, &bit_depth, &color_type,
+               nullptr, nullptr, nullptr);
+
+  if (width == 0 || height == 0) {
+    png_destroy_read_struct(&png_ptr, &info_ptr, nullptr);
+    return;
+  }
+
+  // Only handle grayscale images here; bail out otherwise.
+  if (color_type != PNG_COLOR_TYPE_GRAY) {
+    png_destroy_read_struct(&png_ptr, &info_ptr, nullptr);
+    return;
+  }
+
+  const png_size_t rowbytes = png_get_rowbytes(png_ptr, info_ptr);
+  std::vector<std::uint8_t> buffer(rowbytes * height);
+  std::vector<png_bytep> row_pointers(height);
+  for (png_uint_32 y = 0; y < height; ++y) {
+    row_pointers[y] = buffer.data() + y * rowbytes;
+  }
+
+  // Keep decoded 16-bit samples in host endianness (little-endian on macOS).
+  if (bit_depth == 16) {
+    png_set_swap(png_ptr);
+  }
+
+  png_read_image(png_ptr, row_pointers.data());
+  png_read_end(png_ptr, info_ptr);
+  png_destroy_read_struct(&png_ptr, &info_ptr, nullptr);
+
+  const char* home = std::getenv("HOME");
+  std::string path =
+      home ? std::string(home) + "/Documents/pngDecoded.txt" : "pngDecoded.txt";
+  std::ofstream out(path, std::ios::out | std::ios::app);
+  if (!out.is_open())
+    return;
+
+  out << "==== " << label << " decoded GRAY "
+      << "w=" << width << " h=" << height << " bit_depth=" << bit_depth
+      << " bytes=" << buffer.size() << " ====\n";
+  if (bit_depth == 16 && buffer.size() >= 2) {
+    std::int16_t min_s16 = std::numeric_limits<std::int16_t>::max();
+    std::int16_t max_s16 = std::numeric_limits<std::int16_t>::min();
+    for (std::size_t i = 0; i + 1 < buffer.size(); i += 2) {
+      // PNG stores 16-bit samples in big-endian.
+      const std::uint16_t raw =
+          (static_cast<std::uint16_t>(buffer[i]) << 8) |
+          static_cast<std::uint16_t>(buffer[i + 1]);
+      const std::int16_t v = static_cast<std::int16_t>(raw);
+      if (v < min_s16)
+        min_s16 = v;
+      if (v > max_s16)
+        max_s16 = v;
+    }
+    out << "s16_min=" << min_s16 << " s16_max=" << max_s16 << "\n";
+
+    if (original_data != nullptr && original_len >= 2) {
+      const std::size_t decoded_samples = buffer.size() / 2;
+      const std::size_t original_samples = original_len / 2;
+      const std::size_t sample_count = std::min(decoded_samples,
+original_samples); std::size_t mismatch_count = 0; std::size_t
+first_mismatch_index = 0; std::int16_t first_decoded_value = 0; std::int16_t
+first_original_value = 0; bool found_first = false;
+
+      for (std::size_t s = 0; s < sample_count; ++s) {
+        const std::size_t db = s * 2;
+        const std::size_t ob = s * 2;
+        // Decoded PNG bytes are big-endian.
+        const std::uint16_t decoded_raw =
+            (static_cast<std::uint16_t>(buffer[db]) << 8) |
+            static_cast<std::uint16_t>(buffer[db + 1]);
+        // Original pixels in memory are little-endian on this platform.
+        const std::uint16_t original_raw =
+            static_cast<std::uint16_t>(original_data[ob]) |
+            (static_cast<std::uint16_t>(original_data[ob + 1]) << 8);
+        const std::int16_t decoded_s16 = static_cast<std::int16_t>(decoded_raw);
+        const std::int16_t original_s16 =
+static_cast<std::int16_t>(original_raw); if (decoded_s16 != original_s16) {
+          ++mismatch_count;
+          if (!found_first) {
+            found_first = true;
+            first_mismatch_index = s;
+            first_decoded_value = decoded_s16;
+            first_original_value = original_s16;
+          }
+        }
+      }
+
+      const bool same_length = decoded_samples == original_samples;
+      out << "compare_with_original_s16 "
+          << "decoded_samples=" << decoded_samples
+          << " original_samples=" << original_samples
+          << " compared_samples=" << sample_count
+          << " mismatches=" << mismatch_count
+          << " same_length=" << (same_length ? "true" : "false") << "\n";
+      if (found_first) {
+        out << "first_mismatch index=" << first_mismatch_index
+            << " decoded=" << first_decoded_value
+            << " original=" << first_original_value << "\n";
+      }
+    }
+  }
+
+  const std::size_t bytes_per_line = 32;
+  for (std::size_t i = 0; i < buffer.size(); i += bytes_per_line) {
+    const std::size_t end = std::min(i + bytes_per_line, buffer.size());
+    out << std::hex << std::setw(8) << std::setfill('0') << i << ": ";
+    for (std::size_t j = i; j < end; ++j) {
+      out << std::hex << std::setw(2) << std::setfill('0')
+          << static_cast<std::int32_t>(buffer[j]);
+      if (j + 1 < end)
+        out << ' ';
+    }
+    out << '\n';
+  }
+  out << std::dec << '\n';
+}*/
+
 }  // namespace
 
 void request_service::process_download_images_request(
@@ -67,7 +281,7 @@ void request_service::process_download_images_request(
         try {
           db->find_download_series_by_seq(
               dlseq, onis::database::lock_mode::NO_LOCK, *dlinfo);
-        } catch (const site_server_exception& e) {
+        } catch (const onis::exception& e) {
           dlitem->res.set(OSRSP_FAILURE, e.get_code(), e.what(), false);
           continue;
         } catch (...) {
@@ -110,12 +324,12 @@ void request_service::process_download_images_request(
       }
       if ((*it)->type == 1 || (*it)->type == 3) {  // raw or png format
         // raw format or png!
-        std::int32_t count = 0;
+        std::size_t count = 0;
         const void* pixels = (*it)->frame->get_intermediate_pixel_data(&count);
         if ((*it)->cur_res == -1) {
           if ((*it)->type == 3) {  // png format
             // convert to png:
-            std::int32_t width, height;
+            std::size_t width, height;
             (*it)->frame->get_dimensions(&width, &height);
             png_structp png_ptr = png_create_write_struct(PNG_LIBPNG_VER_STRING,
                                                           NULL, NULL, NULL);
@@ -144,17 +358,35 @@ void request_service::process_download_images_request(
                       std::uint16_t* data = (std::uint16_t*)pixels;
                       for (int i = 0; i < height; i++)
                         row_pointers[i] = (png_bytep)&data[width * i];
+                      /*dump_bytes_as_hex(
+                          reinterpret_cast<const std::uint8_t*>(data),
+                          static_cast<std::size_t>(width) *
+                              static_cast<std::size_t>(height) *
+                              sizeof(std::uint16_t),
+                          "pre-png monochrome 16-bit pixels",
+                          "pngPreEncode.txt");*/
                       png_set_write_fn(png_ptr, *it, my_png_write_data,
                                        my_png_flush);
                       png_set_IHDR(png_ptr, info_ptr, width, height, 16,
                                    PNG_COLOR_TYPE_GRAY, PNG_INTERLACE_NONE,
                                    PNG_COMPRESSION_TYPE_DEFAULT,
                                    PNG_FILTER_TYPE_DEFAULT);
+                      // Our source buffer is uint16 in host endianness.
+                      // PNG requires big-endian 16-bit samples.
+                      png_set_swap(png_ptr);
                       png_set_rows(png_ptr, info_ptr, row_pointers);
                       png_write_png(png_ptr, info_ptr, PNG_TRANSFORM_IDENTITY,
                                     NULL);
+                      /*if ((*it)->data && (*it)->data_len) {
+                         dump_png_decoded_as_hex(
+                             (*it)->data, (*it)->data_len,
+                             "decoded from just-encoded png (16-bit)",
+                             reinterpret_cast<const std::uint8_t*>(data),
+                             static_cast<std::size_t>(width) *
+                                 static_cast<std::size_t>(height) *
+                                 sizeof(std::uint16_t));
+                       }*/
                     }
-
                   } else {
                     // reconstruct the rgb data:
                     std::uint8_t* rgb = new std::uint8_t[width * height * 3];
@@ -163,9 +395,9 @@ void request_service::process_download_images_request(
                     source[1] = ((std::uint8_t**)pixels)[1];
                     source[2] = ((std::uint8_t**)pixels)[2];
                     std::int32_t offset = 0;
-                    for (int i = 0; i < height; i++) {
+                    for (std::size_t i = 0; i < height; i++) {
                       std::int32_t k = width * i;
-                      for (std::int32_t j = 0; j < width; j++) {
+                      for (std::size_t j = 0; j < width; j++) {
                         rgb[offset] = source[0][k + j];
                         offset++;
                         rgb[offset] = source[1][k + j];
@@ -198,14 +430,14 @@ void request_service::process_download_images_request(
               (*it)->type = 1;
               delete[] (*it)->data;
               (*it)->data = (std::uint8_t*)pixels;
-              (*it)->data_len = count;
+              (*it)->data_len = static_cast<std::uint32_t>(count);
               (*it)->delete_data = false;
             }
 
           } else {  // raw format
 
             (*it)->data = (std::uint8_t*)pixels;
-            (*it)->data_len = count;
+            (*it)->data_len = static_cast<std::uint32_t>(count);
             (*it)->delete_data = false;
           }
 
@@ -358,7 +590,7 @@ void request_service::process_download_images_request(
           if ((*it)->res.good()) {
             if ((*it)->type == 1 || (*it)->type == 3) {  // raw or png format
 
-              std::int32_t width, height;
+              std::size_t width, height;
               (*it)->frame->get_dimensions(&width, &height);
 
               if ((*it)->cur_res == -1) {
@@ -422,9 +654,14 @@ void request_service::process_download_images_request(
                   *((std::int32_t*)&binary_output[current_offset]) =
                       (*it)->data_len;
                   current_offset += sizeof(std::int32_t);
-                  if ((*it)->data_len)
+                  if ((*it)->data_len) {
+                    /*dump_bytes_as_hex((*it)->data, (*it)->data_len,
+                                      "monochrome image data (PNG or raw)");
+                    dump_png_decoded_as_hex((*it)->data, (*it)->data_len,
+                                            "monochrome image data decoded");*/
                     memcpy(&binary_output[current_offset], (*it)->data,
                            (*it)->data_len);
+                  }
                   current_offset += (*it)->data_len;
 
                 } else {

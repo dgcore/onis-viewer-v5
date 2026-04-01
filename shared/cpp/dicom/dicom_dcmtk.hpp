@@ -9,6 +9,7 @@ using auto_ptr = std::unique_ptr<T>;
 }
 #endif
 
+#include "../../../libs/onis_kit/include/core/bitmap.hpp"
 #include "../../../libs/onis_kit/include/dicom/dicom.hpp"
 
 #include <chrono>
@@ -54,7 +55,7 @@ using auto_ptr = std::unique_ptr<T>;
 #define CPR_DCM_MPEG 7
 
 ///////////////////////////////////////////////////////////////////////
-// odicom_base
+// dicom_dcmtk_base
 ///////////////////////////////////////////////////////////////////////
 
 class dicom_dcmtk_base : public virtual onis::dicom_base {
@@ -167,7 +168,7 @@ private:
 };
 
 ///////////////////////////////////////////////////////////////////////
-// odicom_dataset (dicom dataset without meta header)
+// dicom_dcmtk_dataset (dicom dataset without meta header)
 ///////////////////////////////////////////////////////////////////////
 
 class dicom_dcmtk_dataset : public onis::dicom_dataset,
@@ -184,7 +185,7 @@ public:
 };
 
 ///////////////////////////////////////////////////////////////////////
-// odicom_file (dicom file with meta header)
+// dicom_dcmtk_file (dicom file with meta header)
 ///////////////////////////////////////////////////////////////////////
 
 class dicom_dcmtk_file : public onis::dicom_file,
@@ -268,7 +269,342 @@ protected:
 };
 
 ///////////////////////////////////////////////////////////////////////
-// odicom_manager
+// dcmtk_dicom_frame
+///////////////////////////////////////////////////////////////////////
+
+class dcmtk_dicom_frame : public onis::dicom_frame {
+  friend class dicom_dcmtk_file;
+
+public:
+  // static creator:
+  static onis::dicom_frame_ptr create();
+
+  // constructor:
+  dcmtk_dicom_frame() = default;
+
+  // destructor:
+  ~dcmtk_dicom_frame() override;
+
+  // dicom file:
+  // bool set_dicom_file(const onis::dicom_file_ptr& file) override;
+  // onis::dicom_file_ptr get_dicom_file() override;
+
+  // frame:
+  void set_frame_index(std::int32_t index) override;
+  std::int32_t get_frame_index() override;
+
+  // properties:
+  bool is_monochrome() const override;
+  bool get_dimensions(std::size_t* width, std::size_t* height) const override;
+  std::int32_t get_bits_per_pixel() const override;
+
+  // window Level:
+  void set_window_level(double center, double width) override;
+  bool get_window_level(double* center, double* width) const override;
+  void set_original_window_level(double center, double width) override;
+  void get_original_window_level(double* center, double* width) const override;
+
+  // voi lut:
+  void set_voi_lut_function(std::int32_t mode) override;
+  std::int32_t get_voi_lut_function() const override;
+
+  // palette:
+  onis::dicom_palette* get_palette(std::int32_t channel) override;
+  bool have_palette() const override;
+  void reconstruct_palette_image(std::uint8_t* red, std::uint8_t* green,
+                                 std::uint8_t* blue) override;
+
+  // internal data:
+  const void* get_intermediate_pixel_data(std::size_t* count) const override;
+  std::int32_t get_representation(bool* signed_data) const override;
+
+  // min-max values:
+  bool get_min_max_values(double* min_val, double* max_val,
+                          bool intermediate) const override;
+  bool set_min_max_values(double min_val, double max_val,
+                          bool intermediate) override;
+
+  // rescale/intercept:
+  bool get_rescale_and_intercept(double* rescale, double* intercept) override;
+  bool set_rescale_and_intercept(double rescale, double intercept) override;
+
+  // mpeg frame:
+  bool is_mpeg_frame() override;
+
+  // overlays:
+  // void show_all_overlays(b32 show);
+  // void show_overlay(s32 index, b32 show);
+  // b32 is_overlay_hidden(s32 index);
+  // const onis::dicom_overlay* get_overlay(s32 index);
+
+  // extract bitmap:
+  onis::core::bitmap_ptr create_bitmap(
+      std::int32_t bits, bool inverse_color = false,
+      onis::core::bitmap_ptr use_this_bitmap = nullptr) override;
+  std::uint8_t* get_png_data(std::size_t* len) const override;
+
+  // representation of internal data
+  // void* merge_intermediate_pixel_data_with_overlays(s32* count) const;
+
+  // utilities:
+  // void inter_to_display_window_level(f64* center, f64* width);
+  // void display_to_inter_window_level(f64* center, f64* width);
+
+  // regions:
+  // void get_regions(onis::frame_region_list& list) const;
+  // void set_regions(const onis::frame_region_list& list);
+
+  // void reconstruct_palette_image(u8* red, u8* green, u8* blue);
+
+protected:
+  // members:
+  DicomImage* _image{nullptr};
+  onis::core::bitmap_ptr _mpeg_bmp;
+  bool _is_mpeg_frame{false};
+  mutable std::recursive_mutex _mutex;
+
+  // png:
+  // static void _my_png_write_data(png_structp png_ptr, png_bytep data,
+  // png_size_t length);
+  // static void _my_png_flush(png_structp png_ptr);
+
+  // overlays:
+  onis::dicom_overlay _overlays[16];
+
+  // values of window level are saved here in the display world (not
+  // intermediate image)
+  double _original_window_center{50.0};
+  double _original_window_width{100.0};
+  double _window_center{0.0};
+  double _window_width{1.0};
+  bool _window_level_valid{false};
+  // onis::dicom_file_ptr _dicom_file;
+  std::int32_t _frame_index{0};
+  double _rescale_slope{1.0};
+  double _intercept{0.0};
+  bool _is_monochrome1{false};
+  // onis::db::convolution_filter_wptr _wconv_filter;
+  // onis::db::color_lut_wptr _wcolor_lut;
+  // onis::db::opacity_table_wptr _wopacity_table;
+  std::int32_t _voi_lut_function{0};
+
+  // regions:
+  onis::frame_region_list _regions;
+
+  // Min and max values are saved in the intermediate world
+  double _min_value{0.0};  // because dcmtk lost the value in a clone image
+  double _max_value{0.0};  // because dcmtk lost the value in a clone image
+
+  onis::dicom_palette _palette[3];
+
+  void create_window_level_lut(std::uint8_t* lut, std::int32_t representation,
+                               bool is_signed, bool inverse);
+  void create_window_level_lut_for_RGB_image(std::uint8_t* lut, bool inverse);
+
+  void calculate_pixel_data(std::int32_t bits, bool inverse_color,
+                            std::size_t width, std::size_t height,
+                            std::uint8_t* output);
+
+  /*template<class T> void
+  ProcessConvolutionFilter3x3ForMonochrome(onis::db::convolution_filter
+  *pup_Filter, s32 pi_Width, s32 pi_Height, T *pup_Pixels, s32 *pip_Output);
+  template<class T> void
+  ProcessConvolutionFilter5x5ForMonochrome(onis::db::convolution_filter
+  *pup_Filter, s32 pi_Width, s32 pi_Height, T *pup_Pixels, s32 *pip_Output);
+  void ProcessConvolutionFilter3x3ForRGBData(onis::db::convolution_filter
+  *pup_Filter, s32 pi_Width, s32 pi_Height, u8 *pup_Pixels[3], u8
+  *pup_Output[3]); void
+  ProcessConvolutionFilter5x5ForRGBData(onis::db::convolution_filter
+  *pup_Filter, s32 pi_Width, s32 pi_Height, u8 *pup_Pixels[3], u8
+  *pup_Output[3]); void
+  ProcessConvolutionFilter3x3ForRGBData_MPEG(onis::db::convolution_filter
+  *pup_Filter, s32 stride, s32 pi_Width, s32 pi_Height, u8 *pup_Pixels, u8
+  *pup_Output); void
+  ProcessConvolutionFilter5x5ForRGBData_MPEG(onis::db::convolution_filter
+  *pup_Filter, s32 stride, s32 pi_Width, s32 pi_Height, u8 *pup_Pixels, u8
+  *pup_Output);*/
+
+  // void CalculatePixelDataForSignedIntDataWithColorLutAndOpacityTable(s32
+  // pi_OutputBits, u8 *pup_Output, s32 pi_Width, s32 pi_Height, u8 *pup_Pixels,
+  // u8 *pup_WindowLevelLut, onis::db::color_lut *pup_ColorLut,
+  // onis::db::opacity_table *pup_Table); void
+  // CalculatePixelDataForSignedIntDataWithColorLut(s32 pi_OutputBits, u8
+  // *pup_Output, s32 pi_Width, s32 pi_Height, u8 *pup_Pixels, u8
+  // *pup_WindowLevelLut, onis::db::color_lut *pup_ColorLut); void
+  // CalculatePixelDataForSignedIntDataWithOpacityTable(s32 pi_OutputBits, u8
+  // *pup_Output, s32 pi_Width, s32 pi_Height, u8 *pup_Pixels, u8
+  // *pup_WindowLevelLut, onis::db::opacity_table *pup_Table);
+  /*void CalculatePixelDataForSignedIntData(s32 pi_OutputBits, u8* pup_Output,
+                                          s32 pi_Width, s32 pi_Height,
+                                          u8* pup_Pixels,
+                                          u8* pup_WindowLevelLut);*/
+  // void CalculatePixelDataForUnsignedIntDataWithColorLutAndOpacityTable(s32
+  // pi_OutputBits, u8 *pup_Output, s32 pi_Width, s32 pi_Height, u8 *pup_Pixels,
+  // u8 *pup_WindowLevelLut, onis::db::color_lut *pup_ColorLut,
+  // onis::db::opacity_table *pup_Table); void
+  // CalculatePixelDataForUnsignedIntDataWithColorLut(s32 pi_OutputBits, u8
+  // *pup_Output, s32 pi_Width, s32 pi_Height, u8 *pup_Pixels, u8
+  // *pup_WindowLevelLut, onis::db::color_lut *pup_ColorLut); void
+  // CalculatePixelDataForUnsignedIntDataWithOpacityTable(s32 pi_OutputBits, u8
+  // *pup_Output, s32 pi_Width, s32 pi_Height, u8 *pup_Pixels, u8
+  // *pup_WindowLevelLut, onis::db::opacity_table *pup_Table);
+  /*void CalculatePixelDataForUnsignedIntData(s32 pi_OutputBits, u8* pup_Output,
+                                            s32 pi_Width, s32 pi_Height,
+                                            u8* pup_Pixels,
+                                            u8* pup_WindowLevelLut);*/
+
+  // void CalculatePixelDataForSignedShortDataWithColorLutAndOpacityTable(s32
+  // pi_OutputBits, u8 *pup_Output, s32 pi_Width, s32 pi_Height, u8 *pup_Pixels,
+  // u8 *pup_WindowLevelLut, onis::db::color_lut *pup_ColorLut,
+  // onis::db::opacity_table *pup_Table); void
+  // CalculatePixelDataForSignedShortDataWithColorLut(s32 pi_OutputBits, u8
+  // *pup_Output, s32 pi_Width, s32 pi_Height, u8 *pup_Pixels, u8
+  // *pup_WindowLevelLut, onis::db::color_lut *pup_ColorLut); void
+  // CalculatePixelDataForSignedShortDataWithOpacityTable(s32 pi_OutputBits, u8
+  // *pup_Output, s32 pi_Width, s32 pi_Height, u8 *pup_Pixels, u8
+  // *pup_WindowLevelLut, onis::db::opacity_table *pup_Table);
+  /*void CalculatePixelDataForSignedShortData(s32 pi_OutputBits, u8* pup_Output,
+                                            s32 pi_Width, s32 pi_Height,
+                                            u8* pup_Pixels,
+                                            u8* pup_WindowLevelLut);*/
+  // void CalculatePixelDataForUnsignedShortDataWithColorLutAndOpacityTable(s32
+  // pi_OutputBits, u8 *pup_Output, s32 pi_Width, s32 pi_Height, u8 *pup_Pixels,
+  // u8 *pup_WindowLevelLut, onis::db::color_lut *pup_ColorLut,
+  // onis::db::opacity_table *pup_Table); void
+  // CalculatePixelDataForUnsignedShortDataWithColorLut(s32 pi_OutputBits, u8
+  // *pup_Output, s32 pi_Width, s32 pi_Height, u8 *pup_Pixels, u8
+  // *pup_WindowLevelLut, onis::db::color_lut *pup_ColorLut); void
+  // CalculatePixelDataForUnsignedShortDataWithOpacityTable(s32 pi_OutputBits,
+  // u8 *pup_Output, s32 pi_Width, s32 pi_Height, u8 *pup_Pixels, u8
+  // *pup_WindowLevelLut, onis::db::opacity_table *pup_Table);
+  /*void CalculatePixelDataForUnsignedShortData(s32 pi_OutputBits, u8*
+     pup_Output, s32 pi_Width, s32 pi_Height, u8* pup_Pixels, u8*
+     pup_WindowLevelLut);*/
+
+  // void CalculatePixelDataForSignedByteDataWithColorLutAndOpacityTable(s32
+  // pi_OutputBits, u8 *pup_Output, s32 pi_Width, s32 pi_Height, u8 *pup_Pixels,
+  // u8 *pup_WindowLevelLut, onis::db::color_lut *pup_ColorLut,
+  // onis::db::opacity_table *pup_Table); void
+  // CalculatePixelDataForSignedByteDataWithColorLut(s32 pi_OutputBits, u8
+  // *pup_Output, s32 pi_Width, s32 pi_Height, u8 *pup_Pixels, u8
+  // *pup_WindowLevelLut, onis::db::color_lut *pup_ColorLut); void
+  // CalculatePixelDataForSignedByteDataWithOpacityTable(s32 pi_OutputBits, u8
+  // *pup_Output, s32 pi_Width, s32 pi_Height, u8 *pup_Pixels, u8
+  // *pup_WindowLevelLut, onis::db::opacity_table *pup_Table);
+  /*void CalculatePixelDataForSignedByteData(s32 pi_OutputBits, u8* pup_Output,
+                                           s32 pi_Width, s32 pi_Height,
+                                           u8* pup_Pixels,
+                                           u8* pup_WindowLevelLut);*/
+  // void CalculatePixelDataForUnsignedByteDataWithColorLutAndOpacityTable(s32
+  // pi_OutputBits, u8 *pup_Output, s32 pi_Width, s32 pi_Height, u8 *pup_Pixels,
+  // u8 *pup_WindowLevelLut, onis::db::color_lut *pup_ColorLut,
+  // onis::db::opacity_table *pup_Table); void
+  // CalculatePixelDataForUnsignedByteDataWithColorLut(s32 pi_OutputBits, u8
+  // *pup_Output, s32 pi_Width, s32 pi_Height, u8 *pup_Pixels, u8
+  // *pup_WindowLevelLut, onis::db::color_lut *pup_ColorLut); void
+  // CalculatePixelDataForUnsignedByteDataWithOpacityTable(s32 pi_OutputBits, u8
+  // *pup_Output, s32 pi_Width, s32 pi_Height, u8 *pup_Pixels, u8
+  // *pup_WindowLevelLut, onis::db::opacity_table *pup_Table);
+  /*void CalculatePixelDataForUnsignedByteData(s32 pi_OutputBits, u8*
+     pup_Output, s32 pi_Width, s32 pi_Height, u8* pup_Pixels, u8*
+     pup_WindowLevelLut);*/
+
+  // void CalculatePixelDataFor24BitsRGBDataWithColorLutAndOpacityTable(s32
+  // pi_OutputBits, u8 *pup_Output, s32 pi_Width, s32 pi_Height, u8
+  // *pup_Pixels[3], u8 *pup_WindowLevelLut, onis::db::color_lut *pup_ColorLut,
+  // onis::db::opacity_table *pup_Table); void
+  // CalculatePixelDataFor24BitsRGBDataWithColorLut(s32 pi_OutputBits, u8
+  // *pup_Output, s32 pi_Width, s32 pi_Height, u8 *pup_Pixels[3], u8
+  // *pup_WindowLevelLut, onis::db::color_lut *pup_ColorLut); void
+  // CalculatePixelDataFor24BitsRGBDataWithOpacityTable(s32 pi_OutputBits, u8
+  // *pup_Output, s32 pi_Width, s32 pi_Height, u8 *pup_Pixels[3], u8
+  // *pup_WindowLevelLut, onis::db::opacity_table *pup_Table);
+  /*void CalculatePixelDataFor24BitsRGBData(s32 pi_OutputBits, u8* pup_Output,
+                                          s32 pi_Width, s32 pi_Height,
+                                          u8* pup_Pixels[3],
+                                          u8* pup_WindowLevelLut);*/
+
+  // void CalculatePixelDataFor32BitsRGBDataWithColorLutAndOpacityTable(s32
+  // pi_OutputBits, u8 *pup_Output, s32 pi_Width, s32 pi_Height, u8
+  // *pup_Pixels[3], u8 *pup_WindowLevelLut, onis::db::color_lut *pup_ColorLut,
+  // onis::db::opacity_table *pup_Table); void
+  // CalculatePixelDataFor32BitsRGBDataWithColorLut(s32 pi_OutputBits, u8
+  // *pup_Output, s32 pi_Width, s32 pi_Height, u8 *pup_Pixels[3], u8
+  // *pup_WindowLevelLut, onis::db::color_lut *pup_ColorLut); void
+  // CalculatePixelDataFor32BitsRGBDataWithOpacityTable(s32 pi_OutputBits, u8
+  // *pup_Output, s32 pi_Width, s32 pi_Height, u8 *pup_Pixels[3], u8
+  // *pup_WindowLevelLut, onis::db::opacity_table *pup_Table);
+  /*void CalculatePixelDataFor32BitsRGBData(s32 pi_OutputBits, u8* pup_Output,
+                                          s32 pi_Width, s32 pi_Height,
+                                          u8* pup_Pixels[3],
+                                          u8* pup_WindowLevelLut);*/
+
+  // void
+  // CalculatePixelDataFor24BitsRGBData_MPEG_WithColorLutAndOpacityTable(s32
+  // pi_OutputBits, u8 *pup_Output, s32 pi_Width, s32 pi_Height, u8 *pup_Pixels,
+  // u8 *pup_WindowLevelLut, onis::db::color_lut *pup_ColorLut,
+  // onis::db::opacity_table *pup_Table); void
+  // CalculatePixelDataFor24BitsRGBData_MPEG_WithColorLut(s32 pi_OutputBits, u8
+  // *pup_Output, s32 pi_Width, s32 pi_Height, u8 *pup_Pixels, u8
+  // *pup_WindowLevelLut, onis::db::color_lut *pup_ColorLut);
+  /*void CalculatePixelDataFor24BitsRGBData_MPEG(s32 pi_OutputBits,
+                                               u8* pup_Output, s32 pi_Width,
+                                               s32 pi_Height, u8* pup_Pixels,
+                                               u8* pup_WindowLevelLut);*/
+  // void CalculatePixelDataFor24BitsRGBData_MPEG_WithOpacityTable(s32
+  // pi_OutputBits, u8 *pup_Output, s32 pi_Width, s32 pi_Height, u8 *pup_Pixels,
+  // u8 *pup_WindowLevelLut, onis::db::opacity_table *pup_Table);
+
+private:
+  // utilities:
+  void inter_to_display_window_level(double* center, double* width);
+  void display_to_inter_window_level(double* center, double* width);
+
+  void* merge_intermediate_pixel_data_with_overlays(std::size_t* count) const;
+
+  void calculate_pixel_data_for_signed_int_data(
+      std::int32_t output_bits, std::uint8_t* output, std::size_t width,
+      std::size_t height, std::uint8_t* pixels, std::uint8_t* window_level_lut);
+
+  void calculate_pixel_data_for_unsigned_int_data(
+      std::int32_t output_bits, std::uint8_t* output, std::size_t width,
+      std::size_t height, std::uint8_t* pixels, std::uint8_t* window_level_lut);
+
+  void calculate_pixel_data_for_signed_short_data(
+      std::int32_t output_bits, std::uint8_t* output, std::size_t width,
+      std::size_t height, std::uint8_t* pixels, std::uint8_t* window_level_lut);
+
+  void calculate_pixel_data_for_unsigned_short_data(
+      std::int32_t output_bits, std::uint8_t* output, std::size_t width,
+      std::size_t height, std::uint8_t* pixels, std::uint8_t* window_level_lut);
+
+  void calculate_pixel_data_for_signed_byte_data(
+      std::int32_t output_bits, std::uint8_t* output, std::size_t width,
+      std::size_t height, std::uint8_t* pixels, std::uint8_t* window_level_lut);
+
+  void calculate_pixel_data_for_unsigned_byte_data(
+      std::int32_t output_bits, std::uint8_t* output, std::size_t width,
+      std::size_t height, std::uint8_t* pixels, std::uint8_t* window_level_lut);
+
+  void calculate_pixel_data_for_24_bits_rgb_data(
+      std::int32_t output_bits, std::uint8_t* output, std::size_t width,
+      std::size_t height, std::uint8_t* pixels[3],
+      std::uint8_t* window_level_lut);
+
+  void calculate_pixel_data_for_32_bits_rgb_data(
+      std::int32_t output_bits, std::uint8_t* output, std::size_t width,
+      std::size_t height, std::uint8_t* pixels[3],
+      std::uint8_t* window_level_lut);
+
+  void calculate_pixel_data_for_24_bits_rgb_data_mpeg(
+      std::int32_t output_bits, std::uint8_t* output, std::size_t width,
+      std::size_t height, std::uint8_t* pixels, std::uint8_t* window_level_lut);
+};
+
+typedef std::shared_ptr<dcmtk_dicom_frame> dcmtk_dicom_frame_ptr;
+
+///////////////////////////////////////////////////////////////////////
+// dicom_dcmtk_manager
 ///////////////////////////////////////////////////////////////////////
 
 class dicom_dcmtk_manager : public onis::dicom_manager {

@@ -131,7 +131,7 @@ class DicomFile {
   //window level
   //-----------------------------------------------------------------------
 
-  (double center, double width)? get windowLevel {
+  ({double center, double width})? get windowLevel {
     List<double> centerwidth = [0, 1];
     String swidth = getStringElement(DicomTags.tagWindowWidth, null, null);
     String scenter = getStringElement(DicomTags.tagWindowCenter, null, null);
@@ -181,7 +181,7 @@ class DicomFile {
       }
     }
     if (valid && centerwidth[1] == 0.0 && centerwidth[0] == 0.0) valid = false;
-    return valid ? (centerwidth[0], centerwidth[1]) : null;
+    return valid ? (center: centerwidth[0], width: centerwidth[1]) : null;
   }
 
   List<ImageRegion> getRegions() {
@@ -287,7 +287,7 @@ class DicomFile {
               double center = 128.0;
               double width = 256.0;
               if (!frame.havePalette) {
-                (double center, double width)? wl = windowLevel;
+                ({double center, double width})? wl = windowLevel;
                 if (wl == null) {
                   (double min, double max)? minMax =
                       frame.getMinMaxValues(false);
@@ -313,10 +313,13 @@ class DicomFile {
                       }
                     }
                   }
+                } else {
+                  center = wl.center;
+                  width = wl.width;
                 }
               }
-              frame.setOriginalWindowLevel(center, width);
-              frame.setWindowLevel(center, width);
+              frame.setOriginalWindowLevel((center: center, width: width));
+              frame.setWindowLevel((center: center, width: width));
             }
           }
         }

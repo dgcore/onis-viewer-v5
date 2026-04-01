@@ -5,6 +5,11 @@ import 'package:onis_viewer/core/graphics/container/controllers/container_contro
 import 'package:onis_viewer/core/graphics/drivers/driver.dart';
 import 'package:onis_viewer/core/graphics/renderer/renderer.dart';
 import 'package:onis_viewer/core/layout/view_wnd.dart';
+import 'package:onis_viewer/core/models/database/color_lut.dart';
+import 'package:onis_viewer/core/models/database/convolution_filter.dart';
+import 'package:onis_viewer/core/models/database/hanging_protocol.dart';
+import 'package:onis_viewer/core/models/database/opacity_table.dart';
+import 'package:onis_viewer/core/models/database/window_level.dart';
 import 'package:onis_viewer/core/models/entities/patient.dart' as entities;
 
 enum OsContDraw {
@@ -17,6 +22,36 @@ enum OsContDrawTarget {
   osDrawTargetScreen,
   osDrawTargetPrinter,
   osDrawTargetPrintPreviewContainer,
+}
+
+///////////////////////////////////////////////////////////////////////
+// incoming_image_properties
+///////////////////////////////////////////////////////////////////////
+
+class OsIncomingImageProperties {
+  bool flipHorizontally = false;
+  bool flipVertically = false;
+  double rotation = 0;
+  double zoom = 0.0;
+  WindowLevel? windowLevelPreset;
+  ColorLut? colorLutPreset;
+  OpacityTable? opacityTablePreset;
+  ConvolutionFilter? convolutionFilterPreset;
+  int targetMode = 0;
+  int targetPage = 0;
+  List<HpDicomTag> targetTags = [];
+
+  void reset() {
+    flipHorizontally = false;
+    flipVertically = false;
+    rotation = 0.0;
+    zoom = 0.0;
+    windowLevelPreset = null;
+    colorLutPreset = null;
+    opacityTablePreset = null;
+    convolutionFilterPreset = null;
+    targetTags.clear();
+  }
 }
 
 ///////////////////////////////////////////////////////////////////////
@@ -41,7 +76,6 @@ class OsContainerWnd extends ChangeNotifier {
   final ValueNotifier<int> _redrawNotifier = ValueNotifier<int>(0);
   final OsContainerController _controller;
   final WeakReference<ViewWnd>? _wView;
-  //private _controller:OsContainerController|null;
   //private _view:OsViewWnd|null;
   //members:
   int _rowCnt = 0;
@@ -116,7 +150,7 @@ class OsContainerWnd extends ChangeNotifier {
   //protected _pageSlider:OsContainerPageSlider|null;
   //private _pageSliderEnable:boolean;
 
-  final bool _pageMode = false;
+  bool _pageMode = false;
 
   //private _drawLocalizer:boolean = false;
   //private _wLocalizerStudy:OsWeakObject|null = null;
@@ -379,14 +413,14 @@ class OsContainerWnd extends ChangeNotifier {
     //-----------------------------------------------------------------------
     public getLastMousePosition(xy:[number, number]):boolean {
         return this._component?this._component.getLastMousePosition(xy):false;
-    }
-
-    //-----------------------------------------------------------------------
-    //controller
-    //-----------------------------------------------------------------------
-    public getController():OsContainerController|null {
-        return this._controller;
     }*/
+
+  //-----------------------------------------------------------------------
+  //controller
+  //-----------------------------------------------------------------------
+  OsContainerController get controller {
+    return _controller;
+  }
 
   //-----------------------------------------------------------------------
   //image matrix
@@ -419,6 +453,20 @@ class OsContainerWnd extends ChangeNotifier {
     if (index < 0 || index >= _rowCnt * _colCnt) return null;
     OsContainerImageBoxInfo? box = _imageBoxes[index];
     return box.renderer;
+  }
+
+  ({double x, double y, double width, double height}) getImageBoxRect(
+      int index) {
+    if (index < 0 || index >= _rowCnt * _colCnt) {
+      return (x: 0, y: 0, width: 0, height: 0);
+    }
+    OsContainerImageBoxInfo? box = _imageBoxes[index];
+    return (
+      x: box.rect[0],
+      y: box.rect[1],
+      width: box.rect[2],
+      height: box.rect[3]
+    );
   }
 
   /*public getImageBoxRect(index:number, rect:[number, number, number, number]):void {
@@ -923,20 +971,19 @@ class OsContainerWnd extends ChangeNotifier {
 
     public isUsingOpengl():boolean {
         return this._idriver == 2;
-    }
+    }*/
 
-    //-----------------------------------------------------------------------
-    //pages
-    //-----------------------------------------------------------------------
-    public getPageMode():boolean {
-        return this._pageMode;
-    }
-    
-    public setPageMode(enable:boolean) {
-        this._pageMode = enable;
-        this.setCurrentPage(0, OsContDraw.OS_FORCE_REDRAW);
-    }
-    */
+  //-----------------------------------------------------------------------
+  //pages
+  //-----------------------------------------------------------------------
+  bool get pageMode {
+    return _pageMode;
+  }
+
+  set pageMode(bool enable) {
+    _pageMode = enable;
+    setCurrentPage(index: 0, mode: OsContDraw.osForceRedraw);
+  }
 
   int get pageCount {
     final items = _controller.rendererElements;
@@ -1047,8 +1094,9 @@ class OsContainerWnd extends ChangeNotifier {
           //we should not release its memory:
           int j;
           for (j = 0; j < redrawCount; j++) {
-            if (identical(oldRender, getImageBoxRenderer(redrawItems[j])))
+            if (identical(oldRender, getImageBoxRenderer(redrawItems[j]))) {
               break;
+            }
           }
           if (j == redrawCount) {
             releaseItems[releaseCount] = oldRender;

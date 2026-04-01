@@ -7,6 +7,7 @@ enum ResultStatus {
   warning,
   canceled,
   pending,
+  streaming,
   pendingWarning,
   pendingOperation,
   waiting,

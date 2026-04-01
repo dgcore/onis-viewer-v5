@@ -170,6 +170,17 @@ class SiteChildSource extends DatabaseSource {
           }
           data.remove("series");
           break;
+        case RequestType.downloadImages:
+          data["source"] = sourceId;
+          data["type"] = type.value;
+
+          /*Map<String, dynamic> data = {
+        "items": items, 
+        "pendingRanges": candidates.pendingRanges,
+        
+      };*/
+          break;
+
         default:
           break;
       }

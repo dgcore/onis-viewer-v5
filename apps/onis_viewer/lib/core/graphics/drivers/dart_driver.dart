@@ -1,6 +1,8 @@
 import 'dart:typed_data';
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+import 'package:onis_viewer/core/dicom/dicom_frame.dart';
 import 'package:onis_viewer/core/graphics/drivers/driver.dart';
 import 'package:onis_viewer/core/graphics/renderer/renderer.dart';
 import 'package:onis_viewer/core/math/matrix.dart';
@@ -432,7 +434,7 @@ class OsDartDriver extends OsDriver {
   //Images:
   @override
   OsDriverImage? createImage() {
-    return null;
+    return OsDartDriverImage();
   }
 
   //Text:
@@ -460,6 +462,124 @@ class OsDartDriver extends OsDriver {
   //depth buffer:
   @override
   void enableDepthTest(bool enable) {}
+}
+
+///////////////////////////////////////////////////////////////////////
+// OsDartDriverText
+///////////////////////////////////////////////////////////////////////
+
+class OsDartDriverImage extends OsDriverImage {
+  ui.Image? _bmp;
+  int _width = 0;
+  int _height = 0;
+  int _filterType = 0;
+
+  @override
+  bool initWithFrame(DicomFrame frame) {
+    final dims = frame.getDimensions();
+    if (dims == null) return false;
+    final width = dims.$1;
+    final height = dims.$2;
+    if (width <= 0 || height <= 0) return false;
+    final pixels = Uint8List(width * height * 4);
+    if (!frame.createBitmap(
+      bits: 32,
+      inverseColor: false,
+      pixels: pixels,
+      width: width,
+      height: height,
+    )) {
+      return false;
+    }
+    return initWithPixels(width: width, height: height, pixels: pixels);
+  }
+
+  bool initWithPixels({
+    required int width,
+    required int height,
+    required Uint8List pixels,
+  }) {
+    if (width <= 0 || height <= 0) return false;
+    if (pixels.length < width * height * 4) return false;
+    _width = width;
+    _height = height;
+    ui.decodeImageFromPixels(
+      pixels,
+      width,
+      height,
+      ui.PixelFormat.rgba8888,
+      (ui.Image image) {
+        _bmp = image;
+      },
+    );
+    return true;
+  }
+
+  bool initFromImageData(ui.Image image) {
+    _bmp = image;
+    _width = image.width;
+    _height = image.height;
+    return true;
+  }
+
+  // Draw:
+  @override
+  bool willDraw(OsDriverContext ctx) {
+    //return _bmp == null;
+    return false;
+  }
+
+  @override
+  void draw(OsDriver driver, OsRenderInfo info, bool useAlpha) {
+    if (_bmp == null || _width <= 0 || _height <= 0) return;
+    final context = driver.currentContext;
+    if (context is! OsDartDriverContext || context.canvas == null) return;
+
+    final viewport = <double>[0, 0, 0, 0];
+    driver.getViewport(viewport);
+    final globalMatrix = OsMatrix();
+    globalMatrix.mat[0] = viewport[2] * 0.5;
+    globalMatrix.mat[5] = -viewport[3] * 0.5;
+    globalMatrix.mat[12] = viewport[2] * 0.5 + viewport[0];
+    globalMatrix.mat[13] = viewport[3] * 0.5 + viewport[1];
+
+    final invertMatrix = OsMatrix();
+    invertMatrix.mat[5] = -1;
+
+    info.pushMatrix();
+    final scaleToOneMatrix = OsMatrix();
+    scaleToOneMatrix.mat[0] = 1.0 / _width;
+    scaleToOneMatrix.mat[5] = 1.0 / _height;
+    info.applyWorldTransformation(scaleToOneMatrix);
+
+    globalMatrix.postMultiply(info.projMat);
+    globalMatrix.postMultiply(info.viewMat);
+    globalMatrix.postMultiply(info.worldMat);
+    globalMatrix.postMultiply(invertMatrix);
+    info.popMatrix();
+
+    final canvas = context.canvas!;
+    final paint = Paint()
+      ..isAntiAlias = true
+      ..filterQuality =
+          _filterType == 0 ? FilterQuality.none : FilterQuality.medium;
+
+    canvas.save();
+    canvas.transform(Float64List.fromList(globalMatrix.mat));
+    canvas.drawImage(_bmp!, Offset(-_width * 0.5, -_height * 0.5), paint);
+    canvas.restore();
+  }
+
+  // Filter:
+  @override
+  set filterType(int type) {
+    _filterType = type;
+  }
+
+  @override
+  int get filterType {
+    return _filterType;
+  }
 }
 
 ///////////////////////////////////////////////////////////////////////

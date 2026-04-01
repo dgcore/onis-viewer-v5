@@ -1,7 +1,7 @@
 #pragma once
 
-#include "../../exceptions/site_server_exceptions.hpp"
 #include "./db_item.hpp"
+#include "onis_kit/include/core/exception.hpp"
 
 using json = Json::Value;
 
@@ -17,8 +17,7 @@ namespace onis::database {
 struct download_image {
   static void create(json& output) {
     if (!output.isObject()) {
-      throw site_server_exception(EOS_PARAM,
-                                  "download_image is not an json object");
+      throw onis::exception(EOS_PARAM, "download_image is not an json object");
     }
     output.clear();
     output[BASE_SEQ_KEY] = "";

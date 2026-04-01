@@ -3,7 +3,6 @@
 #include <iostream>
 #include <vector>
 #include "../../../include/database/items/db_media.hpp"
-#include "../../../include/exceptions/site_server_exceptions.hpp"
 #include "../../../include/services/requests/sessions/request_session.hpp"
 #include "onis_kit/include/core/exception.hpp"
 #include "onis_kit/include/core/result.hpp"
@@ -206,7 +205,7 @@ void request_service::verify_partition_access_permission(
       throw onis::exception(EOS_NOT_AVAILABLE, "Partition not available");
   } catch (const onis::exception& e) {
     if (e.get_code() == EOS_PERMISSION) {
-      throw site_server_exception(EOS_PERMISSION, "Permission denied");
+      throw onis::exception(EOS_PERMISSION, "Permission denied");
     } else {
       throw;
     }
@@ -333,7 +332,10 @@ std::string request_service::convert_dicom_file_to_json(
       snprintf(key_buf, sizeof(key_buf), "%04X:%04X", std::uint16_t(tmp[1]),
                std::uint16_t(tmp[0]));
       std::string key = key_buf;
-      root[key] = value;
+      root[key]["vr"] = vr;
+      root[key]["vm"] = vm;
+      root[key]["val"] = value;
+      // root[key] = value;
       elem = dcm->get_next_element(i, elem, &tag, &vr, &vm);
     }
   }

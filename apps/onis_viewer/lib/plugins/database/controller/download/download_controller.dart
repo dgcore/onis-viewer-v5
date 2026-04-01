@@ -1,8 +1,19 @@
+import 'dart:convert';
+import 'dart:typed_data';
+
+import 'package:image/image.dart' as img;
 import 'package:onis_viewer/api/ov_api.dart';
 import 'package:onis_viewer/api/request/async_request.dart';
 import 'package:onis_viewer/api/services/message_codes.dart';
 import 'package:onis_viewer/core/database_source.dart';
+import 'package:onis_viewer/core/dicom/dicom_file.dart';
+import 'package:onis_viewer/core/dicom/intermediate_pixel_data.dart';
+import 'package:onis_viewer/core/dicom/raw_palette.dart';
 import 'package:onis_viewer/core/error_codes.dart';
+import 'package:onis_viewer/core/graphics/container/container_wnd.dart';
+import 'package:onis_viewer/core/graphics/container/controllers/container_controller.dart';
+import 'package:onis_viewer/core/graphics/renderer/items/image.dart';
+import 'package:onis_viewer/core/graphics/renderer/renderer.dart';
 import 'package:onis_viewer/core/models/entities/patient.dart' as entities;
 import 'package:onis_viewer/core/result/result.dart';
 import 'package:onis_viewer/plugins/database/controller/download/download_candidate.dart';
@@ -19,7 +30,7 @@ class DownloadController extends IDownloadController {
   final List<DownloadSeries> _downloadingList = [];
   int _maxConcurrentDownload = 4;
   final List<DownloadPerformance> _performanceSources = [];
-  final int _containerIndex = -1;
+  int _containerIndex = -1;
   //final List<OsJ2kDecodeItem> _j2kItems = [];
   //final List<OsJ2kDecoder> _j2kDecoders = [];
 
@@ -104,41 +115,47 @@ class DownloadController extends IDownloadController {
   // Containers
   //-----------------------------------------------------
 
-  /*public registerContainer(container =IContainerWnd, reg =boolean):void {
-        let index:[number] = [-1];
-        this._findContainer(container, index);
-        //register or unregister:
-        if (reg && index[0] == -1) _containers.push(OsDownloadContainer(container));
-        else
-        if (!reg && index[0] != -1) {
-            _containers[index[0]].destroy();
-            _containers.splice(index[0], 1);
+  @override
+  void registerContainer(OsContainerWnd container, bool reg) {
+    List<int> index = [-1];
+    _findContainer(container, index);
+    //register or unregister:
+    if (reg && index[0] == -1) {
+      _containers.add(DownloadContainer(container));
+    } else if (!reg && index[0] != -1) {
+      _containers.removeAt(index[0]);
+    }
+  }
+
+  @override
+  void setContainerPriority(OsContainerWnd container, bool hasPriority) {
+    DownloadContainer? info = _findContainer(container, null);
+    info?.hasPriority = hasPriority;
+  }
+
+  DownloadContainer? _findContainer(
+      OsContainerWnd container, List<int>? index) {
+    for (int i = 0; i < _containers.length; i++) {
+      if (identical(_containers[i].getContainer(), container)) {
+        if (index != null) {
+          index[0] = i;
+        } else {
+          return _containers[i];
         }
+      }
     }
+    if (index != null) index[0] = -1;
+    return null;
+  }
 
-    public setContainerPriority(container =IContainerWnd, hasPriority =boolean):void {
-        let info:OsDownloadContainer|null = this._findContainer(container, null);
-        if (info) info.hasPriority = hasPriority;
+  void _cleanContainers() {
+    for (int i = 0; i < _containers.length; i++) {
+      if (_containers[i].getContainer() == null) {
+        _containers.removeAt(i);
+        i--;
+      }
     }
-
-    private _findContainer(container =IContainerWnd, index =[number]|null):OsDownloadContainer|null {
-        for (let iinnumber=0; i<_containers.length; i++) 
-            if (_containers[i].getContainer() === container) {
-                if (index) index[0] = i;
-                return _containers[i];
-            }
-        if (index) index[0] = -1;
-        return null;
-    }
-
-    private _cleanContainers():void {
-        for (let iinnumber=0; i<_containers.length; i++) 
-            if (_containers[i].getContainer() === null) {
-                _containers[i].destroy();
-                _containers.splice(i, 1);
-                i--;
-            }
-    }*/
+  }
 
   //-----------------------------------------------------
   // download series
@@ -147,12 +164,12 @@ class DownloadController extends IDownloadController {
   @override
   void addSeriesToLoadingQueue(entities.Series series, bool process) {
     for (final item in _waitingList) {
-      if (item.series == series) {
+      if (identical(item.getSeries(), series)) {
         return;
       }
     }
     for (final item in _downloadingList) {
-      if (item.series == series) {
+      if (identical(item.getSeries(), series)) {
         return;
       }
     }
@@ -166,8 +183,7 @@ class DownloadController extends IDownloadController {
   void processLoadingQueue() {
     //clean up the active list:
     for (int i = 0; i < _downloadingList.length; i++) {
-      entities.Series? series = _downloadingList[i].series;
-
+      entities.Series? series = _downloadingList[i].getSeries();
       bool remove = series != null
           ? series.loadStatus.status != ResultStatus.pending &&
               series.loadStatus.status != ResultStatus.waiting
@@ -194,17 +210,10 @@ class DownloadController extends IDownloadController {
   }
 
   bool _startDownload(DownloadSeries info) {
-    entities.Series? series = info.series;
+    entities.Series? series = info.getSeries();
     series?.loadStatus.status = ResultStatus.waiting;
-
-    String? sourceUid = series?.sourceUid;
-    if (sourceUid == null) return false;
-
-    final dbApi =
-        OVApi().plugins.getPublicApi<DatabaseApi>('onis_database_plugin');
-    final source = dbApi?.sourceController.sources.findSourceByUid(sourceUid);
+    final source = info.getSource();
     if (source == null) return false;
-
     Map<String, dynamic> data = {
       "series": [series]
     };
@@ -259,7 +268,7 @@ class DownloadController extends IDownloadController {
   //-----------------------------------------------------
   void _downloadImages(DownloadSeries info) {
     if (!_downloadingList.contains(info) || info.request != null) return;
-    entities.Series? series = info.series;
+    entities.Series? series = info.getSeries();
     if (series == null || series.loadStatus.status != ResultStatus.waiting) {
       processLoadingQueue();
       return;
@@ -268,155 +277,224 @@ class DownloadController extends IDownloadController {
     if (candidates == null) return;
     DatabaseSource source = candidates.source;
 
-    /*let items:any[] = [];
-    for (let jinnumber=0; j<candidates.images.length; j++) {
-        let image:OsOpenedImage = candidates.images[j];
-        let dcm:OsDicomFile|null = image.getDicomFile();
-        if (!dcm) items.push({dl:info.downloadSeq, index: image.loadIndex, from: -1});
-        else {
-            let interData:OsIntermediatePixelData|null = dcm.getIntermediatePixelData(0);
-            if (interData) items.push({dl:info.downloadSeq, index: image.loadIndex, from: interData.resIndex});
+    List<Map<String, dynamic>> items = [];
+    for (int j = 0; j < candidates.images.length; j++) {
+      entities.Image image = candidates.images[j];
+      DicomFile? dcm = image.dicomFile;
+      if (dcm == null) {
+        items.add(
+            {"dl": info.downloadSeq, "index": image.loadIndex, "from": -1});
+      } else {
+        IntermediatePixelData? interData = dcm.getIntermediatePixelData(0);
+        if (interData != null) {
+          items.add({
+            "dl": info.downloadSeq,
+            "index": image.loadIndex,
+            "from": interData.resIndex
+          });
         }
+      }
     }
-    if (items.length) {
-        let sp:DownloadPerformance|null = this._getSourcePerformance(source, true);
-        info.tm = performance.now();
-        info.request = this._onis.viewerService.downloadImages(server, source.session, source.subType, source.sourceId, items, candidates.pendingRanges, info.maxBytes, _onDownloadImagesResponse, this, info.guid);
-    }*/
+    if (items.isNotEmpty) {
+      //let sp:DownloadPerformance|null = this._getSourcePerformance(source, true);
+      //info.tm = performance.now();
+
+      Map<String, dynamic> data = {
+        "images": items,
+        "pendingRanges": candidates.pendingRanges,
+        "max_bytes": info.maxBytes,
+      };
+      info.request = source.createRequest(RequestType.downloadImages, data);
+      if (info.request != null) {
+        info.request?.send().then((response) {
+          _onDownloadImagesResponse(info, response);
+        });
+      }
+
+      //info.request = this._onis.viewerService.downloadImages(server, source.session, source.subType, source.sourceId, items, candidates.pendingRanges, info.maxBytes, _onDownloadImagesResponse, this, info.guid);
+    }
   }
 
   DownloadCandidates? _getImagesToDownload(DownloadSeries info) {
     DownloadCandidates? candidates;
-    /*let candidates:OsDownloadCandidates|null = null;
-        //make sure all containers are valid:
-        this._cleanContainers();
-        //we alternate the first container to analyze, to make the download more balanced.
-        let series:OsOpenedSeries|null = info.getSeries();
-        let source:IPacsSource|null = series?series.getSource():null;
-        if (series && source) {
-            candidates = OsDownloadCandidates(source);
-            if (_containers.length > 1) _containerIndex = (_containerIndex + 1) % _containers.length;
-            else _containerIndex = 0;
-            //prepare container information.
-            let contInfo:any[] = [];
-            for (let kinnumber=0; k<2; k++) {
-                let start:number = k?0:_containerIndex;
-                let stop:number = k?_containerIndex:_containers.length;
-                for (let iinnumber=start; i<stop; i++) {
-                    let container:IContainerWnd|null = _containers[i].getContainer();
-                    let controller:IContainerController|null = container?container.getController():null;
-                    if (!container || !controller || !controller.isSeriesDisplayed(series)) continue;
-                    let renderers:IRenderer[] = controller.getRendererElements();
-                    if (renderers) {
-                        let rowCol:[number, number] = [0, 0];
-                        container.getImageMatrix(rowCol);
-                        let count:number = rowCol[0]*rowCol[1];
-                        let startIndex = container.getCurrentPage();
-                        if (container.getPageMode()) startIndex *= count;
-                        let firstPos:number = container.findStartingPosition(renderers, startIndex);
-                        let lastPos:number = firstPos;
-                        if (count > 1) {
-                            for (let jinnumber=firstPos; j<renderers.length; j++) 
-                                if (renderers[j] === container.getImageBoxRenderer(count-1)) {
-                                    lastPos = i;
-                                    break;
-                                }
-                        }
-                        contInfo.push({
-                            container: _containers[i],
-                            renderers: renderers,
-                            firstPos: firstPos,
-                            lastPos: lastPos,
-                            done: false,
-                        });
-                    }
-                }
+
+    //make sure all containers are valid:
+    _cleanContainers();
+    //we alternate the first container to analyze, to make the download more balanced.
+    entities.Series? series = info.getSeries();
+    final source = info.getSource();
+    if (source == null) return null;
+    candidates = DownloadCandidates(source);
+
+    if (_containers.length > 1) {
+      _containerIndex = (_containerIndex + 1) % _containers.length;
+    } else {
+      _containerIndex = 0;
+    }
+
+    //prepare container information.
+    List<Map<String, dynamic>> contInfo = [];
+    for (int k = 0; k < 2; k++) {
+      int start = k == 0 ? _containerIndex : 0;
+      int stop = k == 0 ? _containers.length : _containerIndex;
+      for (int i = start; i < stop; i++) {
+        OsContainerWnd? container = _containers[i].getContainer();
+        OsContainerController? controller = container?.controller;
+        if (controller == null) continue;
+        if (!controller.isSeriesDisplayed(series!)) continue;
+        List<OsRenderer> renderers = controller.rendererElements;
+        if (renderers.isEmpty) continue;
+
+        List<int> rowCol = container!.getImageMatrix();
+        int count = rowCol[0] * rowCol[1];
+        int startIndex = container.currentPage;
+        if (container.pageMode) startIndex *= count;
+        int firstPos = container.findStartingPosition(renderers, startIndex);
+        if (firstPos == -1) continue;
+        int lastPos = firstPos;
+        if (count > 1) {
+          for (int j = firstPos; j < renderers.length; j++) {
+            if (identical(
+                renderers[j], container.getImageBoxRenderer(count - 1))) {
+              lastPos = j;
+              break;
             }
+          }
+        }
+        contInfo.add({
+          "container": _containers[i],
+          "renderers": renderers,
+          "firstPos": firstPos,
+          "lastPos": lastPos,
+          "done": false,
+        });
+      }
+    }
 
-            
+    //search within displayed images:
+    for (int i = 0; i < _containers.length; i++) {
+      OsContainerWnd? container = _containers[i].getContainer();
+      OsContainerController? controller = container?.controller;
+      if (controller == null || !controller.isSeriesDisplayed(series!)) {
+        continue;
+      }
 
-            for (let iinnumber=0; i<_containers.length; i++) {
-                let container:IContainerWnd|null = _containers[i].getContainer();
-                let controller:IContainerController|null = container?container.getController():null;
-                if (container && controller) {
-                    if (controller.isSeriesDisplayed(series)) {
-                        //get all candidates:
-                        let rowCol:[number, number] = [0, 0];
-                        container.getImageMatrix(rowCol);
-                        let count:number = rowCol[0]*rowCol[1];
-                        for (let jinnumber=0; j<count; j++) {
-                            let render:IRenderer|null = container.getImageBoxRenderer(j);
-                            if (!render) continue;
-                            let data:[OsOpenedSeries|null, OsOpenedImage|null] = this._getRenderInfo(candidates, series, render);
-                            if (data[0]) candidates.registerCandidate(data[0], data[1]);
-                        }
-                    }
-                }
+      //get all candidates:
+      List<int> rowCol = container!.getImageMatrix();
+      int count = rowCol[0] * rowCol[1];
+      for (int j = 0; j < count; j++) {
+        OsRenderer? render = container.getImageBoxRenderer(j);
+        if (render == null) continue;
+        List<(entities.Series?, entities.Image?)> data =
+            _getRenderInfo(candidates, series, render);
+        if (data[0].$1 != null) {
+          candidates.registerCandidate(data[0].$1!, data[0].$2);
+        }
+      }
+    }
+    candidates.analyzeCandidates(true);
+
+    //now, search within undisplayed images:
+    if (contInfo.isNotEmpty) {
+      int done = 0;
+      int index = 0;
+      while (true) {
+        if (!contInfo[index]["done"]) {
+          contInfo[index]["firstPos"]--;
+          contInfo[index]["lastPos"]++;
+          if (contInfo[index]["firstPos"] < 0 &&
+              contInfo[index]["lastPos"] >=
+                  contInfo[index]["renderers"].length) {
+            contInfo[index]["done"] = true;
+            done++;
+          } else {
+            if (contInfo[index]["lastPos"] <
+                contInfo[index]["renderers"].length) {
+              List<(entities.Series?, entities.Image?)> info = _getRenderInfo(
+                  candidates,
+                  series,
+                  contInfo[index]["renderers"][contInfo[index]["lastPos"]]);
+              if (info[0].$1 != null) {
+                candidates.registerCandidate(info[0].$1!, info[0].$2);
+              }
             }
-            candidates.analyzeCandidates(true);
-
-            //now, search within undisplayed images:
-            if (contInfo.length) {
-                let done:number = 0;
-                let index:number = 0;
-                while (1) {
-                    if (!contInfo[index].done) {
-                        contInfo[index].firstPos--;
-                        contInfo[index].lastPos++;
-                        if (contInfo[index].firstPos < 0 && contInfo[index].lastPos >= contInfo[index].renderers.length) {
-                            contInfo[index].done = true;
-                            done++;
-                        }
-                        else {
-                            if (contInfo[index].lastPos < contInfo[index].renderers.length) {
-                                let info:[OsOpenedSeries|null, OsOpenedImage|null] = this._getRenderInfo(candidates, series, contInfo[index].renderers[contInfo[index].lastPos]);
-                                if (info[0]) candidates.registerCandidate(info[0], info[1]);
-                            }
-                            if (contInfo[index].firstPos >= 0) {
-                                let info:[OsOpenedSeries|null, OsOpenedImage|null] = this._getRenderInfo(candidates, series, contInfo[index].renderers[contInfo[index].firstPos]);
-                                if (info[0]) candidates.registerCandidate(info[0], info[1]);
-                            }
-                        }
-                    }
-                    if (done == contInfo.length) break;
-                    index = (index+1)%contInfo.length;
-                }
-                candidates.analyzeCandidates(false);
+            if (contInfo[index]["firstPos"] >= 0) {
+              List<(entities.Series?, entities.Image?)> info = _getRenderInfo(
+                  candidates,
+                  series,
+                  contInfo[index]["renderers"][contInfo[index]["firstPos"]]);
+              if (info[0].$1 != null) {
+                candidates.registerCandidate(info[0].$1!, info[0].$2);
+              }
             }
+          }
+        }
+        if (done == contInfo.length) break;
+        index = (index + 1) % contInfo.length;
+      }
+      candidates.analyzeCandidates(false);
+    }
 
-            if (candidates.images.length == 0 && series.loadStatus.status == RESULT.OSRSP_WAITING) {
-                for (let iinnumber=0; i<series.images.length; i++) {
-                    //ignore if the image download is completed:
-                    let image:OsOpenedImage = series.images[i];
-                    if (image && image.loadStatus.status != RESULT.OSRSP_PENDING && image.loadStatus.status != RESULT.OSRSP_STREAMING) continue;
-                    if (!candidates.registerCandidate(series, image)) break;
-                }
-                candidates.analyzeCandidates(false);
-            }
+    if (candidates.images.isEmpty &&
+        series!.loadStatus.status == ResultStatus.waiting) {
+      for (int i = 0; i < series.images.length; i++) {
+        //ignore if the image download is completed:
+        entities.Image image = series.images[i];
+        if (image.loadStatus.status != ResultStatus.pending &&
+            image.loadStatus.status != ResultStatus.streaming) {
+          continue;
+        }
+        if (!candidates.registerCandidate(series, image)) break;
+      }
+      candidates.analyzeCandidates(false);
+    }
 
-            //indicate the range of images we can download:
-            info.pendingRanges.forEach(elt=>{if (candidates) candidates.pendingRanges.push([elt[0], elt[1]]);});
-        }*/
+    //indicate the range of images we can download:
+    for (var elt in info.pendingRanges) {
+      candidates.pendingRanges.add([elt[0], elt[1]]);
+    }
+
     return candidates;
   }
 
-  /*private _getRenderInfo(candidates =OsDownloadCandidates, from =OsOpenedSeries, render =IRenderer):[OsOpenedSeries|null, OsOpenedImage|null] {
-        if (!render) return [null, null];
-        if (candidates.isFull()) return [null, null];
-        let img:OsGraphicImage|null = render?render.getPrimaryImageItem(false):null;
-        let series:OsOpenedSeries|null = img?img.isNullImage():null;
-        let image:OsOpenedImage|null = img?img.getImage():null;
-        if (image && !series) series = image.getParent(false);
-        if (series !== from) return [null, null];
-        //ignore if the series download is completed or if there is no series:
-        if (!series || (series.loadStatus.status != RESULT.OSRSP_PENDING && series.loadStatus.status != RESULT.OSRSP_WAITING)) return [null, null];
-        //ignore if the image download is completed:
-        if (image && image.loadStatus.status != RESULT.OSRSP_PENDING && image.loadStatus.status != RESULT.OSRSP_STREAMING) return [null, null];
-        //get the source:
-        let source = series.getSource();
-        if (!source) return [null, null];
-        return [series, image];
-    }*/
+  List<(entities.Series?, entities.Image?)> _getRenderInfo(
+      DownloadCandidates candidates,
+      entities.Series? from,
+      OsRenderer? render) {
+    if (render == null) return [(null, null)];
+    if (candidates.isFull) return [(null, null)];
+    OsGraphicImage? img = render.getPrimaryImageItem();
+    entities.Series? series = img?.isNullImage();
+    entities.Image? image = img?.getImage();
+    if (image != null && series == null) {
+      series = image.series;
+    }
+    if (!identical(series, from)) return [(null, null)];
+
+    //ignore if the series download is completed or if there is no series:
+    if (series == null ||
+        (series.loadStatus.status != ResultStatus.pending &&
+            series.loadStatus.status != ResultStatus.waiting)) {
+      return [(null, null)];
+    }
+
+    //ignore if the image download is completed:
+    if (image != null &&
+        image.loadStatus.status != ResultStatus.pending &&
+        image.loadStatus.status != ResultStatus.streaming) {
+      return [(null, null)];
+    }
+
+    String? sourceUid = series.sourceUid;
+    if (sourceUid == null) return [(null, null)];
+
+    final dbApi =
+        OVApi().plugins.getPublicApi<DatabaseApi>('onis_database_plugin');
+    final source = dbApi?.sourceController.sources.findSourceByUid(sourceUid);
+    if (source == null) return [(null, null)];
+
+    return [(series, image)];
+  }
 
   //-----------------------------------------------------
   // series response
@@ -424,7 +502,7 @@ class DownloadController extends IDownloadController {
 
   void _onInitSeriesDownloadResponse(
       DownloadSeries info, AsyncResponse response) {
-    final series = info.series;
+    final series = info.getSeries();
     if (response.isSuccess && response.data != null) {
       try {
         String downloadSeq = response.data!["data"][0]['seq'] as String;
@@ -494,220 +572,807 @@ class DownloadController extends IDownloadController {
         srinfo.maxBytes = 10*1024;
         //console.log("bandwidth: " + srinfo.maxBytes + " prev: " + prev + " new: " + srinfo.maxBytes);
       }
-    }
+    }*/
 
-    private _onDownloadImagesResponse(status =boolean, data =any, cbkdata =any) {
-      let srinfo:DownloadSeries|undefined = _downloadingList.find(elt=>elt.guid === cbkdata);
-      let series:OsOpenedSeries|null = srinfo?srinfo.getSeries():null;
-      let delayNextDownload:boolean = false;
-      let completedImages:OsOpenedImage[] = [];
-      let firstTimeImages:OsOpenedImage[] = [];
-      if (!delayNextDownload) this._downloadImages(srinfo.guid);
-      else setTimeout(()=>{if (srinfo) this._downloadImages(srinfo.guid);}, 500);
-
-      if (this._viewer.messageService) {
-        if (firstTimeImages.length > 0) this._viewer.messageService.sendMessage(MSG.SERIES_IMAGES_RECEIVED, firstTimeImages);
-        if (completedImages.length > 0) this._viewer.messageService.sendMessage(MSG.SERIES_IMAGES_DOWNLOAD_COMPLETED, completedImages);
+  void _onDownloadImagesResponse(DownloadSeries info, AsyncResponse response) {
+    if (!_downloadingList.contains(info)) return;
+    entities.Series? series = info.getSeries();
+    bool delayNextDownload = false;
+    List<entities.Image> completedImages = [];
+    List<entities.Image> firstTimeImages = [];
+    //if the series is null, it means the series was closed, so we don't have anything to do
+    if (series != null) {
+      //the series was not closed!
+      if (info.request != null) {
+        //cleanup the request
+        info.request!.cancel();
+        info.request = null;
       }
+      if (!response.isSuccess || response.data == null) {
+        //the connection has failed, or the response is not valid (we expect to receive binary data)
+        _interruptSeriesDownload(series, ResultStatus.failure,
+            OnisErrorCodes.invalidRequest, completedImages);
+      } else {
+        //we got some binary data to analyze.
+        Uint8List bytes = response.data!['binary'] as Uint8List;
 
+        int offset = 0;
+        //this._analyzeBandwidth(srinfo, series, bytes);
+        int responseStatus = ((bytes[offset + 3] << 24) |
+                (bytes[offset + 2] << 16) |
+                (bytes[offset + 1] << 8) |
+                bytes[offset]) >>>
+            0;
+        offset += 4;
+        if (responseStatus != 0) {
+          //bad response, we interrupt the download of the series:
+          _interruptSeriesDownload(
+              series, ResultStatus.failure, responseStatus, completedImages);
+        } else {
+          //how many series information we have?
+          //it should be at most only one since we are downloading just one series at a time
+          int count = ((bytes[offset + 3] << 24) |
+                  (bytes[offset + 2] << 16) |
+                  (bytes[offset + 1] << 8) |
+                  bytes[offset]) >>>
+              0;
+          offset += 4;
+          if (count != 0 && count != 1) {
+            //invalid value, we interrupt the download of the series:
+            _interruptSeriesDownload(series, ResultStatus.failure,
+                OnisErrorCodes.invalidResponse, completedImages);
+          } else {
+            //read series information if provided:
+            if (count == 1) {
+              offset = _readSeriesInformation(info, series, bytes, offset);
+            }
+            if (offset == -1) {
+              _interruptSeriesDownload(series, ResultStatus.failure,
+                  OnisErrorCodes.invalidResponse, completedImages);
+            } else {
+              //read the images information:
+              while (offset < bytes.length) {
+                if (offset == -1)
+                  break; //offset equals -1 when an error occurred.
+                List<dynamic> imageInfo =
+                    _readImageInformation(series, bytes, offset);
+                offset = imageInfo[0];
+                if (offset == -1) {
+                  _interruptSeriesDownload(series, ResultStatus.failure,
+                      OnisErrorCodes.invalidResponse, completedImages);
+                } else {
+                  //the image information is correct:
+                  entities.Image? image = imageInfo[2];
+
+                  int imageIndex = imageInfo[3];
+                  int imageResult = imageInfo[4];
+                  //update the download range index (to prevent to redownload the same image twice)
+                  _updateImageRangeIndex(info, imageIndex);
+                  //analyze the image result:
+                  if (imageResult != 0) {
+                    //if the image is not found but the download is not complete, the server may need more time to get the image (this is no an error in this case, we will have to resend the download request later)
+                    if (imageResult == OnisErrorCodes.notFound &&
+                        !info.completed) {
+                      delayNextDownload = true;
+                    } else {
+                      _setImageLoadStatus(info, image!, completedImages,
+                          ResultStatus.failure, imageResult, "");
+                    }
+                  } else {
+                    //no error for image
+                    //do we already have a dicom file for the image?
+                    DicomFile? dcm = image!.dicomFile;
+                    if (dcm == null) {
+                      //we don't have a dicom file yet
+                      //read the format of the image:
+                      int imageFormat = ((bytes[offset + 3] << 24) |
+                              (bytes[offset + 2] << 16) |
+                              (bytes[offset + 1] << 8) |
+                              bytes[offset]) >>>
+                          0;
+                      offset += 4;
+                      EncodedFormat encodedFormat =
+                          EncodedFormatExtension.fromInt(imageFormat);
+                      if (encodedFormat != EncodedFormat.raw &&
+                          encodedFormat != EncodedFormat.png &&
+                          encodedFormat != EncodedFormat.j2k) {
+                        offset = _interruptSeriesDownload(
+                            series,
+                            ResultStatus.failure,
+                            OnisErrorCodes.invalidResponse,
+                            completedImages);
+                      } else {
+                        //pre-read for j2k:
+                        /*let j2kRes:number = -1;
+                          let j2kDataLen:number = -1;
+                          let j2kEndOffset:number = -1;
+                          let version:string = "";
+                          if (imageFormat == ENCODED_FORMAT.J2K) {
+                            j2kRes = ((bytes[offset + 3] << 24) | (bytes[offset + 2] << 16) | (bytes[offset + 1] << 8) | bytes[offset]) >>> 0; offset += 4;
+                            //read file version:
+                            let version_len:number = ((bytes[offset + 3] << 24) | (bytes[offset + 2] << 16) | (bytes[offset + 1] << 8) | bytes[offset]) >>> 0; offset += 4;
+                            if (version_len >= 0 && version_len <= 10) {
+                              for (let i:number=0; i<version_len; i++) version += String.fromCharCode(bytes[i+offset]);
+                              offset += version_len;
+                              //read j2k data len:
+                              j2kDataLen = ((bytes[offset + 3] << 24) | (bytes[offset + 2] << 16) | (bytes[offset + 1] << 8) | bytes[offset]) >>> 0; offset += 4;
+                              j2kEndOffset = offset + j2kDataLen;
+                            }
+                            else this._interruptSeriesDownload(series, RESULT.OSRSP_FAILURE, RESULT.EOS_INVALID_RESPONSE, completedImages);
+                          }*/
+
+                        if (series.loadStatus.reason == 0) {
+                          //read the dicom tags:
+                          offset =
+                              _readDicomFileInformation(image, bytes, offset);
+                          if (offset == -1) {
+                            _interruptSeriesDownload(
+                                series,
+                                ResultStatus.failure,
+                                OnisErrorCodes.invalidResponse,
+                                completedImages);
+                          } else {
+                            if (encodedFormat == EncodedFormat.raw ||
+                                encodedFormat == EncodedFormat.png) {
+                              int width = ((bytes[offset + 3] << 24) |
+                                      (bytes[offset + 2] << 16) |
+                                      (bytes[offset + 1] << 8) |
+                                      bytes[offset]) >>>
+                                  0;
+                              offset += 4;
+                              int height = ((bytes[offset + 3] << 24) |
+                                      (bytes[offset + 2] << 16) |
+                                      (bytes[offset + 1] << 8) |
+                                      bytes[offset]) >>>
+                                  0;
+                              offset += 4;
+                              bool isRgb = bytes[offset] == 0 ? false : true;
+                              offset += 1;
+                              if (width < 0 ||
+                                  height < 0 ||
+                                  width > 8192 ||
+                                  height > 8192) {
+                                offset = _interruptSeriesDownload(
+                                    series,
+                                    ResultStatus.failure,
+                                    OnisErrorCodes.invalidResponse,
+                                    completedImages);
+                              } else {
+                                if (encodedFormat == EncodedFormat.raw) {
+                                  if (isRgb) {
+                                    offset = _readRgbRawData(image, width,
+                                        height, bytes, offset, firstTimeImages);
+                                  } else {
+                                    offset = _readMonochromeRawData(
+                                        image,
+                                        width,
+                                        height,
+                                        bytes,
+                                        offset,
+                                        firstTimeImages);
+                                  }
+                                } else if (encodedFormat == EncodedFormat.png) {
+                                  if (isRgb) {
+                                    offset = _readRgbPngData(image, width,
+                                        height, bytes, offset, firstTimeImages);
+                                  } else {
+                                    offset = _readMonochromePngData(
+                                        image,
+                                        width,
+                                        height,
+                                        bytes,
+                                        offset,
+                                        firstTimeImages);
+                                  }
+                                }
+                                if (offset == -1) {
+                                  offset = _interruptSeriesDownload(
+                                      series,
+                                      ResultStatus.failure,
+                                      OnisErrorCodes.invalidResponse,
+                                      completedImages);
+                                } else {
+                                  _setImageLoadStatus(
+                                      info,
+                                      image,
+                                      completedImages,
+                                      ResultStatus.success,
+                                      OnisErrorCodes.none,
+                                      "");
+                                }
+                              }
+                            } else {
+                              //handle J2K Format:
+                              /*if (j2kDataLen < 0 || j2kRes == -1 || j2kEndOffset > bytes.length) offset = this._interruptSeriesDownload(series, RESULT.OSRSP_FAILURE, RESULT.EOS_INVALID_RESPONSE, completedImages);
+                                else {
+
+                                  let minValue:number = 0;
+                                  let maxValue:number = 0;
+                                  if (version == "3.0") {
+                                    //read min and max values:
+                                    var buf = ArrayBuffer(8);
+                                    var view = DataView(buf);
+                                    for (let iinnumber=0; i<8; i++) view.setUint8(i, bytes[offset+7-i]);
+                                    minValue = view.getFloat64(0);
+                                    offset += 8;
+                                    for (let iinnumber=0; i<8; i++) view.setUint8(i, bytes[offset+7-i]);
+                                    maxValue = view.getFloat64(0);
+                                    offset += 8;
+                                  }
+
+                                  offset++;                                  
+                                  let imageBytes = bytes.slice(offset, j2kEndOffset);
+                                  offset += j2kEndOffset-offset;
+                                  offset = this._readJ2kData(srinfo, image, imageBytes, offset, minValue, maxValue, firstTimeImages, completedImages);
+                                  if (offset == -1) offset = this._interruptSeriesDownload(series, RESULT.OSRSP_FAILURE, RESULT.EOS_INVALID_RESPONSE, completedImages);
+                                }*/
+                            }
+                          }
+                        }
+                      }
+                    } else {
+                      //the dicom file already exists.
+                      //we should come here only in case the J2K Streaming
+                      /*offset = this._addJ2kData(srinfo, image, dcm, bytes, offset, completedImages);
+                        if (offset == -1) offset = this._interruptSeriesDownload(series, RESULT.OSRSP_FAILURE, RESULT.EOS_INVALID_RESPONSE, completedImages);*/
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
     }
-
-    private _interruptSeriesDownload(series =OsOpenedSeries, status =number, reason =number, completedImages =OsOpenedImage[]):number {
-      series.images.forEach(image=> {
-        if (image.loadStatus.status == RESULT.OSRSP_PENDING) {
-          image.loadStatus.status = status;
-          image.loadStatus.reason = reason;
-          completedImages.push(image);
-        } 
+    if (!delayNextDownload) {
+      _downloadImages(info);
+    } else {
+      Future.delayed(const Duration(milliseconds: 500), () {
+        _downloadImages(info);
       });
-      series.loadStatus.status = status;
-      series.loadStatus.reason = reason;
-      return -1;
     }
 
-    private _readSeriesInformation(srinfo =DownloadSeries, series =OsOpenedSeries, bytes =Uint8Array, offset =number):number {
-      let valid:boolean = true;
-      //read the series uid:
-      let length:number = bytes[offset]; offset++;
-      let str:string = '';
-      if (length < 0 || length > 100) valid = false;
-      else {
-        for (let j=0; j<length; j++) str += String.fromCharCode(bytes[j+offset]);
-        offset += length;
-        //make sure the series id matches:
-        if (series.downloadSeq !== str) valid = false;
-        else {
-          //information if all the series images are ready to transfer at server side, and also how many images to expect in the series: 
-          let completed:number = ((bytes[offset + 3] << 24) | (bytes[offset + 2] << 16) | (bytes[offset + 1] << 8) | bytes[offset]) >>> 0; offset += 4;
-          let expected:number = ((bytes[offset + 3] << 24) | (bytes[offset + 2] << 16) | (bytes[offset + 1] << 8) | bytes[offset]) >>> 0; offset += 4;  
-          //console.log("series uid: " + series.getDatabaseInfo().uid + " completed: " + completed + " expected: " + expected);
-          if (completed != 0 && completed != 1) valid = false;
-          else if (expected != 0xFFFFFF && (expected < 0 || expected > 2000)) valid = false;
-          else {
-            srinfo.completed = completed == 1;
-            if (expected != 0xFFFFFF) {
-              if (srinfo.expected != expected) {
-                srinfo.expected = expected;
-                series.prepareForDownload(expected);
-              }
-            }
-            if (srinfo.completed && srinfo.pendingRanges.length) {
-              if (srinfo.pendingRanges[srinfo.pendingRanges.length-1][1] == 0xFFFFFF) {
-                srinfo.pendingRanges[srinfo.pendingRanges.length-1][1] = series.images.length-1;
-              }
-            }      
+    OVApi().messages.sendMessage(OSMSG.seriesImagesReceived, firstTimeImages);
+    OVApi()
+        .messages
+        .sendMessage(OSMSG.seriesImagesDownloadCompleted, completedImages);
+  }
+
+  int _interruptSeriesDownload(entities.Series series, ResultStatus status,
+      int reason, List<entities.Image> completedImages) {
+    for (entities.Image image in series.images) {
+      if (image.loadStatus.status == ResultStatus.pending) {
+        image.loadStatus.status = status;
+        image.loadStatus.reason = reason;
+        completedImages.add(image);
+      }
+    }
+    series.loadStatus.status = status;
+    series.loadStatus.reason = reason;
+    return -1;
+  }
+
+  void _setImageLoadStatus(
+      DownloadSeries srinfo,
+      entities.Image image,
+      List<entities.Image> completedImages,
+      ResultStatus status,
+      int reason,
+      String info) {
+    srinfo.received++;
+    completedImages.add(image);
+    image.loadStatus.status = status;
+    image.loadStatus.reason = reason;
+    image.loadStatus.info = info;
+    if (srinfo.expected == srinfo.received) {
+      entities.Series? series = srinfo.getSeries();
+      if (series != null) {
+        setSeriesLoadStatus(
+            series, ResultStatus.success, OnisErrorCodes.none, info);
+      }
+    }
+  }
+
+  int _readSeriesInformation(DownloadSeries info, entities.Series series,
+      Uint8List bytes, int offset) {
+    bool valid = true;
+    //read the series uid:
+    int length = bytes[offset];
+    offset++;
+    String str = '';
+    if (length < 0 || length > 100) {
+      valid = false;
+    } else {
+      for (int j = 0; j < length; j++) {
+        str += String.fromCharCode(bytes[j + offset]);
+      }
+      offset += length;
+      //make sure the series id matches:
+      /*if (series.downloadSeq != str) {
+          valid = false;
+        }
+        else {*/
+      //information if all the series images are ready to transfer at server side, and also how many images to expect in the series:
+      int completed = ((bytes[offset + 3] << 24) |
+              (bytes[offset + 2] << 16) |
+              (bytes[offset + 1] << 8) |
+              bytes[offset]) >>>
+          0;
+      offset += 4;
+      int expected = ((bytes[offset + 3] << 24) |
+              (bytes[offset + 2] << 16) |
+              (bytes[offset + 1] << 8) |
+              bytes[offset]) >>>
+          0;
+      offset += 4;
+      //console.log("series uid: " + series.getDatabaseInfo().uid + " completed: " + completed + " expected: " + expected);
+      if (completed != 0 && completed != 1) {
+        valid = false;
+      } else if (expected != 0xFFFFFF && (expected < 0 || expected > 2000)) {
+        valid = false;
+      } else {
+        info.completed = completed == 1;
+        if (expected != 0xFFFFFF) {
+          if (info.expected != expected) {
+            info.expected = expected;
+            series.prepareForDownload(expected);
+          }
+        }
+        if (info.completed && info.pendingRanges.isNotEmpty) {
+          if (info.pendingRanges[info.pendingRanges.length - 1][1] ==
+              0xFFFFFF) {
+            info.pendingRanges[info.pendingRanges.length - 1][1] =
+                series.images.length - 1;
           }
         }
       }
-      return valid?offset:-1;
+      // }
     }
+    return valid ? offset : -1;
+  }
 
-    private _readImageInformation(series =OsOpenedSeries, bytes =Uint8Array, offset =number):[number, string, OsOpenedImage|null, number, number] {
-      let valid:boolean = true;
-      let str:string = '';
-      let imageIndex:number = -1;
-      let imageResult:number = RESULT.EOS_INTERNAL;
-      let image:OsOpenedImage|undefined = undefined;
-      let length:number = bytes[offset]; offset++;
-      if (length < 0 || length > 100) valid = false;
-      else {
-        for (let j=0; j<length; j++) str += String.fromCharCode(bytes[j+offset]);
-        offset += length;
-        imageIndex = ((bytes[offset + 3] << 24) | (bytes[offset + 2] << 16) | (bytes[offset + 1] << 8) | bytes[offset]) >>> 0; offset += 4;
-        imageResult = ((bytes[offset + 3] << 24) | (bytes[offset + 2] << 16) | (bytes[offset + 1] << 8) | bytes[offset]) >>> 0; offset += 4;
-        if (imageResult < 0 || imageIndex < 0 || imageIndex >= series.images.length) valid = false;
-        else {
-          image = series.images.find(elt=>elt.loadIndex == imageIndex);
-          if (!image) valid = false;
-        }
+  List<dynamic> _readImageInformation(
+      entities.Series series, Uint8List bytes, int offset) {
+    bool valid = true;
+    String str = '';
+    int imageIndex = -1;
+    int imageResult = OnisErrorCodes.internal;
+    entities.Image? image;
+    int length = bytes[offset];
+    offset++;
+    if (length < 0 || length > 100) {
+      valid = false;
+    } else {
+      for (int j = 0; j < length; j++) {
+        str += String.fromCharCode(bytes[j + offset]);
       }
-      return valid?[offset, str, image, imageIndex, imageResult]:[-1, '', null, -1, -1];
-    }
-
-    private _updateImageRangeIndex(srinfo =DownloadSeries, imageIndex =number):void {
-      for (let iinnumber=0; i<srinfo.pendingRanges.length; i++) {
-        if (imageIndex >= srinfo.pendingRanges[i][0] && imageIndex <= srinfo.pendingRanges[i][1]) {
-            if (srinfo.pendingRanges[i][0] == srinfo.pendingRanges[i][1] && srinfo.pendingRanges[i][0] == imageIndex) srinfo.pendingRanges.splice(i, 1);
-            else if (imageIndex == srinfo.pendingRanges[i][0]) srinfo.pendingRanges[i][0] = imageIndex+1;
-            else if (imageIndex == srinfo.pendingRanges[i][1]) srinfo.pendingRanges[i][1] = imageIndex-1;
-            else {
-                srinfo.pendingRanges.splice(i+1, 0, [imageIndex+1, srinfo.pendingRanges[i][1]]);
-                srinfo.pendingRanges[i][1] = imageIndex-1;
-            }
+      offset += length;
+      imageIndex = ((bytes[offset + 3] << 24) |
+              (bytes[offset + 2] << 16) |
+              (bytes[offset + 1] << 8) |
+              bytes[offset]) >>>
+          0;
+      offset += 4;
+      imageResult = ((bytes[offset + 3] << 24) |
+              (bytes[offset + 2] << 16) |
+              (bytes[offset + 1] << 8) |
+              bytes[offset]) >>>
+          0;
+      offset += 4;
+      if (imageResult < 0 ||
+          imageIndex < 0 ||
+          imageIndex >= series.images.length) {
+        valid = false;
+      } else {
+        for (entities.Image img in series.images) {
+          if (img.loadIndex == imageIndex) {
+            image = img;
             break;
+          }
+        }
+        if (image == null) {
+          valid = false;
         }
       }
     }
+    return valid
+        ? [offset, str, image, imageIndex, imageResult]
+        : [-1, '', null, -1, -1];
+  }
 
-    private _readDicomFileInformation(image =OsOpenedImage, bytes =Uint8Array, offset =number):number {
-      let valid:boolean = true;
-      let tagsLength:number = ((bytes[offset + 3] << 24) | (bytes[offset + 2] << 16) | (bytes[offset + 1] << 8) | bytes[offset]) >>> 0; offset += 4;
-      if (tagsLength <= 0 || tagsLength+offset > bytes.length) valid = false;
-      else {
-        //read the tags:
-        let jsonStr:string = '';
-        //for (let i=0; i<tagsLength; i++) jsonStr += String.fromCharCode(bytes[i+offset]);
-        let tagData:Uint8Array = bytes.subarray(offset, offset+tagsLength);
-        jsonStr = TextDecoder("utf-8").decode(tagData);
+  void _updateImageRangeIndex(DownloadSeries info, int imageIndex) {
+    for (int i = 0; i < info.pendingRanges.length; i++) {
+      if (imageIndex >= info.pendingRanges[i][0] &&
+          imageIndex <= info.pendingRanges[i][1]) {
+        if (info.pendingRanges[i][0] == info.pendingRanges[i][1] &&
+            info.pendingRanges[i][0] == imageIndex) {
+          info.pendingRanges.removeAt(i);
+        } else if (imageIndex == info.pendingRanges[i][0]) {
+          info.pendingRanges[i][0] = imageIndex + 1;
+        } else if (imageIndex == info.pendingRanges[i][1]) {
+          info.pendingRanges[i][1] = imageIndex - 1;
+        } else {
+          info.pendingRanges.insert(
+            i + 1,
+            [imageIndex + 1, info.pendingRanges[i][1]],
+          );
+          info.pendingRanges[i][1] = imageIndex - 1;
+        }
+        break;
+      }
+    }
+  }
 
+  int _readDicomFileInformation(
+      entities.Image image, Uint8List bytes, int offset) {
+    bool valid = true;
+    int tagsLength = ((bytes[offset + 3] << 24) |
+            (bytes[offset + 2] << 16) |
+            (bytes[offset + 1] << 8) |
+            bytes[offset]) >>>
+        0;
+    offset += 4;
+    if (tagsLength <= 0 || tagsLength + offset > bytes.length) {
+      valid = false;
+    } else {
+      //read the tags:
+      String jsonStr = '';
+      Uint8List tagData = Uint8List.view(
+        bytes.buffer,
+        bytes.offsetInBytes + offset,
+        tagsLength,
+      );
+      jsonStr = utf8.decode(tagData);
 
-        offset += tagsLength;
-        //read the palette:
-        let palette:Array<OsDicomRawPalette|null> = [null, null, null];
-        let paletteLen:number = ((bytes[offset + 3] << 24) | (bytes[offset + 2] << 16) | (bytes[offset + 1] << 8) | bytes[offset]) >>> 0; offset += 4;
-        if (paletteLen > 0) {
-          for (let kinnumber = 0; k < 3; k++) {
-            let pl:OsDicomRawPalette = OsDicomRawPalette();
-            pl.count = ((bytes[offset+3] << 24) | (bytes[offset+2] << 16) | (bytes[offset+1] << 8) | bytes[offset]) >>> 0; offset += 4;
-            pl.bits = ((bytes[offset+3] << 24) | (bytes[offset+2] << 16) | (bytes[offset+1] << 8) | bytes[offset]) >>> 0; offset += 4;
-            pl.value = ((bytes[offset+3] << 24) | (bytes[offset+2] << 16) | (bytes[offset+1] << 8) | bytes[offset]) >>> 0; offset += 4;
-            let dataLen:number = ((bytes[offset+3] << 24) | (bytes[offset+2] << 16) | (bytes[offset+1] << 8) | bytes[offset]) >>> 0; offset += 4;
-            if (dataLen < 0 || dataLen > 150000 || dataLen+offset>bytes.length) { valid = false; pl.release(); break; }
-            else {
-                pl.data = bytes.slice(offset, offset+dataLen);
-                offset += dataLen;
-            }
-            palette[k] = pl;
+      offset += tagsLength;
+      //read the palette:
+      List<DicomRawPalette?> palette = [null, null, null];
+      int paletteLen = ((bytes[offset + 3] << 24) |
+              (bytes[offset + 2] << 16) |
+              (bytes[offset + 1] << 8) |
+              bytes[offset]) >>>
+          0;
+      offset += 4;
+      if (paletteLen > 0) {
+        for (int k = 0; k < 3; k++) {
+          DicomRawPalette pl = DicomRawPalette();
+          pl.count = ((bytes[offset + 3] << 24) |
+                  (bytes[offset + 2] << 16) |
+                  (bytes[offset + 1] << 8) |
+                  bytes[offset]) >>>
+              0;
+          offset += 4;
+          pl.bits = ((bytes[offset + 3] << 24) |
+                  (bytes[offset + 2] << 16) |
+                  (bytes[offset + 1] << 8) |
+                  bytes[offset]) >>>
+              0;
+          offset += 4;
+          pl.value = ((bytes[offset + 3] << 24) |
+                  (bytes[offset + 2] << 16) |
+                  (bytes[offset + 1] << 8) |
+                  bytes[offset]) >>>
+              0;
+          offset += 4;
+          int dataLen = ((bytes[offset + 3] << 24) |
+                  (bytes[offset + 2] << 16) |
+                  (bytes[offset + 1] << 8) |
+                  bytes[offset]) >>>
+              0;
+          offset += 4;
+          if (dataLen < 0 ||
+              dataLen > 150000 ||
+              dataLen + offset > bytes.length) {
+            valid = false;
+            break;
+          } else {
+            pl.data = bytes.sublist(offset, offset + dataLen);
+            offset += dataLen;
           }
+          palette[k] = pl;
+        }
+      }
+      try {
+        dynamic decodedTags = json.decode(jsonStr);
+        DicomFile dcm = DicomFile(decodedTags);
+        image.dicomFile = dcm;
+        for (int k = 0; k < 3; k++) {
+          dcm.setPalette(k, palette[k]);
+        }
+      } catch (e) {
+        valid = false;
+      }
+    }
+    return valid ? offset : -1;
+  }
+
+  int _readMonochromeRawData(entities.Image image, int width, int height,
+      Uint8List bytes, int offset, List<entities.Image> firstTimeImages) {
+    bool valid = true;
+    int representation = ((bytes[offset + 1] << 8) | bytes[offset]) >>> 0;
+    offset += 2;
+    bool signedData = bytes[offset] == 0 ? false : true;
+    offset += 1;
+    int pixLen = ((bytes[offset + 3] << 24) |
+            (bytes[offset + 2] << 16) |
+            (bytes[offset + 1] << 8) |
+            bytes[offset]) >>>
+        0;
+    offset += 4;
+    if (pixLen <= 0 || pixLen + offset > bytes.length) {
+      valid = false;
+    } else if (representation != 8 &&
+        representation != 12 &&
+        representation != 16) {
+      valid = false;
+    } else {
+      IntermediatePixelData? interData;
+      DicomFile? dcm = image.dicomFile;
+      if (dcm != null) {
+        interData = IntermediatePixelData();
+        interData.encodedDataFormat = EncodedFormat.raw;
+        interData.resIndex = 0;
+        interData.resCount = 1;
+        interData.width = width;
+        interData.height = height;
+        interData.bits = representation;
+        interData.isSigned = signedData;
+        interData.intermediatePixelData =
+            bytes.sublist(offset, offset + pixLen);
+        dcm.setIntermediatePixelData(0, interData);
+        firstTimeImages.add(image);
+        offset += pixLen;
+      } else {
+        valid = false;
+      }
+    }
+    return valid ? offset : -1;
+  }
+
+  int _readRgbRawData(entities.Image image, int width, int height,
+      Uint8List bytes, int offset, List<entities.Image> firstTimeImages) {
+    bool valid = true;
+    int bitsPerPixel = bytes[offset];
+    offset += 1;
+    if (bitsPerPixel != 24 && bitsPerPixel != 32) {
+      valid = false;
+    } else {
+      int pixLen = ((bytes[offset + 3] << 24) |
+              (bytes[offset + 2] << 16) |
+              (bytes[offset + 1] << 8) |
+              bytes[offset]) >>>
+          0;
+      offset += 4;
+      if (pixLen <= 0 || pixLen + offset > bytes.length) {
+        valid = false;
+      } else {
+        DicomFile? dcm = image.dicomFile;
+        if (dcm != null) {
+          IntermediatePixelData interData = IntermediatePixelData();
+          interData.encodedDataFormat = EncodedFormat.raw;
+          interData.rgbOrder = 1;
+          interData.resIndex = 0;
+          interData.resCount = 1;
+          interData.width = width;
+          interData.height = height;
+          interData.bits = bitsPerPixel;
+          interData.isSigned = false;
+          interData.intermediatePixelData =
+              bytes.sublist(offset, offset + pixLen);
+          dcm.setIntermediatePixelData(0, interData);
+          firstTimeImages.add(image);
+          offset += pixLen;
+        } else {
+          valid = false;
+        }
+      }
+    }
+    return valid ? offset : -1;
+  }
+
+  int _readMonochromePngData(entities.Image image, int width, int height,
+      Uint8List bytes, int offset, List<entities.Image> firstTimeImages) {
+    bool valid = true;
+    int representation = ((bytes[offset + 1] << 8) | bytes[offset]) >>> 0;
+    offset += 2;
+    bool signedData = bytes[offset] == 0 ? false : true;
+    offset += 1;
+    int pixLen = ((bytes[offset + 3] << 24) |
+            (bytes[offset + 2] << 16) |
+            (bytes[offset + 1] << 8) |
+            bytes[offset]) >>>
+        0;
+    offset += 4;
+    if (pixLen <= 0 || pixLen + offset > bytes.length) {
+      valid = false;
+    } else if (representation != 8 &&
+        representation != 12 &&
+        representation != 16) {
+      valid = false;
+    } else {
+      final Uint8List pngData = Uint8List.view(
+        bytes.buffer,
+        bytes.offsetInBytes + offset,
+        pixLen,
+      );
+      /*try {
+        final StringBuffer sb = StringBuffer();
+        sb.writeln('pngData length=${pngData.length}');
+        const int bytesPerLine = 32;
+        for (int i = 0; i < pngData.length; i += bytesPerLine) {
+          final int end = (i + bytesPerLine < pngData.length)
+              ? i + bytesPerLine
+              : pngData.length;
+          sb.write(i.toRadixString(16).padLeft(8, '0'));
+          sb.write(': ');
+          for (int j = i; j < end; j++) {
+            sb.write(pngData[j].toRadixString(16).padLeft(2, '0'));
+            if (j + 1 < end) sb.write(' ');
+          }
+          sb.writeln();
+        }
+        final String content = sb.toString();
+        final String home = Platform.environment['HOME'] ?? '';
+        String dumpPath = home.isNotEmpty
+            ? p.join(home, 'Documents', 'pngData.txt')
+            : p.join(Directory.current.path, 'pngData.txt');
+        void tryWrite(String path) {
+          final File file = File(path);
+          file.parent.createSync(recursive: true);
+          file.writeAsStringSync(content, flush: true);
         }
         try {
-          let decodedTags:any = JSON.parse(jsonStr);
-          let dcm:OsDicomFile = OsDicomFile(decodedTags);
-          image.setDicomFile(dcm);
-          for (let kinnumber=0; k<3; k++) dcm.setPalette(k, palette[k]);
-          dcm.release();
+          tryWrite(dumpPath);
+          print('_readMonochromePngData dumped pngData hex to $dumpPath');
+        } on FileSystemException catch (e) {
+          dumpPath = p.join(Directory.systemTemp.path, 'pngData.txt');
+          tryWrite(dumpPath);
+          print(
+            '_readMonochromePngData: ~/Documents/pngData.txt failed ($e), '
+            'wrote to $dumpPath instead',
+          );
         }
-        catch(e) {
-          valid = false;
-        }
-        palette.forEach(item=>item?.release());
-      }
-      return valid?offset:-1;
-    }
+      } catch (e, st) {
+        print('_readMonochromePngData failed to dump pngData: $e\n$st');
+      }*/
 
-    private _readMonochromeRawData(image =OsOpenedImage, width =number, height =number, bytes =Uint8Array, offset =number, firstTimeImages =OsOpenedImage[]):number {
-      let valid:boolean = true;
-      let representation:number = ((bytes[offset + 1] << 8) | bytes[offset]) >>> 0; offset += 2;
-      let signedData:boolean = bytes[offset] == 0 ? false : true; offset += 1;
-      let pixLen:number = ((bytes[offset + 3] << 24) | (bytes[offset + 2] << 16) | (bytes[offset + 1] << 8) | bytes[offset]) >>> 0; offset += 4;
-      if (pixLen <= 0 || pixLen+offset > bytes.length) valid = false;
-      else if (representation != 8 && representation != 12 && representation != 16) valid = false;
-      else {
-        let interData:OsIntermediatePixelData|null = null;
-        let dcm:OsDicomFile|null = image.getDicomFile();
+      offset += pixLen;
+      IntermediatePixelData? interData;
+      DicomFile? dcm = image.dicomFile;
+      if (dcm != null) {
+        interData = IntermediatePixelData();
+        interData.resIndex = 0;
+        interData.resCount = 1;
+        interData.width = width;
+        interData.height = height;
+        interData.bits = representation;
+        interData.isSigned = signedData;
+        interData.encodedDataFormat = EncodedFormat.raw;
+
+        final img.Image? decoded = img.decodePng(pngData);
+
+        /*if (decoded != null) {
+          final Uint8List decodedBytes = decoded.getBytes();
+          if (decodedBytes.length >= 2) {
+            int minU16 = 0xFFFF;
+            int maxU16 = 0;
+            for (int i = 0; i + 1 < decodedBytes.length; i += 2) {
+              final int v = decodedBytes[i] | (decodedBytes[i + 1] << 8);
+              if (v < minU16) minU16 = v;
+              if (v > maxU16) maxU16 = v;
+            }
+            print(
+              '_readMonochromePngData unsigned16 min=$minU16 max=$maxU16 '
+              '(bytes=${decodedBytes.length})',
+            );
+          } else {
+            print(
+              '_readMonochromePngData decoded PNG has insufficient bytes: '
+              '${decodedBytes.length}',
+            );
+          }
+        }*/
+
+        if (decoded == null) {
+          valid = false;
+        } else {
+          final Uint8List raw = decoded.getBytes();
+          int factor = 1;
+          if (representation <= 8) {
+            factor = 1;
+          } else if (representation <= 16) {
+            factor = 2;
+          } else {
+            factor = 4;
+          }
+          if (representation > 8) {
+            // PNG 16-bit samples are decoded in opposite byte order for our
+            // pipeline; swap each 16-bit word to match expected layout.
+            for (int i = 0; i + 1 < raw.length; i += 2) {
+              final int b0 = raw[i];
+              raw[i] = raw[i + 1];
+              raw[i + 1] = b0;
+            }
+          }
+          if (raw.length >= width * height * factor) {
+            interData.intermediatePixelData =
+                raw.sublist(0, width * height * factor);
+            dcm.setIntermediatePixelData(0, interData);
+          } else {
+            valid = false;
+          }
+        }
+        firstTimeImages.add(image);
+      } else {
         valid = false;
       }
-      return valid?offset:-1;
     }
+    return valid ? offset : -1;
+  }
 
-    private _readRgbRawData(image =OsOpenedImage, width =number, height =number, bytes =Uint8Array, offset =number, firstTimeImages =OsOpenedImage[]):number {
-      let valid:boolean = true;
-      let bitsPerPixel:number = bytes[offset]; offset += 1;
-      if (bitsPerPixel != 24 && bitsPerPixel != 32) valid = false;
-      else {
-        let pixLen:number = ((bytes[offset + 3] << 24) | (bytes[offset + 2] << 16) | (bytes[offset + 1] << 8) | bytes[offset]) >>> 0; offset += 4;
-        if (pixLen <= 0 || pixLen+offset > bytes.length) valid = false;
-        else {
-          let dcm:OsDicomFile|null = image?image.getDicomFile():null;
-          valid = false;
-        }
-      }
-      return valid?offset:-1;
-    }
-
-    private _readMonochromePngData(image =OsOpenedImage, width =number, height =number, bytes =Uint8Array, offset =number, firstTimeImages =OsOpenedImage[]):number {
-      let valid:boolean = true;
-      let representation:number = ((bytes[offset + 1] << 8) | bytes[offset]) >>> 0; offset += 2;
-      let signedData:boolean = bytes[offset] == 0 ? false : true; offset += 1;
-      let pixLen:number = ((bytes[offset + 3] << 24) | (bytes[offset + 2] << 16) | (bytes[offset + 1] << 8) | bytes[offset]) >>> 0; offset += 4;
-      if (pixLen <= 0 || pixLen+offset > bytes.length) valid = false;
-      else if (representation != 8 && representation != 12 && representation != 16) valid = false;
-      else {
-        let pngData:Uint8Array = bytes.slice(offset, offset+pixLen);
+  int _readRgbPngData(entities.Image image, int width, int height,
+      Uint8List bytes, int offset, List<entities.Image> firstTimeImages) {
+    bool valid = true;
+    int bitsPerPixel = bytes[offset];
+    offset += 1;
+    if (bitsPerPixel != 24 && bitsPerPixel != 32) {
+      valid = false;
+    } else {
+      int pixLen = ((bytes[offset + 3] << 24) |
+              (bytes[offset + 2] << 16) |
+              (bytes[offset + 1] << 8) |
+              bytes[offset]) >>>
+          0;
+      offset += 4;
+      if (pixLen < 0 || pixLen + offset > bytes.length) {
+        valid = false;
+      } else {
+        final Uint8List pngData = Uint8List.view(
+          bytes.buffer,
+          bytes.offsetInBytes + offset,
+          pixLen,
+        );
         offset += pixLen;
-        let interData:OsIntermediatePixelData|null = null;
-        let dcm:OsDicomFile|null = image.getDicomFile();
-        valid = false;
-      }
-      return valid?offset:-1;
-    }
 
-    private _readRgbPngData(image =OsOpenedImage, width =number, height =number, bytes =Uint8Array, offset =number, firstTimeImages =OsOpenedImage[]):number {
-      let valid:boolean = true;
-      let bitsPerPixel:number = bytes[offset]; offset += 1;
-      if (bitsPerPixel != 24 && bitsPerPixel != 32) valid = false;
-      else {
-        let pixLen:number = ((bytes[offset + 3] << 24) | (bytes[offset + 2] << 16) | (bytes[offset + 1] << 8) | bytes[offset]) >>> 0; offset += 4;
-        if (pixLen < 0 || pixLen+offset > bytes.length) valid = false;
-        else {
-          let pngData:Uint8Array = bytes.slice(offset, offset+pixLen);
-          offset += pixLen;
-          let dcm:OsDicomFile|null = image?image.getDicomFile():null;
+        DicomFile? dcm = image.dicomFile;
+        if (dcm != null) {
+          IntermediatePixelData interData = IntermediatePixelData();
+          interData.encodedDataFormat = EncodedFormat.raw;
+          interData.rgbOrder = 1;
+          interData.resIndex = 0;
+          interData.resCount = 1;
+          interData.width = width;
+          interData.height = height;
+          interData.bits = bitsPerPixel;
+          interData.isSigned = false;
+
+          try {
+            final img.Image? decoded = img.decodePng(pngData);
+
+            if (decoded == null) {
+              valid = false;
+            } else {
+              final Uint8List raw = decoded.getBytes();
+              if (raw.length >= width * height * 3) {
+                interData.intermediatePixelData =
+                    raw.sublist(0, width * height * 3);
+                dcm.setIntermediatePixelData(0, interData);
+                interData.rgbOrder = 0;
+              } else {
+                valid = false;
+              }
+            }
+          } catch (e) {
+            valid = false;
+          }
+          firstTimeImages.add(image);
+        } else {
           valid = false;
         }
       }
-      return valid?offset:-1;
-    }*/
+    }
+    return valid ? offset : -1;
+  }
 
   /*private _readJ2kData(srinfo:DownloadSeries, image:OsOpenedImage, imageBytes:Uint8Array, offset:number, minValue:number, maxValue:number, firstTimeImages:OsOpenedImage[], completedImages:OsOpenedImage[]):number {
       let valid:boolean = true;
@@ -769,489 +1434,6 @@ class DownloadController extends IDownloadController {
       }
       else valid = false;
       return valid?offset:-1;
-    }*/
-
-  /*private _onDownloadImagesResponse1(status =boolean, data =any, cbkdata =any) {
-        let srinfo:DownloadSeries|undefined = _downloadingList.find(elt=>elt.guid === cbkdata);
-        let series:OsOpenedSeries|null = srinfo?srinfo.getSeries():null;
-        if (srinfo && series) {
-            let sp:DownloadPerformance|null = this._getSourcePerformance(series.getSource(), false);
-            let gotImageData:boolean = false;
-            if (status && data) {
-                let bytes:Uint8Array = Uint8Array(data);
-                var duration = (performance.now() - srinfo.tm) / 1000.0;
-                //console.log("duration: " + duration + " / ping time: " + sp.pingTime);
-                if (sp) duration -= sp.pingTime;
-                if (duration > 0) {
-                    srinfo.maxBytes = bytes.length / duration;
-                    //console.log("bandwidth: " + srinfo.maxBytes);
-                    if (srinfo.maxBytes < 50*1024) srinfo.maxBytes = 50*1024;
-                    else if (srinfo.maxBytes > 512*1024) srinfo.maxBytes = 512*1024;
-
-                    srinfo.maxBytes = 10*1024;
-
-                }
-                let offset:number = 0;
-                let responseStatus:number = ((bytes[offset + 3] << 24) | (bytes[offset + 2] << 16) | (bytes[offset + 1] << 8) | bytes[offset]) >>> 0;
-                offset += 4;
-                if (responseStatus == 0) {
-                    //read the number of series information:
-                    let count:number = ((bytes[offset + 3] << 24) | (bytes[offset + 2] << 16) | (bytes[offset + 1] << 8) | bytes[offset]) >>> 0;
-                    offset += 4;
-                    if (count > 0 && count < 1000) {
-                        for (let iinnumber=0; i<count; i++) {
-                            let length:number = bytes[offset]; offset++;
-                            let str:string = '';
-                            for (let j=0; j<length; j++) str += String.fromCharCode(bytes[j+offset]);
-                            offset += length;
-                            let completed:number = ((bytes[offset + 3] << 24) | (bytes[offset + 2] << 16) | (bytes[offset + 1] << 8) | bytes[offset]) >>> 0; offset += 4;
-                            let expected:number = ((bytes[offset + 3] << 24) | (bytes[offset + 2] << 16) | (bytes[offset + 1] << 8) | bytes[offset]) >>> 0; offset += 4;
-                            //if completed is 1, it means that the server has information about the total number of images for the series and that all the images are avaialble for transfer
-                            //let srinfo:DownloadSeries = this._seriesInfo.find(elt=>elt.downloadSeq==str);
-                            //if (srinfo) {
-                                srinfo.completed = completed == 1;
-                                if (expected != 0xFFFFFF) {
-                                    if (srinfo.expected != expected) {
-                                        srinfo.expected = expected;
-                                        let series:OsOpenedSeries|null = srinfo.getSeries();
-                                        if (series) series.prepareForDownload(expected);
-                                    }
-                                }
-                                if (srinfo.completed && srinfo.pendingRanges.length) {
-                                    if (srinfo.pendingRanges[srinfo.pendingRanges.length-1][1] == 0xFFFFFF) {
-                                        let series:OsOpenedSeries|null = srinfo.getSeries();
-                                        if (series) srinfo.pendingRanges[srinfo.pendingRanges.length-1][1] = series.images.length-1;
-                                    }
-                                }
-                            //}
-                        }
-                    }
-                    let valid:boolean = true;
-                    let completedImages:OsOpenedImage[] = [];
-                    let firstTimeImages:OsOpenedImage[] = [];
-
-                    while (offset < bytes.length) {
-
-                        let length:number = bytes[offset]; offset++;
-                        let str:string = '';
-                        for (let j=0; j<length; j++) str += String.fromCharCode(bytes[j+offset]);
-                        offset += length;
-                        let imageIndex:number = ((bytes[offset + 3] << 24) | (bytes[offset + 2] << 16) | (bytes[offset + 1] << 8) | bytes[offset]) >>> 0; offset += 4;
-                        let imageResult:number = ((bytes[offset + 3] << 24) | (bytes[offset + 2] << 16) | (bytes[offset + 1] << 8) | bytes[offset]) >>> 0; offset += 4;
-                        let image:OsOpenedImage|undefined = series.images.find(elt=>elt.loadIndex == imageIndex);
-
-                        
-                        //update the range index:
-                        for (let iinnumber=0; i<srinfo.pendingRanges.length; i++) {
-                            if (imageIndex >= srinfo.pendingRanges[i][0] && imageIndex <= srinfo.pendingRanges[i][1]) {
-                                if (srinfo.pendingRanges[i][0] == srinfo.pendingRanges[i][1] && srinfo.pendingRanges[i][0] == imageIndex) srinfo.pendingRanges.splice(i, 1);
-                                else if (imageIndex == srinfo.pendingRanges[i][0]) srinfo.pendingRanges[i][0] = imageIndex+1;
-                                else if (imageIndex == srinfo.pendingRanges[i][1]) srinfo.pendingRanges[i][1] = imageIndex-1;
-                                else {
-                                    srinfo.pendingRanges.splice(i+1, 0, [imageIndex+1, srinfo.pendingRanges[i][1]]);
-                                    srinfo.pendingRanges[i][1] = imageIndex-1;
-                                }
-                                break;
-                            }
-                        }
-
-                       
-                        
-                        if (imageResult != 0) {
-                            if (imageResult == RESULT.EOS_NOT_EXIST) {
-                                //the image was not found. 
-                                //if the download is not completed, it may arrive later. 
-                                //Otherwise, it should have been founded.
-                                if (srinfo.completed && image) this._setImageLoadStatus(srinfo, image, completedImages, RESULT.OSRSP_FAILURE, imageResult, "");
-                            }
-                            else {
-                                if (image) {
-                                    gotImageData = true;
-                                    this._setImageLoadStatus(srinfo, image, completedImages, RESULT.OSRSP_FAILURE, imageResult, "");
-                                }
-                            }
-                        }
-                        else {
-                            gotImageData = true;
-                            let dcm:OsDicomFile|null = image?image.getDicomFile():null;
-                            if (!dcm) {
-                                let type:number = ((bytes[offset + 3] << 24) | (bytes[offset + 2] << 16) | (bytes[offset + 1] << 8) | bytes[offset]) >>> 0; offset += 4;
-                                if (type == ENCODED_FORMAT.RAW) {
-                                    let tagsLength:number = ((bytes[offset + 3] << 24) | (bytes[offset + 2] << 16) | (bytes[offset + 1] << 8) | bytes[offset]) >>> 0; offset += 4;
-                                    if (tagsLength > 0 && tagsLength+offset <= bytes.length) {
-                                        let jsonStr:string = '';
-                                            for (let i=0; i<tagsLength; i++)
-                                                jsonStr += String.fromCharCode(bytes[i+offset]);
-                                        offset += tagsLength;
-
-                                        let palette:Array<OsDicomRawPalette|null> = [null, null, null];
-                                        let paletteLen:number = ((bytes[offset + 3] << 24) | (bytes[offset + 2] << 16) | (bytes[offset + 1] << 8) | bytes[offset]) >>> 0; offset += 4;
-                                        if (paletteLen > 0) {
-                                            for (let kinnumber = 0; k < 3; k++) {
-                                                let pl:OsDicomRawPalette = OsDicomRawPalette();
-                                                pl.count = ((bytes[offset+3] << 24) | (bytes[offset+2] << 16) | (bytes[offset+1] << 8) | bytes[offset]) >>> 0; offset += 4;
-                                                pl.bits = ((bytes[offset+3] << 24) | (bytes[offset+2] << 16) | (bytes[offset+1] << 8) | bytes[offset]) >>> 0; offset += 4;
-                                                pl.value = ((bytes[offset+3] << 24) | (bytes[offset+2] << 16) | (bytes[offset+1] << 8) | bytes[offset]) >>> 0; offset += 4;
-                                                let dataLen:number = ((bytes[offset+3] << 24) | (bytes[offset+2] << 16) | (bytes[offset+1] << 8) | bytes[offset]) >>> 0; offset += 4;
-                                                if (dataLen < 0 || dataLen > 150000) valid = false;
-                                                else {
-                                                    pl.data = bytes.slice(offset, offset+dataLen);
-                                                    offset += dataLen;
-                                                }
-                                                palette[k] = pl;
-                                            }
-                                        }
-                                        let width:number = ((bytes[offset + 3] << 24) | (bytes[offset + 2] << 16) | (bytes[offset + 1] << 8) | bytes[offset]) >>> 0; offset += 4;
-                                        let height:number = ((bytes[offset + 3] << 24) | (bytes[offset + 2] << 16) | (bytes[offset + 1] << 8) | bytes[offset]) >>> 0; offset += 4;
-                                        let isRgb:boolean = bytes[offset] == 0 ? false : true; offset += 1;
-                                        if (isRgb) {
-                                            let bitsPerPixel:number = bytes[offset]; offset += 1;
-                                            if (bitsPerPixel == 24 || bitsPerPixel == 32) {
-                                                let pixLen:number = ((bytes[offset + 3] << 24) | (bytes[offset + 2] << 16) | (bytes[offset + 1] << 8) | bytes[offset]) >>> 0; offset += 4;
-                                                if (pixLen > 0 && pixLen+offset <= bytes.length) {
-                                                    let dcm:OsDicomFile|null = image?image.getDicomFile():null;
-                                                    if (image) { 
-                                                        try {
-                                                            let decodedTags:any = JSON.parse(jsonStr);
-                                                            dcm = OsDicomFile(decodedTags);
-                                                            image.setDicomFile(dcm);
-                                                            let interData:OsIntermediatePixelData = OsIntermediatePixelData();
-                                                            interData.rgbOrder = 1;
-                                                            interData.resIndex = 0;
-                                                            interData.resCount = 1;
-                                                            interData.width = width;
-                                                            interData.height = height;
-                                                            interData.bits = bitsPerPixel;
-                                                            interData.isSigned = false;
-                                                            interData.intermediatePixelData = bytes.slice(offset, offset+pixLen);
-                                                            dcm.setIntermediatePixelData(0, interData);
-                                                            dcm.release();
-                                                            dcm = null;
-
-                                                            firstTimeImages.push(image);
-                                                            this._setImageLoadStatus(srinfo, image, completedImages, RESULT.OSRSP_SUCCESS, RESULT.EOS_NONE, "");
-                                                        }
-                                                        catch(e) {
-                                                            this._setImageLoadStatus(srinfo, image, completedImages, RESULT.OSRSP_FAILURE, RESULT.EOS_INVALID_RESPONSE, "");
-                                                        }
-                                                    }
-                                                    offset += pixLen;
-                                                }
-                                                else valid = false;
-                                            }
-                                        }   
-                                        else {
-                                            let representation:number = ((bytes[offset + 1] << 8) | bytes[offset]) >>> 0; offset += 2;
-                                            let signedData:boolean = bytes[offset] == 0 ? false : true; offset += 1;
-                                            let pixLen:number = ((bytes[offset + 3] << 24) | (bytes[offset + 2] << 16) | (bytes[offset + 1] << 8) | bytes[offset]) >>> 0; offset += 4;
-                                            if (pixLen > 0 && pixLen+offset <= bytes.length) {
-                                                let interData:OsIntermediatePixelData|null = null;
-                                                let dcm:OsDicomFile|null = image?image.getDicomFile():null;
-                                                if (image) { 
-                                                    try {
-                                                        let decodedTags:any = JSON.parse(jsonStr);
-                                                        dcm = OsDicomFile(decodedTags);
-                                                        for (let kinnumber=0; k<3; k++) dcm.setPalette(k, palette[k]);
-                                                        image.setDicomFile(dcm);
-                                                        //let interData:OsIntermediatePixelData = new OsIntermediatePixelData();
-                                                        interData = OsIntermediatePixelData();
-                                                        interData.resIndex = 0;
-                                                        interData.resCount = 1;
-                                                        interData.width = width;
-                                                        interData.height = height;
-                                                        interData.bits = representation;
-                                                        interData.isSigned = signedData;
-                                                        interData.intermediatePixelData = bytes.slice(offset, offset+pixLen);
-                                                        dcm.setIntermediatePixelData(0, interData);
-                                                        dcm.release();
-                                                        dcm = null;
-                                                        firstTimeImages.push(image);
-                                                        this._setImageLoadStatus(srinfo, image, completedImages, RESULT.OSRSP_SUCCESS, RESULT.EOS_NONE, "");
-                                                        //assign state:
-                                                        //info.series.assignPendingStates(openedImage);
-                                                    }
-                                                    catch(e) {
-                                                        this._setImageLoadStatus(srinfo, image, completedImages, RESULT.OSRSP_FAILURE, RESULT.EOS_INVALID_RESPONSE, "");
-                                                    }
-                                                }
-                                                offset += pixLen;
-                                            }
-                                            else valid = false;
-                                        }
-                                        palette.forEach(elt=>{if(elt) elt.release();});
-                                    }
-                                    else valid = false;
-                                }
-                                else
-                                if (type == ENCODED_FORMAT.PNG) {
-                                    let tagsLength:number = ((bytes[offset + 3] << 24) | (bytes[offset + 2] << 16) | (bytes[offset + 1] << 8) | bytes[offset]) >>> 0; offset += 4;
-                                    if (tagsLength > 0 && tagsLength+offset <= bytes.length) {
-                                        let jsonStr:string = '';
-                                            for (let i=0; i<tagsLength; i++)
-                                                jsonStr += String.fromCharCode(bytes[i+offset]);
-                                        offset += tagsLength;
-
-                                        let palette:Array<OsDicomRawPalette|null> = [null, null, null];
-                                        let paletteLen:number = ((bytes[offset + 3] << 24) | (bytes[offset + 2] << 16) | (bytes[offset + 1] << 8) | bytes[offset]) >>> 0; offset += 4;
-                                        if (paletteLen > 0) {
-                                            for (let kinnumber = 0; k < 3; k++) {
-                                                let pl:OsDicomRawPalette = OsDicomRawPalette();
-                                                pl.count = ((bytes[offset+3] << 24) | (bytes[offset+2] << 16) | (bytes[offset+1] << 8) | bytes[offset]) >>> 0; offset += 4;
-                                                pl.bits = ((bytes[offset+3] << 24) | (bytes[offset+2] << 16) | (bytes[offset+1] << 8) | bytes[offset]) >>> 0; offset += 4;
-                                                pl.value = ((bytes[offset+3] << 24) | (bytes[offset+2] << 16) | (bytes[offset+1] << 8) | bytes[offset]) >>> 0; offset += 4;
-                                                let dataLen:number = ((bytes[offset+3] << 24) | (bytes[offset+2] << 16) | (bytes[offset+1] << 8) | bytes[offset]) >>> 0; offset += 4;
-                                                if (dataLen < 0 || dataLen > 150000) valid = false;
-                                                else {
-                                                    pl.data = bytes.slice(offset, offset+dataLen);
-                                                    offset += dataLen;
-                                                }
-                                                palette[k] = pl;
-                                            }
-                                        }
-                                        let width:number = ((bytes[offset + 3] << 24) | (bytes[offset + 2] << 16) | (bytes[offset + 1] << 8) | bytes[offset]) >>> 0; offset += 4;
-                                        let height:number = ((bytes[offset + 3] << 24) | (bytes[offset + 2] << 16) | (bytes[offset + 1] << 8) | bytes[offset]) >>> 0; offset += 4;
-                                        let isRgb:boolean = bytes[offset] == 0 ? false : true; offset += 1;
-                                        if (isRgb) {
-                                            let bitsPerPixel:number = bytes[offset]; offset += 1;
-                                            if (bitsPerPixel == 24 || bitsPerPixel == 32) {
-                                                let pixLen:number = ((bytes[offset + 3] << 24) | (bytes[offset + 2] << 16) | (bytes[offset + 1] << 8) | bytes[offset]) >>> 0; offset += 4;
-                                                if (pixLen > 0 && pixLen+offset <= bytes.length) {
-                                                    let pngData:Uint8Array = bytes.slice(offset, offset+pixLen);
-                                                    let dcm:OsDicomFile|null = image?image.getDicomFile():null;
-                                                    if (image) { 
-                                                        try {
-                                                            let decodedTags:any = JSON.parse(jsonStr);
-                                                            dcm = OsDicomFile(decodedTags);
-                                                            image.setDicomFile(dcm);
-                                                            let interData:OsIntermediatePixelData = OsIntermediatePixelData();
-                                                            interData.rgbOrder = 1;
-                                                            interData.resIndex = 0;
-                                                            interData.resCount = 1;
-                                                            interData.width = width;
-                                                            interData.height = height;
-                                                            interData.bits = bitsPerPixel;
-                                                            interData.isSigned = false;
-                                                            //interData.intermediatePixelData = bytes.slice(offset, offset+pixLen);
-
-                                                            if ((<any>window)['UPNG'] && pngData) {
-                                                                let res:any = (<any>window)['UPNG'].decode(pngData);
-                                                                if (res && res.data) {
-                                                                    if (res.data.length >= width*height*3) 
-                                                                    interData.intermediatePixelData = res.data.slice(0, width*height*3);
-                                                                    interData.rgbOrder = 0;
-                                                                }
-                                                            }
-
-                                                            dcm.setIntermediatePixelData(0, interData);
-                                                            dcm.release();
-                                                            dcm = null;
-                                                            firstTimeImages.push(image);
-                                                            this._setImageLoadStatus(srinfo, image, completedImages, RESULT.OSRSP_SUCCESS, RESULT.EOS_NONE, "");
-                                                        }
-                                                        catch(e) {
-                                                            this._setImageLoadStatus(srinfo, image, completedImages, RESULT.OSRSP_FAILURE, RESULT.EOS_INVALID_RESPONSE, "");
-                                                        }
-                                                    }
-                                                    offset += pixLen;
-                                                }
-                                                else valid = false;
-                                            }
-                                        }   
-                                        else {
-                                            let representation:number = ((bytes[offset + 1] << 8) | bytes[offset]) >>> 0; offset += 2;
-                                            let signedData:boolean = bytes[offset] == 0 ? false : true; offset += 1;
-                                            let pixLen:number = ((bytes[offset + 3] << 24) | (bytes[offset + 2] << 16) | (bytes[offset + 1] << 8) | bytes[offset]) >>> 0; offset += 4;
-                                            if (pixLen > 0 && pixLen+offset <= bytes.length) {
-                                                let pngData:Uint8Array = bytes.slice(offset, offset+pixLen);
-                                                let interData:OsIntermediatePixelData|null = null;
-                                                let dcm:OsDicomFile|null = image?image.getDicomFile():null;
-                                                if (image) { 
-                                                    try {
-                                                        let decodedTags:any = JSON.parse(jsonStr);
-                                                        dcm = OsDicomFile(decodedTags);
-                                                        for (let kinnumber=0; k<3; k++) dcm.setPalette(k, palette[k]);
-                                                        image.setDicomFile(dcm);
-                                                        //let interData:OsIntermediatePixelData = new OsIntermediatePixelData();
-                                                        interData = OsIntermediatePixelData();
-                                                        interData.resIndex = 0;
-                                                        interData.resCount = 1;
-                                                        interData.width = width;
-                                                        interData.height = height;
-                                                        interData.bits = representation;
-                                                        interData.isSigned = signedData;
-                                                        if ((<any>window)['UPNG'] && pngData) {
-                                                            let res:any = (<any>window)['UPNG'].decode(pngData);
-                                                            if (res && res.data) {
-                                                                let factor:number = 1;
-                                                                if (representation <= 8) factor = 1;
-                                                                else if (representation <= 16) factor = 2;
-                                                                else factor = 4;
-                                                                if (res.data.length > width*height*factor) 
-                                                                interData.intermediatePixelData = res.data.slice(0, width*height*factor);
-                                                            }
-                                                        }
-                                                        dcm.setIntermediatePixelData(0, interData);
-                                                        dcm.release();
-                                                        dcm = null;
-                                                        firstTimeImages.push(image);
-                                                        this._setImageLoadStatus(srinfo, image, completedImages, RESULT.OSRSP_SUCCESS, RESULT.EOS_NONE, "");
-                                                        //assign state:
-                                                        //info.series.assignPendingStates(openedImage);
-                                                    }
-                                                    catch(e) {
-                                                        this._setImageLoadStatus(srinfo, image, completedImages, RESULT.OSRSP_FAILURE, RESULT.EOS_INVALID_RESPONSE, "");
-                                                    }
-                                                }
-                                                offset += pixLen;
-
-                                                
-
-                                            }
-                                            else valid = false;
-                                        }
-                                        palette.forEach(elt=>{if(elt) elt.release();});
-                                    }
-                                    else valid = false;
-                                }  
-                                else 
-                                if (type == ENCODED_FORMAT.J2K) {
-                                    let res:number = ((bytes[offset + 3] << 24) | (bytes[offset + 2] << 16) | (bytes[offset + 1] << 8) | bytes[offset]) >>> 0; offset += 4;
-                                    if (res != -1) {
-                                        let dataLen:number = ((bytes[offset + 3] << 24) | (bytes[offset + 2] << 16) | (bytes[offset + 1] << 8) | bytes[offset]) >>> 0; offset += 4;
-                                        let endOffset:number = offset + dataLen;
-                                        if (dataLen > 0 && endOffset <= bytes.length) {
-                                            //DICOM Tags:
-                                            let jsonLen:number = ((bytes[offset+3] << 24) | (bytes[offset+2] << 16) | (bytes[offset+1] << 8) | bytes[offset]) >>> 0; offset += 4;
-                                            let jsonBin = bytes.slice(offset, offset+jsonLen);
-                                            let jsonStr:string = '';
-                                            for (let i=0; i<jsonBin.length; i++)
-                                                jsonStr += String.fromCharCode(jsonBin[i]);
-                                            offset += jsonLen;
-                                            //Palette info:
-                                            //let paletteLen:number = ((bytes[offset+4+jsonLen+3] << 24) | (bytes[offset+4+jsonLen+2] << 16) | (bytes[offset+4+jsonLen+1] << 8) | bytes[offset+4+jsonLen+0]) >>> 0; offset += 4;
-                                            let palette:Array<OsDicomRawPalette|null> = [null, null, null];
-                                            let paletteLen:number = ((bytes[offset+3] << 24) | (bytes[offset+2] << 16) | (bytes[offset+1] << 8) | bytes[offset+0]) >>> 0; offset += 4;
-                                            if (paletteLen > 0) {
-                                                for (let kinnumber = 0; k < 3; k++) {
-                                                    let pl:OsDicomRawPalette = OsDicomRawPalette();
-                                                    pl.count = ((bytes[offset+3] << 24) | (bytes[offset+2] << 16) | (bytes[offset+1] << 8) | bytes[offset]) >>> 0; offset += 4;
-                                                    pl.bits = ((bytes[offset+3] << 24) | (bytes[offset+2] << 16) | (bytes[offset+1] << 8) | bytes[offset]) >>> 0; offset += 4;
-                                                    pl.value = ((bytes[offset+3] << 24) | (bytes[offset+2] << 16) | (bytes[offset+1] << 8) | bytes[offset]) >>> 0; offset += 4;
-                                                    let dataLen:number = ((bytes[offset+3] << 24) | (bytes[offset+2] << 16) | (bytes[offset+1] << 8) | bytes[offset]) >>> 0; offset += 4;
-                                                    if (dataLen < 0 || dataLen > 100000) valid = false;
-                                                    else {
-                                                        pl.data = bytes.slice(offset, offset+dataLen);
-                                                        offset += dataLen;
-                                                    }
-                                                    palette[k] = pl;
-                                                }
-                                            }
-                                            //let imageBytes = bytes.slice(offset+9+jsonLen+paletteLen, offset+dataLen);
-                                            offset++; //progression order
-                                            let imageBytes = bytes.slice(offset, endOffset);
-                                            offset += endOffset-offset;
-                                            let dcm:OsDicomFile|null = image?image.getDicomFile():null;
-                                            if (image) { 
-                                                try {
-                                                    let decodedTags:any = JSON.parse(jsonStr);
-                                                    dcm = OsDicomFile(decodedTags);
-                                                    for (let kinnumber=0; k<3; k++) dcm.setPalette(k, palette[k]);
-                                                    image.setDicomFile(dcm);
-                                                    let interData:OsIntermediatePixelData = OsIntermediatePixelData();
-                                                    interData.encodedData = [];
-                                                    interData.encodedData.push(imageBytes);
-                                                    interData.encodedDataFormat = ENCODED_FORMAT.J2K;
-                                                    interData.rgbOrder = 0;
-                                                    let info:[number,number] = this._getJ2kResInfo(interData.encodedData);
-                                                    interData.resIndex = info[0];
-                                                    interData.resCount = info[1];
-                                                    dcm.setIntermediatePixelData(0, interData);
-                                                    dcm.release();
-                                                    dcm = null;
-                                                    firstTimeImages.push(image);
-                                                    if (interData.resIndex == interData.resCount-1) 
-                                                        this._setImageLoadStatus(srinfo, image, completedImages, RESULT.OSRSP_SUCCESS, RESULT.EOS_NONE, "");
-                                                    else {
-                                                        image.loadStatus.status = RESULT.OSRSP_STREAMING;
-                                                        image.loadStatus.reason = RESULT.EOS_NONE;
-                                                    }
-                                                    /*if (interData.resIndex == interData.resCount-1) {
-                                                        image.loadStatus.status = RESULT.OSRSP_SUCCESS;
-                                                        image.loadStatus.reason = RESULT.EOS_NONE;
-                                                        completedImages.push(image);
-                                                    }*/
-                                                    this.addJ2kStreamToDecode(image);
-                                                }
-                                                catch(e) {
-                                                    this._setImageLoadStatus(srinfo, image, completedImages, RESULT.OSRSP_FAILURE, RESULT.EOS_INVALID_RESPONSE, "");
-                                                }
-                                            }
-                                            palette.forEach(elt=>{if(elt) elt.release();});
-                                            //offset += dataLen;
-                                        }
-                                        else valid = false;
-                                    }
-                                    else {
-                                        //we should not be here
-                                        valid = false;
-                                    }
-                                }
-                                else valid = false;
-                            }
-                            else {
-                                let interData:OsIntermediatePixelData|null = dcm.getIntermediatePixelData(0);
-                                if (image && interData) {
-                                    if (interData.encodedDataFormat == ENCODED_FORMAT.J2K) {
-                                        let dataLen:number = ((bytes[offset + 3] << 24) | (bytes[offset + 2] << 16) | (bytes[offset + 1] << 8) | bytes[offset]) >>> 0; offset += 4;
-                                        if (dataLen > 0 && dataLen+offset <= bytes.length) {
-                                            if (interData.encodedData) {
-                                                interData.encodedData.push(bytes.slice(offset, offset+dataLen));
-                                                let info:[number,number] = this._getJ2kResInfo(interData.encodedData);
-                                                interData.resIndex = info[0];
-                                                interData.resCount = info[1];
-                                                if (interData.resIndex == interData.resCount-1) 
-                                                    this._setImageLoadStatus(srinfo, image, completedImages, RESULT.OSRSP_SUCCESS, RESULT.EOS_NONE, "");
-                                                this.addJ2kStreamToDecode(image);
-                                            }
-                                            else {
-                                                //we should not be here
-                                                this._setImageLoadStatus(srinfo, image, completedImages, RESULT.OSRSP_FAILURE, RESULT.EOS_INTERNAL, "");
-                                            }
-                                        }
-                                        else {
-                                            if (dataLen == 0) {
-                                                //there is a problem with file on the server:
-                                                this._setImageLoadStatus(srinfo, image, completedImages, RESULT.OSRSP_FAILURE, RESULT.EOS_NO_FILE, "");
-                                            }
-                                            else valid = false;
-                                        }
-                                        offset += dataLen;
-                                    }
-                                }
-                            }
-                        }
-                        if (!valid) break;
-                    }
-                    
-                    if (this._viewer.messageService) {
-                        if (firstTimeImages.length > 0) this._viewer.messageService.sendMessage(MSG.SERIES_IMAGES_RECEIVED, firstTimeImages);
-                        if (completedImages.length > 0) this._viewer.messageService.sendMessage(MSG.SERIES_IMAGES_DOWNLOAD_COMPLETED, completedImages);
-                    }
-                    if (!valid) {
-                        //mark the loading of all series as failed:
-                        if (series.loadStatus.status == RESULT.OSRSP_WAITING) {
-                            this._setSeriesLoadStatus(series, RESULT.OSRSP_FAILURE, RESULT.EOS_INTERNAL, "");
-                        }
-                    }
-                }
-            }
-            if (srinfo.request) {
-                srinfo.request.cancel();
-                srinfo.request = null;
-            }
-            if (gotImageData) this._downloadImages(srinfo.guid);
-            else setTimeout(()=>{if (srinfo) this._downloadImages(srinfo.guid);}, 500);
-        }
     }*/
 
   //-----------------------------------------------------
@@ -1511,30 +1693,37 @@ class DownloadController extends IDownloadController {
   // utilities for series
   //-----------------------------------------------------
 
-  /*private _setSeriesLoadStatus(series =OsOpenedSeries, status =number, reason =number, info =string):void {
-        series.loadStatus.status = status;
-        series.loadStatus.reason = reason;
-        series.loadStatus.info = info;
+  void setSeriesLoadStatus(
+      entities.Series series, ResultStatus status, int reason, String info) {
+    series.loadStatus.status = status;
+    series.loadStatus.reason = reason;
+    series.loadStatus.info = info;
+  }
+
+  //-----------------------------------------------------
+  // utilities for images
+  //-----------------------------------------------------
+
+  void setImageLoadStatus(
+      DownloadSeries srinfo,
+      entities.Image image,
+      List<entities.Image> completedImages,
+      ResultStatus status,
+      int reason,
+      String info) {
+    srinfo.received++;
+    completedImages.add(image);
+    image.loadStatus.status = status;
+    image.loadStatus.reason = reason;
+    image.loadStatus.info = info;
+    if (srinfo.expected == srinfo.received) {
+      entities.Series? series = srinfo.getSeries();
+      if (series != null) {
+        setSeriesLoadStatus(
+            series, ResultStatus.success, OnisErrorCodes.none, info);
+      }
     }
-
-    //-----------------------------------------------------
-    // utilities for images
-    //-----------------------------------------------------
-
-    private _setImageLoadStatus(srinfo =DownloadSeries, image =OsOpenedImage, completedImages =OsOpenedImage[], status =number, reason =number, info =string):void {
-        srinfo.received++;
-        completedImages.push(image);
-        image.loadStatus.status = status;
-        image.loadStatus.reason = reason;
-        image.loadStatus.info = info;
-        if (srinfo.expected == srinfo.received) {
-            let series:OsOpenedSeries|null = srinfo.getSeries();
-            if (series) {
-              this._setSeriesLoadStatus(series, RESULT.OSRSP_SUCCESS, RESULT.EOS_NONE, info);
-              //console.log("complete");
-            }
-        }
-    }*/
+  }
 
   //-----------------------------------------------------
   // utilities for sources
