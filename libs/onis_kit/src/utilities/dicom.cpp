@@ -17,7 +17,8 @@ static std::string first_ds_component(const std::string& s) {
   return s.substr(0, pos);
 }
 
-bool get_window_level(onis::dicom_base* dataset, double* center, double* width) {
+bool get_window_level(onis::dicom_base* dataset, double* center,
+                      double* width) {
   if (dataset == nullptr || center == nullptr || width == nullptr)
     return false;
   std::string wc_str;
