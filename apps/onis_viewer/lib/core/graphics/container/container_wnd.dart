@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:onis_viewer/api/core/ov_api_core.dart';
+import 'package:onis_viewer/api/services/message_codes.dart';
 import 'package:onis_viewer/core/graphics/canvas/canvas.dart';
+import 'package:onis_viewer/core/graphics/container/container_syncho_item.dart';
 import 'package:onis_viewer/core/graphics/container/container_widget.dart';
 import 'package:onis_viewer/core/graphics/container/controllers/container_controller.dart';
 import 'package:onis_viewer/core/graphics/drivers/driver.dart';
 import 'package:onis_viewer/core/graphics/renderer/renderer.dart';
 import 'package:onis_viewer/core/layout/view_wnd.dart';
+import 'package:onis_viewer/core/math/matrix.dart';
 import 'package:onis_viewer/core/models/database/color_lut.dart';
 import 'package:onis_viewer/core/models/database/convolution_filter.dart';
 import 'package:onis_viewer/core/models/database/hanging_protocol.dart';
@@ -121,7 +125,7 @@ class OsContainerWnd extends ChangeNotifier {
 
   int _currentPage = 0;
   //private _savePageIndex:number;
-  //private _inactive:boolean;
+  bool _inactive = false;
   //private _inactiveColor:Array<number>;
 
   //private _cineSpeed:number;
@@ -884,13 +888,14 @@ class OsContainerWnd extends ChangeNotifier {
 
     public setSynchroItem(item:IContainerSynchroItem|null) {
         this._synchroItem = item;
-    }
+    }*/
 
-    public getSynchroItem():IContainerSynchroItem|null {
-        return this._synchroItem;
-    }
+  OsContainerSynchroItem? getSynchroItem() {
+    //return this._synchroItem;
+    return null;
+  }
 
-    public processSynchro() {
+  /*public processSynchro() {
         let containersToRedraw:Array<OsContainerWnd> = [];
         if (this._synchroItem) this._synchroItem.synchronize(this, containersToRedraw);
     }
@@ -907,10 +912,16 @@ class OsContainerWnd extends ChangeNotifier {
     
     public getScoutItem():OsContainerScoutItem|null {
         return this._wscoutItem ? <OsContainerScoutItem>this._wscoutItem.lock(false) : null;
-    }
-    
-    public setShouldDrawLocalizer(draw:boolean, study:OsOpenedStudy|null, series:OsOpenedSeries|null, mat:OsMatrix|null, dimensions:number[]|null):boolean {
-        let ret:boolean = false;
+    }*/
+
+  bool setShouldDrawLocalizer(
+      {required bool draw,
+      required entities.Study? study,
+      required entities.Series? series,
+      required OsMatrix? mat,
+      required List<double>? dimensions}) {
+    return false;
+    /*let ret:boolean = false;
         if (this._drawLocalizer != draw) ret = true;
         if (!ret && draw) {
             if (!this._wLocalizerStudy || this._wLocalizerStudy.lock(false) !== study) ret = true;
@@ -932,15 +943,13 @@ class OsContainerWnd extends ChangeNotifier {
             this._localizerSize[0] = dimensions[0];
             this._localizerSize[1] = dimensions[1];
         }
-        return ret;
-    }
-    
-   
-    
-    //-----------------------------------------------------------------------
-    //propagation
-    //-----------------------------------------------------------------------
-    public setPropagationItem(item:IContainerPropagateItem|null) {
+        return ret;*/
+  }
+
+  //-----------------------------------------------------------------------
+  //propagation
+  //-----------------------------------------------------------------------
+  /*public setPropagationItem(item =IContainerPropagateItem|null) {
         let current:IContainerPropagateItem|null = this._propagationItem;
         if (current) current.registerContainer(this, false);
         this._propagationItem = null;
@@ -957,13 +966,13 @@ class OsContainerWnd extends ChangeNotifier {
     //-----------------------------------------------------------------------
     //rendering drivers
     //-----------------------------------------------------------------------
-    public useOpenGL(use:boolean, sharedContext:OsDriverContext|null):boolean {
+    public useOpenGL(use =boolean, sharedContext =OsDriverContext|null):boolean {
         let idriver:number = (use) ? 2 : 1;
         let driverName:string = (idriver == 2) ? 'OPENGL1' : 'WEBCANVAS';
         let manager:OsGraphicManager|null = this._view&&this._view.viewer?this._view.viewer.getGraphicManager():null;
         let driver:OsDriver|null = manager?manager.findDriver(driverName):null;
         if (!driver) return false;
-        this._driver = driver;
+        _driver = driver;
         this._idriver = idriver;
         
         return true;
@@ -1454,32 +1463,28 @@ class OsContainerWnd extends ChangeNotifier {
 
     public getAnchor():OsRenderer|null {
         return this._wanchor ? <OsRenderer>this._wanchor.lock(false) : null;;
-    }
+    }*/
 
-    public haveSelected():boolean {
-        let list:OsRenderer[]|null = this._controller?this._controller.getRendererElements():null;
-        if (list) {
-            for (let i=0; i<list.length; i++) {
-                if (!list[i].isHidden())
-                    if (list[i].isSelected())
-                        return true;
-            }
-        }
-        return false;
+  bool haveSelected() {
+    List<OsRenderer> list = _controller.rendererElements;
+    for (final renderer in list) {
+      if (!renderer.hidden) {
+        if (renderer.selected) return true;
+      }
     }
+    return false;
+  }
 
-    public getSelected(list:OsRenderer[]):void {
-        let elements:OsRenderer[]|null = this._controller?this._controller.getRendererElements():null;
-        if (elements) {
-            for (let i=0; i<elements.length; i++) {
-                if (!elements[i].isHidden())
-                    if (elements[i].isSelected())
-                        list.push(elements[i]);
-            }
-        }
+  void getSelected(List<OsRenderer> list) {
+    List<OsRenderer> elements = _controller.rendererElements;
+    for (final renderer in elements) {
+      if (!renderer.hidden) {
+        if (renderer.selected) list.add(renderer);
+      }
     }
+  }
 
-    public processSelection(render:OsRenderer, shiftKey:boolean, ctrlKey:boolean):boolean {
+  /*public processSelection(render:OsRenderer, shiftKey:boolean, ctrlKey:boolean):boolean {
         if (render == null) return false;
         if (ctrlKey && !shiftKey) {
             let isSelected:boolean = render.isSelected();
@@ -1803,19 +1808,17 @@ class OsContainerWnd extends ChangeNotifier {
             if (modification1 == 2 || modification2 == 2) return 2;
             if (modification1 == 1 || modification2 == 1) return 1;
             return 0;
-        }
+        }*/
 
-        public haveVisible():boolean {
-            let elements:OsRenderer[]|null = this._controller?this._controller.getRendererElements():null;
-            if (elements != null) {
-                for (let i=0; i<elements.length; i++) {
-                    if (!elements[i].isHidden()) return true;
-                }
-            }
-            return false;
-        }
+  bool haveVisible() {
+    List<OsRenderer> elements = _controller.rendererElements;
+    for (final renderer in elements) {
+      if (!renderer.hidden) return true;
+    }
+    return false;
+  }
 
-        public getVisible(list:OsRenderer[]){
+  /*public getVisible(list:OsRenderer[]){
             let elements:OsRenderer[]|null = this._controller?this._controller.getRendererElements():null;
             if(elements != null){
                 for (let i=0; i<elements.length; i++){
@@ -1859,28 +1862,30 @@ class OsContainerWnd extends ChangeNotifier {
 
     public getFilterType():number {
         return this._filterType;
-    }
-        
-    //-----------------------------------------------------------------------
-    //inactive
-    //-----------------------------------------------------------------------
+    }*/
 
-    public setInactive(inactive:boolean,  sendModifiedMessage:boolean = false):void {
-        this._inactive = inactive;
-        
-        if (sendModifiedMessage && this._viewer && this._viewer.messageService) this._viewer.messageService.sendMessage(MSG.IMGCONT_MODIFIED, this);
-    }
+  //-----------------------------------------------------------------------
+  //inactive
+  //-----------------------------------------------------------------------
 
-    public isInactive():boolean {
-        
-        return this._inactive;
+  void setInactive(
+      {required bool inactive, required bool sendModifiedMessage}) {
+    _inactive = inactive;
+    if (sendModifiedMessage) {
+      OVApi().messages.sendMessage(OSMSG.imageContainerModified, this);
     }
-    
-    //-----------------------------------------------------------------------
-    //default renderer
-    //-----------------------------------------------------------------------
-    public getDefaultRenderer():OsRenderer|null {
-        let winner:OsRenderer|null = null;
+  }
+
+  bool isInactive() {
+    return _inactive;
+  }
+
+  //-----------------------------------------------------------------------
+  //default renderer
+  //-----------------------------------------------------------------------
+
+  OsRenderer? getDefaultRenderer() {
+    /*let winner:OsRenderer|null = null;
         //if we have a renderer with selected annotations, we choose this one in priority:
         let controller:OsContainerController|null = this.getController();
         if (controller != null) {
@@ -1919,10 +1924,11 @@ class OsContainerWnd extends ChangeNotifier {
             }
             if (winner == null) winner = unselectedRender;
         }
-        return winner;
-    }
+        return winner;*/
+    return null;
+  }
 
-    public getActionRenderers(list:OsRenderer[], forPropagation:boolean, type:string):boolean {
+  /*public getActionRenderers(list:OsRenderer[], forPropagation:boolean, type:string):boolean {
         if (forPropagation) {
             let propagate:IContainerPropagateItem|null = this.getPropagationItem();
             if (propagate != null) return propagate.getActionRenderers(this, type, list);
@@ -2174,10 +2180,10 @@ class OsContainerWnd extends ChangeNotifier {
         }
         if (sendModifiedMessage && this._viewer && this._viewer.messageService) this._viewer.messageService.sendMessage(MSG.IMGCONT_MODIFIED, this);
         return true;
-    }
+    }*/
 
-    public stopPlaying(sendModifiedMessage:boolean = false):void {
-        if (this._isPlaying) {
+  void stopPlaying(bool sendModifiedMessage) {
+    /*if (this._isPlaying) {
             if (this._cineTimerId) clearInterval(this._cineTimerId);
             this._cineTimerId = null;
             this._isPlaying = false;
@@ -2186,10 +2192,10 @@ class OsContainerWnd extends ChangeNotifier {
         else {
             let container:OsContainerWnd|null = this.getPlayingContainer();
             if (container != null) container.stopPlaying(sendModifiedMessage);
-        }
-    }
+        }*/
+  }
 
-    public setPlaySpeed(speed:number, sendModifiedMessage:boolean):boolean {
+  /*public setPlaySpeed(speed:number, sendModifiedMessage:boolean):boolean {
         let container:OsContainerWnd|null = this.getPlayingContainer();
         if (container == null || container === this) {
             let oldSpeed:number = this.getPlaySpeed();

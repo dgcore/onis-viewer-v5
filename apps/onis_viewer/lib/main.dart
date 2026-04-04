@@ -13,16 +13,35 @@ bool isPerfectGrayscalePng(String path) {
     throw Exception('Failed to decode PNG: $path');
   }
 
+  print("image path: $path");
+
   //check perfect grayscale:
   bool isPerfectGrayscale = true;
   bool isPerfectRedScale = true;
   bool isPerfectGreenScale = true;
   bool isPerfectBlueScale = true;
   int pixelIndex = 0;
+  int maxDifGrayscale = 0;
+  int maxDifRedGreen = 0;
+  int maxDifRedBlue = 0;
+  int maxDifGreenBlue = 0;
   for (final pixel in image) {
     final r = pixel.r.toInt();
     final g = pixel.g.toInt();
     final b = pixel.b.toInt();
+
+    if ((r - g).abs() > maxDifRedGreen) {
+      maxDifRedGreen = (r - g).abs();
+      //print("maxDifRedGreen: $maxDifRedGreen");
+    }
+    if ((r - b).abs() > maxDifRedBlue) {
+      maxDifRedBlue = (r - b).abs();
+      //print("maxDifRedBlue: $maxDifRedBlue");
+    }
+    if ((g - b).abs() > maxDifGreenBlue) {
+      maxDifGreenBlue = (g - b).abs();
+      //print("maxDifGreenBlue: $maxDifGreenBlue");
+    }
 
     if (r != g || g != b) {
       //print("index: $pixelIndex, r: $r, g: $g, b: $b");
@@ -30,7 +49,7 @@ bool isPerfectGrayscalePng(String path) {
     }
 
     if (g != 0 || b != 0) {
-      print("index: $pixelIndex, r: $r, g: $g, b: $b");
+      //print("index: $pixelIndex, r: $r, g: $g, b: $b");
       isPerfectRedScale = false;
     }
     if (r != 0 || b != 0) {
@@ -43,6 +62,11 @@ bool isPerfectGrayscalePng(String path) {
 
     pixelIndex++;
   }
+
+  //print("maxDifGrayscale: $maxDifGrayscale");
+  print("maxDifRedGreen: $maxDifRedGreen");
+  print("maxDifRedBlue: $maxDifRedBlue");
+  print("maxDifGreenBlue: $maxDifGreenBlue");
 
   print("isPerfectGrayscale: $isPerfectGrayscale");
   print("isPerfectRedScale: $isPerfectRedScale");
@@ -58,7 +82,7 @@ void main() {
     HttpOverrides.global = _MyHttpOverrides();
   }
 
-  /*String basePath = "/Users/cedric/Downloads/The4thPNGs2/";
+  /*String basePath = "/Users/cedric/Downloads/The5thPNGs/";
   String baseName = "frame_";
   String full709Range = "709Full_";
   String limited709Range = "709Limited_";
@@ -68,9 +92,17 @@ void main() {
   String redBase = "R32level";
   String greenBase = "G32level";
   String blueBase = "B32level";
+  String nvidiaGray = "frame_convert_with_nvidia_gray32level";
 
-  isPerfectGrayscalePng("$basePath$baseName$limited709RangeV2$redBase.png");
-*/
+  //isPerfectGrayscalePng("${basePath}from_encoder_vlc.png");
+  //isPerfectGrayscalePng("${basePath}monitor.png");
+  //isPerfectGrayscalePng("${basePath}from_vlc2.png");
+  //isPerfectGrayscalePng("$basePath$nvidiaGray.png");
+
+  isPerfectGrayscalePng("${basePath}frame_convert_with_nvidia_gray32level.png");
+
+  //isPerfectGrayscalePng("$basePath$baseName$limited709RangeV2$redBase.png");*/
+
   /*print("--------------------------------");
   print("709 FULL RANGE");
   print("--------------------------------");

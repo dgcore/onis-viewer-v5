@@ -47,24 +47,29 @@ class OsContainerController {
   bool isSeriesDisplayed(entities.Series series) {
     return false;
   }
+
   //virtual void remove_series(const onis::opened_series_ptr &series, b32 notify, container_wnd_list *modified_containers) = 0;
   /*public resetContent(notify =boolean, resetSynchro =boolean, modifiedContainers =OsContainerWnd[]|null) {}
-    public isSeriesDisplayed(series =OsOpenedSeries):boolean { return false; }
-    public getDisplayedSeries(list =OsOpenedSeries[]):void;
-    public isStillDownloading():boolean { return false; }
+    public isSeriesDisplayed(series =OsOpenedSeries):boolean { return false; }*/
+  void getDisplayedSeries(List<entities.Series> list) {}
+  /*public isStillDownloading():boolean { return false; }
     public getLoadingProgression():number { return 0; }
     public onPreloadedRenderer(render =OsRenderer):void;
     //virtual void preload_renderer(const renderer_ptr &render, const preload_renderer_info_ptr &info) = 0;
-    public preloadRenderers():void;
+    public preloadRenderers():void;*/
 
-    //study:
-    public isStudyDisplayed(study =OsOpenedStudy):boolean { return false; }
+  //study:
+  bool isStudyDisplayed(entities.Study study) {
+    return false;
+  }
 
-    //patient:
-    public isPatientDisplayed(study =OsOpenedPatient):boolean { return false; }
+  //patient:
+  bool isPatientDisplayed(entities.Patient patient) {
+    return false;
+  }
 
-    //states:
-    public setStateId(id =string):void;
+  //states:
+  /*public setStateId(id =string):void;
     public getStateId():string { return ''; }
     public getSeriesState(series =OsOpenedSeries, forSaving =boolean):OsSeriesState|null { return null; }
     public setSeriesState(state =OsSeriesState):boolean { return false; }
