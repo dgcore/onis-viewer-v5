@@ -271,6 +271,19 @@ class OsContainerController2D extends OsContainerController {
     return false;
   }
 
+  @override
+  void getDisplayedSeries(List<entities.Series> list) {
+    for (int i = 0; i < _listOfSeriesInfo.length; i++) {
+      entities.Series? displayedSeries = _listOfSeriesInfo[i].series;
+      if (displayedSeries != null) {
+        list.add(displayedSeries);
+      } else {
+        _listOfSeriesInfo.removeAt(i);
+        i--;
+      }
+    }
+  }
+
   OsDisplayedSeriesInfo? _findSeriesInfo(entities.Series series) {
     for (int i = 0; i < _listOfSeriesInfo.length; i++) {
       if (_listOfSeriesInfo[i].series == series) {
@@ -463,17 +476,21 @@ class OsContainerController2D extends OsContainerController {
         int pageToRefresh = applyIncomingImageProperties(incomingImageRender,
             false); //if we redraw here, it become slow with little images (too much redrawing)
         //restore the states:
-        /*let img1:OsGraphicImage|null = incomingImageRender.getPrimaryImageItem(false);
-                let image1:OsOpenedImage|null = img1?img1.getImage():null;
-                if (image1 && seriesInfo.dupInfo) this._applyImageStates(-1, incomingImageRender, series, image1, seriesInfo.dupInfo, series.findState(this._stateId, 0), fromHangingProtocol);
-                //propagate:
-                let propagate:IContainerPropagateItem|null = container?container.getPropagationItem():null;
-                if (container) {
-                    if (propagate) propagate.onReceivedImage(container, incomingImageRender);
-                    if (pageToRefresh != container.getCurrentPage()) 
-                        container.setCurrentPage(pageToRefresh, OsContDraw.OS_FORCE_REDRAW);
-                }
-                this.preloadRenderers();*/
+        OsGraphicImage? img1 = incomingImageRender.getPrimaryImageItem();
+        entities.Image? image1 = img1?.getImage();
+        //if (image1 != null && seriesInfo.dupInfo) this._applyImageStates(-1, incomingImageRender, series, image1, seriesInfo.dupInfo, series.findState(this._stateId, 0), fromHangingProtocol);
+        //propagate:
+        /*OsContainerPropagateItem? propagate = container?.getPropagationItem();
+        if (container != null) {
+          if (propagate != null) {
+            propagate.onReceivedImage(container, incomingImageRender);
+          }
+          if (pageToRefresh != container.currentPage) {
+            container.setCurrentPage(
+                index: pageToRefresh, mode: OsContDraw.osForceRedraw);
+          }
+        }*/
+        //this.preloadRenderers();
       }
       if (spaceAdded || !seriesInfo.firstImageArrived) {
         //if space is added everytime, it will be too slow send the modified message each time.
@@ -491,6 +508,10 @@ class OsContainerController2D extends OsContainerController {
                         }*/
         }
       }
+
+//TODO: Remove later
+      container?.setCurrentPage(
+          index: container.currentPage, mode: OsContDraw.osForceRedraw);
     }
   }
 
@@ -541,21 +562,18 @@ class OsContainerController2D extends OsContainerController {
     camera.validateMatrix();
 
     int pageIndexToRefresh = container.currentPage;
-    /*if (this._incomingImageProperties.targetMode == OSHP.mode_page) {
-                //try to go the target page:
-                if (this._incomingImageProperties.targetPage == -1) {
-                    this._incomingImageProperties.targetMode = 0;
-                    pageIndexToRefresh = container.getPageCount()-1;
-                }
-                else
-                if (this._incomingImageProperties.targetPage < container.getPageCount()) {
-                    this._incomingImageProperties.targetMode = 0;
-                    pageIndexToRefresh = this._incomingImageProperties.targetPage;
-                }
-            }
-            else
-            if (this._incomingImageProperties.targetMode == OSHP.mode_dicom_tags) {
-                for (let index=0; index<this._listRenderElements.length; index++) {
+    //if (_incomingImageProperties.targetMode == OsHpMode.mode_page) {
+    //try to go the target page:
+    if (_incomingImageProperties.targetPage == -1) {
+      _incomingImageProperties.targetMode = 0;
+      pageIndexToRefresh = container.pageCount - 1;
+    } else if (_incomingImageProperties.targetPage < container.pageCount) {
+      _incomingImageProperties.targetMode = 0;
+      pageIndexToRefresh = _incomingImageProperties.targetPage;
+    }
+    //}
+    /*else if (_incomingImageProperties.targetMode == OSHP.mode_dicom_tags) {
+      for (let index=0; index<this._listRenderElements.length; index++) {
                     if (this._listRenderElements[index].isHidden()) continue;
                     let img:OsGraphicImage|null = this._listRenderElements[index].getPrimaryImageItem(false);
                     if (img) {
@@ -585,7 +603,7 @@ class OsContainerController2D extends OsContainerController {
                         }
                     }
                 }
-            }*/
+    }*/
     if (refresh) {
       container.setCurrentPage(
           index: pageIndexToRefresh, mode: OsContDraw.osForceRedraw);

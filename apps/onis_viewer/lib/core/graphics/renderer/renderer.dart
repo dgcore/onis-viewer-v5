@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:onis_viewer/core/graphics/drivers/driver.dart';
+import 'package:onis_viewer/core/graphics/renderer/items/camera.dart';
 import 'package:onis_viewer/core/graphics/renderer/items/image.dart';
 import 'package:onis_viewer/core/math/matrix.dart';
 
@@ -247,6 +248,7 @@ abstract class OsRenderer {
   //void setKey(bool value, int status = 1) {}
 
   //camera:
+  OsGraphicCamera getCamera();
   //OsGraphicCamera? getCamera() { return null; }
   //bool fitCamera(double cx, double cy) { return false; }
   //bool scaleCameraToOriginal(double cx, double cy) { return false; }
