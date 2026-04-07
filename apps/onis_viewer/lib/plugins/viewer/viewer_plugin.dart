@@ -3,6 +3,7 @@ import 'package:onis_viewer/core/layout/view_layout.dart';
 import 'package:onis_viewer/core/toolbar/toolbar_item.dart';
 import 'package:onis_viewer/plugins/viewer/public/viewer_api.dart';
 import 'package:onis_viewer/plugins/viewer/toolbar_items/layout_toolbar_item.dart';
+import 'package:onis_viewer/plugins/viewer/toolbar_items/tools_toolbar_item.dart';
 
 import '../../core/page_type.dart';
 import '../../core/plugin_interface.dart';
@@ -39,6 +40,7 @@ class _ViewerApiImpl implements ViewerApi {
 
   Future<void> initialize() async {
     _toolbar.addItem(OsLayoutToolbarItem('layout_toolbar_item', 'Layout'));
+    _toolbar.addItem(OsToolsToolbarItem('tools_toolbar_item', 'Tools'));
     _layout.setTiling(1, 1);
   }
 

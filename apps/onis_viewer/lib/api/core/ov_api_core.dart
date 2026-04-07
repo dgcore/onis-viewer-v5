@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:onis_viewer/api/core/page_manager.dart';
 import 'package:onis_viewer/api/core/plugin_manager.dart';
 import 'package:onis_viewer/api/graphics/managers/render_type_manager.dart';
+import 'package:onis_viewer/api/graphics/managers/support_set_manager.dart';
 import 'package:onis_viewer/api/services/message_service.dart';
 import 'package:onis_viewer/api/view_type/view_type_manager.dart';
 
@@ -18,6 +19,7 @@ class OVApi {
   late final PluginManager _pluginManager;
   late final ViewTypeManager _viewTypeManager;
   late final OsRenderTypeManager _renderTypeManager;
+  late final OsSContainerSupportSetManager _containerSupportSetManager;
 
   // Services
   late final OsMessageService _messageService;
@@ -28,6 +30,8 @@ class OVApi {
   ViewTypeManager get viewTypes => _viewTypeManager;
   OsRenderTypeManager get renderTypes => _renderTypeManager;
   OsMessageService get messages => _messageService;
+  OsSContainerSupportSetManager get containerSupportSets =>
+      _containerSupportSetManager;
 
   /// Initialize the API with all modules
   Future<void> initialize() async {
@@ -37,6 +41,7 @@ class OVApi {
       _pageManager = PageManager();
       _pluginManager = PluginManager();
       _renderTypeManager = OsRenderTypeManager();
+      _containerSupportSetManager = OsSContainerSupportSetManager();
 
       // Initialize services
       _messageService = OsMessageService();
@@ -44,6 +49,7 @@ class OVApi {
       // Initialize modules
       _renderTypeManager.initialize();
       _viewTypeManager.initialize();
+      _containerSupportSetManager.initialize();
       await _pageManager.initialize();
       await _pluginManager.initialize();
 
@@ -61,6 +67,7 @@ class OVApi {
     await _pageManager.dispose();
     await _pluginManager.dispose();
     _viewTypeManager.dispose();
+    _containerSupportSetManager.dispose();
     debugPrint('OVApi disposed');
   }
 
