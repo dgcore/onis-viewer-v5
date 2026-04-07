@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:onis_viewer/api/core/ov_api_core.dart';
 import 'package:onis_viewer/api/services/message_codes.dart';
 
@@ -9,12 +10,13 @@ class OsContainerTool {
   //protected _defaultShortcut:OsShortcut;
   final bool _didRun = false;
   final int _restoreFilterType = 0;
-  final String _icon = '';
+  final IconData _icon;
+  final String _tooltip;
 
   //-----------------------------------------------------------------------
   //constructor
   //-----------------------------------------------------------------------
-  OsContainerTool(this._id, this._name);
+  OsContainerTool(this._id, this._name, this._icon, this._tooltip);
 
   //-----------------------------------------------------------------------
   //properties
@@ -25,7 +27,8 @@ class OsContainerTool {
   bool get visible => _visible;
   bool get isRunning => _isRunning;
   bool get didRun => _didRun;
-  String get icon => _icon;
+  IconData get icon => _icon;
+  String get tooltip => _tooltip;
 
   //-----------------------------------------------------------------------
   //Operations

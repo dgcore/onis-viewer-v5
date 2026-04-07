@@ -42,7 +42,23 @@ class ViewerToolbar extends StatelessWidget {
                 horizontal: OnisViewerConstants.paddingMedium,
               ),
               child: Row(
-                children: toolbar.items.map((item) => item.widget).toList(),
+                children: [
+                  for (int i = 0; i < toolbar.items.length; i++) ...[
+                    if (i != 0)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 10),
+                        child: Center(
+                          child: Container(
+                            width: 1,
+                            height: (height - 20).clamp(16.0, 36.0),
+                            color: OnisViewerConstants.textSecondaryColor
+                                .withValues(alpha: 0.45),
+                          ),
+                        ),
+                      ),
+                    toolbar.items[i].widget,
+                  ],
+                ],
               ));
         });
   }
