@@ -1,8 +1,7 @@
 import "dart:io";
-import 'dart:math' as math;
-import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:onis_viewer/app/onis_viewer_app.dart';
 
 void main() {
   // Set up SSL certificate validation override for desktop platforms

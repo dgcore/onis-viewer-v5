@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math';
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
@@ -19,6 +20,8 @@ class RawPointerInfo {
 class OsPainter extends CustomPainter {
   final ValueNotifier<int> repaintNotifier;
   late OsContainerWnd container;
+  final int _operation =
+      -1; //0 -> for single drag, 1 -> for scale or pan, 2 -> for tap, 3 -> for long press
 
   OsPainter(this.repaintNotifier) : super(repaint: repaintNotifier);
 
@@ -45,7 +48,7 @@ class OsCanvas extends StatefulWidget {
 
 class OsCanvasState extends State<OsCanvas> {
   final List<RawPointerInfo> _pointers = [];
-  final int _operation =
+  int _operation =
       -1; //0 -> for single drag, 1 -> for scale or pan, 2 -> for tap, 3 -> for long press
   Timer? _longPressTime;
 
@@ -72,28 +75,28 @@ class OsCanvasState extends State<OsCanvas> {
                   _handleMouseHoverEvent(pointer);
                 },
                 onPointerSignal: (PointerSignalEvent event) {
-                  /*if (event is PointerScrollEvent) {
+                  if (event is PointerScrollEvent) {
                     _handleScroll(event);
-                  }*/
+                  }
                 },
                 onPointerPanZoomStart: (PointerPanZoomStartEvent event) {
-                  /*if (_operation == -1) {
+                  if (_operation == -1) {
                     _operation = 1;
                     _handlePanZoomStart(_createDefaultTrackpadPointers(),
                         const Offset(0, 0), 1.0);
-                  }*/
+                  }
                 },
                 onPointerPanZoomUpdate: (PointerPanZoomUpdateEvent event) {
-                  /*if (_operation == 1) {
+                  if (_operation == 1) {
                     _handlePanZoomUpdate(_createDefaultTrackpadPointers(),
                         Offset(event.pan.dx, event.pan.dy), event.scale);
-                  }*/
+                  }
                 },
                 onPointerPanZoomEnd: (PointerPanZoomEndEvent event) {
-                  //_abort();
+                  _abort();
                 },
                 onPointerDown: (event) {
-                  /*focusNode.requestFocus();
+                  focusNode.requestFocus();
                   RawPointerInfo? pointer = _findRawPointer(event.pointer);
                   if (pointer != null) _pointers.remove(pointer);
                   pointer = RawPointerInfo(event.pointer, event.kind);
@@ -122,10 +125,10 @@ class OsCanvasState extends State<OsCanvas> {
                         }
                       });
                     }
-                  }*/
+                  }
                 },
                 onPointerUp: (event) {
-                  /*RawPointerInfo? pointer = _findRawPointer(event.pointer);
+                  RawPointerInfo? pointer = _findRawPointer(event.pointer);
                   if (pointer != null) {
                     _copyPointerData(event, pointer, false);
                   }
@@ -133,13 +136,13 @@ class OsCanvasState extends State<OsCanvas> {
                     _operation = 2;
                     _handleTap();
                   }
-                  _abort();*/
+                  _abort();
                 },
                 onPointerCancel: (event) {
-                  //_abort();
+                  _abort();
                 },
                 onPointerMove: (event) {
-                  /*RawPointerInfo? pointer = _findRawPointer(event.pointer);
+                  RawPointerInfo? pointer = _findRawPointer(event.pointer);
                   if (pointer == null) {
                     _abort();
                   } else {
@@ -181,7 +184,7 @@ class OsCanvasState extends State<OsCanvas> {
                         _handlePanZoomUpdate(_pointers, pan, scale);
                       }
                     }
-                  }*/
+                  }
                 },
                 child: MouseRegion(
                     //cursor: widget.painter.container.cursor,
@@ -199,7 +202,7 @@ class OsCanvasState extends State<OsCanvas> {
     }));
   }
 
-  /*RawPointerInfo? _findRawPointer(int pointer) {
+  RawPointerInfo? _findRawPointer(int pointer) {
     var res = _pointers.where((element) => element.id == pointer);
     return res.isEmpty ? null : res.first;
   }
@@ -209,7 +212,7 @@ class OsCanvasState extends State<OsCanvas> {
       RawPointerInfo(0, PointerDeviceKind.trackpad),
       RawPointerInfo(0, PointerDeviceKind.trackpad)
     ];
-  }*/
+  }
 
   void _copyPointerData(
       var event, RawPointerInfo pointer, bool includeOriginal) {
@@ -225,7 +228,7 @@ class OsCanvasState extends State<OsCanvas> {
         Offset(event.localPosition.dx, event.localPosition.dy);
   }
 
-  /*Offset _calculatePan() {
+  Offset _calculatePan() {
     double originalCenterX = (_pointers[0].originalLocalPosition.dx +
             _pointers[1].originalLocalPosition.dx) *
         0.5;
@@ -259,9 +262,9 @@ class OsCanvasState extends State<OsCanvas> {
         pow(_pointers[0].localPosition.dy - _pointers[1].localPosition.dy, 2)
             .toDouble());
     return originalLength == 0 ? 1 : newLength / originalLength;
-  }*/
+  }
 
-  /*void _abort() {
+  void _abort() {
     _longPressTime?.cancel();
     _longPressTime = null;
     if (_operation == 0) {
@@ -274,7 +277,7 @@ class OsCanvasState extends State<OsCanvas> {
     }
     _pointers.clear();
     _operation = -1;
-  }*/
+  }
 
   void _handleMouseHoverEvent(RawPointerInfo pointer) {
     if (widget.painter.container.onSetCursor(pointer)) setState(() {});
@@ -283,7 +286,7 @@ class OsCanvasState extends State<OsCanvas> {
     }
   }
 
-  /*void _handleDragStart() {
+  void _handleDragStart() {
     if (widget.painter.container.onDragStart(_pointers[0])) {
       widget.painter.repaintNotifier.value++;
     } else {
@@ -336,11 +339,30 @@ class OsCanvasState extends State<OsCanvas> {
   void _handlePanZoomEnd() {
     widget.painter.container.onPanZoomEnd();
     widget.painter.repaintNotifier.value++;
-  }*/
+  }
 
   void _handleMouseExit(PointerExitEvent details) {
-    /*if (widget.painter.container.onMouseExit()) {
+    if (widget.painter.container.onMouseExit()) {
       widget.painter.repaintNotifier.value++;
-    }*/
+    }
   }
+
+  /*int _getMouseBoxIndex(RawPointerInfo pointer, List<double>? rect) {
+    int index = widget.painter.container.findImageBoxIndexFromPoint(pointer);
+    if (index != -1) {
+      final boxRect = widget.painter.container.getImageBoxRect(index);
+      if (rect != null) {
+        rect[0] = boxRect.x;
+        rect[1] = boxRect.y;
+        rect[2] = boxRect.width;
+        rect[3] = boxRect.height;
+      }
+    } else if (rect != null) {
+      rect[0] = 0;
+      rect[1] = 0;
+      rect[2] = 100;
+      rect[3] = 100;
+    }
+    return index;
+  }*/
 }

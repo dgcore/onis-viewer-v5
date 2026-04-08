@@ -1,14 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:onis_viewer/api/core/ov_api_core.dart';
 import 'package:onis_viewer/api/services/message_codes.dart';
+import 'package:onis_viewer/core/graphics/canvas/canvas.dart';
+import 'package:onis_viewer/core/graphics/container/container_wnd.dart';
 
 class OsContainerTool {
   bool _visible = true;
   final String _id;
   final String _name;
-  final bool _isRunning = false;
+  bool _isRunning = false;
   //protected _defaultShortcut:OsShortcut;
-  final bool _didRun = false;
+  bool _didRun = false;
   final int _restoreFilterType = 0;
   final IconData _icon;
   final String _tooltip;
@@ -36,8 +38,9 @@ class OsContainerTool {
 
   void setVisibility({required bool value, required bool sendMessage}) {
     _visible = visible;
-    if (sendMessage)
+    if (sendMessage) {
       OVApi().messages.sendMessage(OSMSG.imageContainerToolVisibility, this);
+    }
   }
 
   /*public getDefaultShortcut():OsShortcut {
@@ -49,12 +52,105 @@ class OsContainerTool {
         let pset:OsDbPropertySet|null = set?set.findPropertySet('SHORTCUTS'):null;
         let cat:OsPropertyMap|null = pset?pset.findCategory('IMGTOOL'):null;
         return OsShortcut.fromArray(cat?cat.get(this._id):null);
-    }*
+    }*/
 
+  //-----------------------------------------------------------------------
+  //drag
+  //-----------------------------------------------------------------------
 
+  bool canDrag(
+      OsContainerWnd container, bool byShortcut, RawPointerInfo pointer) {
+    return false;
+  }
 
-    //start/stop:
-    public canStart(container:OsContainerWnd, box:number, byShortcut:boolean, x:number, y:number, flags:number):boolean { 
+  bool startDrag(OsContainerWnd container, RawPointerInfo pointer) {
+    if (isRunning) return false;
+    _isRunning = true;
+    _didRun = true;
+    /*if (_supportSnapshot) {
+      _snapshot =
+          container.render != null ? container.render!.createSnapshot() : null;
+    }*/
+    return true;
+  }
+
+  void drag(OsContainerWnd container, RawPointerInfo pointer) {}
+
+  void endDrag(OsContainerWnd container, RawPointerInfo pointer, bool cancel) {
+    /*if (container.render != null && _snapshot != null && didRun) {
+      container.render!.pushSnapshot(_snapshot!);
+      _snapshot = null;
+    }*/
+    _isRunning = false;
+  }
+
+  //-----------------------------------------------------------------------
+  //pan / zoom
+  //-----------------------------------------------------------------------
+
+  bool canPanOrZoom(
+      OsContainerWnd container, bool byShortcut, List<RawPointerInfo> info) {
+    return false;
+  }
+
+  bool startPanOrZoom(OsContainerWnd container, List<RawPointerInfo> pointers,
+      Offset pan, double scale) {
+    if (isRunning) return false;
+    _isRunning = true;
+    _didRun = true;
+    /*if (_supportSnapshot) {
+      _snapshot =
+          container.render != null ? container.render!.createSnapshot() : null;
+    }*/
+    return true;
+  }
+
+  void panOrZoom(OsContainerWnd container, List<RawPointerInfo> pointers,
+      Offset pan, double scale) {}
+
+  void endPanOrZoom(OsContainerWnd container, bool cancel) {
+    /*if (container.render != null && _snapshot != null && didRun) {
+      container.render!.pushSnapshot(_snapshot!);
+      _snapshot = null;
+    }*/
+    _isRunning = false;
+  }
+
+  bool canLongPress(OsContainerWnd container, RawPointerInfo pointer) {
+    if (_isRunning) return false;
+    return true;
+  }
+
+  //-----------------------------------------------------------------------
+  //mouse events
+  //-----------------------------------------------------------------------
+
+  bool onMouseHover(OsContainerWnd container, RawPointerInfo pointer) {
+    return false;
+  }
+
+  void onTap(OsContainerWnd container, RawPointerInfo pointer) {}
+  void onLongPress(OsContainerWnd container, RawPointerInfo pointer) {}
+  bool supportMouseWheel(OsContainerWnd container, RawPointerInfo pointer) {
+    return false;
+  }
+
+  void onMouseWheel(OsContainerWnd container, RawPointerInfo pointer) {}
+
+  //-----------------------------------------------------------------------
+  //abort
+  //-----------------------------------------------------------------------
+
+  void abort(OsContainerWnd container) {
+    /*if (container.render != null && _snapshot != null && didRun) {
+      container.render!.pushSnapshot(_snapshot!);
+      _snapshot = null;
+    }*/
+    _isRunning = false;
+  }
+
+  //start/stop:
+  /*public canStart(container:OsContainerWnd, box:number, byShortcut:boolean, x:number, y:number, flags:number):boolean { 
         return false; 
     }
 
