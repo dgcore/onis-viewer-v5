@@ -3,6 +3,7 @@ import 'package:onis_viewer/api/core/ov_api_core.dart';
 import 'package:onis_viewer/api/services/message_codes.dart';
 import 'package:onis_viewer/core/graphics/canvas/canvas.dart';
 import 'package:onis_viewer/core/graphics/container/container_syncho_item.dart';
+import 'package:onis_viewer/core/graphics/container/container_tool.dart';
 import 'package:onis_viewer/core/graphics/container/container_widget.dart';
 import 'package:onis_viewer/core/graphics/container/controllers/container_controller.dart';
 import 'package:onis_viewer/core/graphics/drivers/driver.dart';
@@ -98,6 +99,7 @@ class OsContainerWnd extends ChangeNotifier {
   final OsDriver _driver;
   late final OsDriverContext _context;
   List<double> _rect = [0, 0, 0, 0];
+  final List<double> _lastCursorPosition = [0, 0];
   //private _refreshTimerId:any;
   //private _cineTimerId:any;
   //private _drawTarget:number;
@@ -112,10 +114,11 @@ class OsContainerWnd extends ChangeNotifier {
   //private _isCaptured:boolean;
   //private _capturedIndex:number;
 
-  //private _wtool:OsWeakObject|null;
-  //private _wtoolData:OsWeakObject|null;
-  //private _wrunningTool:OsWeakObject|null;
-  //private _wrunningToolData:OsWeakObject|null;
+  WeakReference<OsContainerTool>? _wtool;
+  WeakReference<Object>? _wtoolData;
+  WeakReference<OsContainerTool>? _wrunningTool;
+  WeakReference<Object>? _wrunningToolData;
+
   //private _annotationAction:OsAnnotationAction|null; /*annotation_action_wptr _wannotation_action;*/
   //private _wrunningItem:OsWeakObject|null;
 
@@ -533,18 +536,22 @@ class OsContainerWnd extends ChangeNotifier {
     // console.log("set " + index + ": " + this._imageBoxes[index].rect[0] + " " + this._imageBoxes[index].rect[1] + " " + this._imageBoxes[index].rect[2] + " " + this._imageBoxes[index].rect[3]);
   }
 
-  /*public findImageBoxIndexFromPoint(x:number, y:number):number {
-        for (let i=0; i<this._imageBoxes.length; i++) {
-            if (x >= this._imageBoxes[i].rect[0] && x <= this._imageBoxes[i].rect[0] + this._imageBoxes[i].rect[2]) 
-                if (y >= this._imageBoxes[i].rect[1] && y <= this._imageBoxes[i].rect[1] + this._imageBoxes[i].rect[3]) 
-                    return i;
+  int findImageBoxIndexFromPoint(RawPointerInfo pointer) {
+    double x = pointer.localPosition.dx;
+    double y = pointer.localPosition.dy;
+    for (int i = 0; i < _imageBoxes.length; i++) {
+      if (x >= _imageBoxes[i].rect[0] &&
+          x <= _imageBoxes[i].rect[0] + _imageBoxes[i].rect[2]) {
+        if (y >= _imageBoxes[i].rect[1] &&
+            y <= _imageBoxes[i].rect[1] + _imageBoxes[i].rect[3]) {
+          return i;
         }
-        return -1;
+      }
     }
+    return -1;
+  }
 
-   
-
-    public setImageBoxRender(index:number, render:OsRenderer|null) {
+  /*public setImageBoxRender(index:number, render:OsRenderer|null) {
         this._imageBoxes[index].setRenderer(render);
     }
 
@@ -1989,49 +1996,48 @@ class OsContainerWnd extends ChangeNotifier {
     public getSupportSet(retain:boolean):OsContainerSupportSet|null {
         if (this._wsupportSet) return <OsContainerSupportSet>this._wsupportSet.lock(retain);
         else return null;
+    }*/
+
+  //-----------------------------------------------------------------------
+  //tools
+  //-----------------------------------------------------------------------
+
+  void setCurrentTool(
+      OsContainerTool? tool, Object? data, bool sendModifiedMessage) {
+    final currentTool = getCurrentTool();
+    bool doCallback = !identical(currentTool.tool, tool);
+    _wtool = tool != null ? WeakReference(tool) : null;
+    _wtoolData = data != null ? WeakReference(data) : null;
+    if (doCallback) {
+      OVApi().messages.sendMessage(OSMSG.imageContainerToolSet, this);
     }
-
-    //-----------------------------------------------------------------------
-    //tools
-    //-----------------------------------------------------------------------
-
-    public setCurrentTool(tool:OsContainerTool|null, data:OsStrongObject|null, sendModifiedMessage:boolean = false):void {
-        let doCallback:boolean = (this.getCurrentTool(null, false) === tool) ? false : true;
-        if (this._wtool) this._wtool.destroy();
-        if (this._wtoolData) this._wtoolData.destroy();
-        this._wtool = tool ? tool.getWeakObject() : null;
-        this._wtoolData = data ? data.getWeakObject() : null;
-        if (this._viewer && this._viewer.messageService) {
-            if (doCallback) this._viewer.messageService.sendMessage(MSG.IMGCONT_TOOL_SET, this);
-            if (sendModifiedMessage) this._viewer.messageService.sendMessage(MSG.IMGCONT_MODIFIED, this);
-        }
+    if (sendModifiedMessage) {
+      OVApi().messages.sendMessage(OSMSG.imageContainerModified, this);
     }
+  }
 
-    public getCurrentTool(data:[OsStrongObject|null]|null, retain:boolean):OsContainerTool|null { 
-        let tool:OsContainerTool|null = this._wtool ? <OsContainerTool>this._wtool.lock(retain) : null;
-        if (tool != null && data) data[0] = this._wtoolData ? this._wtoolData.lock(retain) : null;
-        return tool;
-    }
+  ({OsContainerTool? tool, Object? data}) getCurrentTool() {
+    final tool = _wtool?.target;
+    final data = _wtoolData?.target;
+    return (tool: tool, data: data);
+  }
 
-    
-    public setRunningTool(tool:OsContainerTool|null, data:OsStrongObject|null):void {
-        if (this._wrunningTool) this._wrunningTool.destroy();
-        if (this._wrunningToolData) this._wrunningToolData.destroy();
-        this._wrunningTool = tool ? tool.getWeakObject() : null;
-        this._wrunningToolData = data ? data.getWeakObject() : null;
-    }
+  void setRunningTool(OsContainerTool? tool, Object? data) {
+    _wrunningTool = tool != null ? WeakReference(tool) : null;
+    _wrunningToolData = data != null ? WeakReference(data) : null;
+  }
 
-    public getRunningTool(data:[OsStrongObject|null]|null, retain:boolean):OsContainerTool|null {
-        let tool:OsContainerTool|null = this._wrunningTool ? <OsContainerTool>this._wrunningTool.lock(retain) : null;
-        if (tool != null && data) data[0] = this._wrunningToolData ? this._wrunningToolData.lock(retain) : null;
-        return tool;
-    }
-    
-    //-----------------------------------------------------------------------
-    //responder
-    //-----------------------------------------------------------------------
+  ({OsContainerTool? tool, Object? data}) getRunningTool() {
+    final tool = _wrunningTool?.target;
+    final data = _wrunningToolData?.target;
+    return (tool: tool, data: data);
+  }
 
-    public setRunningItem(item:OsGraphicResponder|null) {
+  //-----------------------------------------------------------------------
+  //responder
+  //-----------------------------------------------------------------------
+
+  /*public setRunningItem(item:OsGraphicResponder|null) {
         if (this._wrunningItem) this._wrunningItem.destroy();
         this._wrunningItem = item ? item.getWeakObject() : null;
     }
@@ -2479,10 +2485,6 @@ class OsContainerWnd extends ChangeNotifier {
   //mouse events
   //-----------------------------------------------------------------------
 
-  bool onMouseHover(RawPointerInfo pointer) {
-    return false;
-  }
-
   /*public onLeftButtonDown(box:number, x:number, y:number, shiftKey:boolean, controlKey:boolean, altKey:boolean):void {
         if (this.isPlaying(null)) return;
         let shouldCheckSlider:boolean = true;
@@ -2882,14 +2884,132 @@ class OsContainerWnd extends ChangeNotifier {
         if (this._redrawAsapTimerId == null) 
             this.setCurrentPage(this.getCurrentPage(), OsContDraw.OS_FORCE_REDRAW);
 
+    }*/
+
+  void abortTool() {
+    /*ContainerTool? tool = runningTool;
+    if (tool != null) {
+      tool.abort(this);
+      runningTool = null;
+    }*/
+  }
+
+  bool onDragStart(RawPointerInfo pointer) {
+    _lastCursorPosition[0] = pointer.localPosition.dx;
+    _lastCursorPosition[1] = pointer.localPosition.dy;
+    /*if (runningTool == null) {
+      ContainerTool? tool; // = supportSet?.findToolByShortcut(this, info);
+      tool ??= currentTool;
+      if (tool != null) {
+        if (tool.canDrag(this, false, pointer)) {
+          runningTool = tool;
+          return tool.startDrag(this, pointer);
+        }
+      }
+    }*/
+    return false;
+  }
+
+  void onDragEnd(RawPointerInfo pointer) {
+    _lastCursorPosition[0] = pointer.localPosition.dx;
+    _lastCursorPosition[1] = pointer.localPosition.dy;
+    /*ContainerTool? tool = runningTool;
+    //tool?.stop1(this, [pointer], false);
+    tool?.endDrag(this, pointer, false);
+    runningTool = null;*/
+  }
+
+  void onDragMove(RawPointerInfo pointer) {
+    _lastCursorPosition[0] = pointer.localPosition.dx;
+    _lastCursorPosition[1] = pointer.localPosition.dy;
+    /*ContainerTool? tool = runningTool;
+    tool?.drag(this, pointer);*/
+  }
+
+  void onMouseWheel(RawPointerInfo pointer) {
+    /*ContainerTool? tool = runningTool;
+    if (tool == null) {
+      if (currentTool != null &&
+          currentTool!.supportMouseWheel(this, pointer)) {
+        tool = currentTool;
+      }
     }
+    tool ??= supportSet?.findToolSupportMouseWheel1(this, pointer);
+    tool?.onMouseWheel(this, pointer);*/
+  }
 
-   
+  void onLongPress(RawPointerInfo pointer) {
+    /*ContainerTool? tool = runningTool;
+    tool ??= currentTool;*/
+    _lastCursorPosition[0] = pointer.localPosition.dx;
+    _lastCursorPosition[1] = pointer.localPosition.dy;
+    //tool?.onLongPress(this, pointer);
+  }
 
-    //-----------------------------------------------------------------------
-    //keyboard events
-    //-----------------------------------------------------------------------
-    public onKeyDown(box:number, key:number, shiftKey:boolean, controlKey:boolean, altKey:boolean) {
+  void onTap(RawPointerInfo pointer) {
+    _lastCursorPosition[0] = pointer.localPosition.dx;
+    _lastCursorPosition[1] = pointer.localPosition.dy;
+    /*ContainerTool? tool = runningTool;
+    tool ??= currentTool;
+    tool?.onTap(this, pointer);
+    */
+  }
+
+  bool onMouseHover(RawPointerInfo pointer) {
+    /*ContainerTool? tool = runningTool;
+    tool ??= currentTool;*/
+    _lastCursorPosition[0] = pointer.localPosition.dx;
+    _lastCursorPosition[1] = pointer.localPosition.dy;
+    /* return tool != null ? tool.onMouseHover(this, pointer) : false;
+    */
+    return false;
+  }
+
+  bool onMouseExit() {
+    _lastCursorPosition[0] = -1;
+    _lastCursorPosition[1] = -1;
+    //return render != null ? render!.onMouseExit() : false;
+    return false;
+  }
+
+  bool canLongPress(RawPointerInfo pointer) {
+    /*if (runningTool == null) {
+      ContainerTool? tool = currentTool;
+      if (tool != null) {
+        return tool.canLongPress(this, pointer);
+      }
+    }*/
+    return false;
+  }
+
+  void onPanZoomStart(List<RawPointerInfo> pointers, Offset pan, double scale) {
+    /*if (runningTool == null) {
+      ContainerTool? tool = currentTool;
+      if (tool != null) {
+        if (tool.canPanOrZoom(this, false, pointers)) {
+          runningTool = tool;
+          tool.startPanOrZoom(this, pointers, pan, scale);
+        }
+      }
+    }*/
+  }
+
+  void onPanZoomUpdate(
+      List<RawPointerInfo> pointers, Offset pan, double scale) {
+    /*ContainerTool? tool = runningTool;
+    tool?.panOrZoom(this, pointers, pan, scale);*/
+  }
+
+  void onPanZoomEnd() {
+    /*ContainerTool? tool = runningTool;
+    tool?.endPanOrZoom(this, false);
+    runningTool = null;*/
+  }
+
+  //-----------------------------------------------------------------------
+  //keyboard events
+  //-----------------------------------------------------------------------
+  /* public onKeyDown(box:number, key:number, shiftKey:boolean, controlKey:boolean, altKey:boolean) {
         if (box == -1) return;
         if (this.isPlaying(null)) return;
         //if (_on_key_handler != NULL) 
@@ -3034,6 +3154,15 @@ class OsContainerWnd extends ChangeNotifier {
     }*/
 
   bool onSetCursor(RawPointerInfo pointer) {
+    /*ContainerTool? tool = runningTool;
+    tool ??= currentTool;*/
+    _lastCursorPosition[0] = pointer.localPosition.dx;
+    _lastCursorPosition[1] = pointer.localPosition.dy;
+    /*if (tool != null) {
+      return tool.onSetCursor(this, pointer);
+    } else {
+      return false;
+    }*/
     return false;
   }
   /*public onSetCursor(box:number, x:number, y:number, shiftKey:boolean, ctrlKey:boolean):boolean {

@@ -7,4 +7,5 @@ class OSMSG {
   static const int seriesImagesDownloadCompleted = 4;
 
   static const int imageContainerToolVisibility = 5;
+  static const int imageContainerToolSet = 6;
 }
