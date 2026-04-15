@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:async';
 
 import 'package:desktop_multi_window/desktop_multi_window.dart';
 import 'package:flutter/material.dart';
@@ -19,6 +20,9 @@ class _OnisViewerAppState extends State<OnisViewerApp> with WindowListener {
   final OVApi _api = OVApi();
   final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
   final List<WindowController> _windows = [];
+  bool? _backendSharedAcrossWindows;
+  int? _mainBackendInstanceId;
+  int? _displayBackendInstanceId;
 
   @override
   void initState() {
@@ -64,9 +68,72 @@ class _OnisViewerAppState extends State<OnisViewerApp> with WindowListener {
       await window.setTitle('Display 1');
       await window.show();
       _windows.add(window);
-    } catch (e) {
-      debugPrint('Error initializing OnisViewerApp: $e');
+      await _runSharedBackendSelfTest(window);
+    } catch (e, st) {
+      if (mounted) {
+        setState(() {
+          _backendSharedAcrossWindows = false;
+        });
+      }
+      debugPrint('Error initializing OnisViewerApp: $e\n$st');
     }
+  }
+
+  Future<void> _runSharedBackendSelfTest(WindowController window) async {
+    final mainInstanceId = _api.backend.backendInstanceId;
+    final mainVersion = _api.backend.backendVersion;
+    const int maxAttempts = 8;
+    Map<dynamic, dynamic>? response;
+
+    for (int attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        final result = await DesktopMultiWindow
+            .invokeMethod(
+              window.windowId,
+              'onis/backend_identity',
+              <String, dynamic>{},
+            )
+            .timeout(const Duration(milliseconds: 700));
+        if (result is Map) {
+          response = result;
+          break;
+        }
+      } catch (_) {
+        // Display window may not have registered handler yet.
+      }
+      await Future<void>.delayed(const Duration(milliseconds: 250));
+    }
+
+    if (response == null) {
+      if (mounted) {
+        setState(() {
+          _backendSharedAcrossWindows = false;
+          _mainBackendInstanceId = mainInstanceId;
+          _displayBackendInstanceId = null;
+        });
+      }
+      debugPrint(
+        'Backend self-test failed: no response from display window.',
+      );
+      return;
+    }
+
+    final displayInstanceId = response['backendInstanceId'];
+    final displayVersion = response['backendVersion'];
+    final isShared = displayInstanceId == mainInstanceId;
+    if (mounted) {
+      setState(() {
+        _backendSharedAcrossWindows = isShared;
+        _mainBackendInstanceId = mainInstanceId;
+        _displayBackendInstanceId =
+            displayInstanceId is int ? displayInstanceId : null;
+      });
+    }
+    debugPrint(
+      'Backend self-test => shared=$isShared '
+      '(main: version=$mainVersion instance=$mainInstanceId, '
+      'display: version=$displayVersion instance=$displayInstanceId)',
+    );
   }
 
   @override
@@ -105,7 +172,49 @@ class _OnisViewerAppState extends State<OnisViewerApp> with WindowListener {
           ),
           useMaterial3: true,
         ),
-        home: OsMonitorWidget());
+        home: Stack(
+          children: [
+            const OsMonitorWidget(),
+            Positioned(
+              top: OnisViewerConstants.marginMedium,
+              right: OnisViewerConstants.marginMedium,
+              child: _buildBackendSharedIndicator(),
+            ),
+          ],
+        ));
+  }
+
+  Widget _buildBackendSharedIndicator() {
+    final status = _backendSharedAcrossWindows;
+    final bool isOk = status == true;
+    final Color color = status == null
+        ? OnisViewerConstants.textSecondaryColor
+        : (isOk ? Colors.green : Colors.redAccent);
+    final String label = status == null
+        ? 'Backend link: testing...'
+        : (isOk ? 'Backend shared: OK' : 'Backend shared: KO');
+
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: OnisViewerConstants.paddingMedium,
+        vertical: OnisViewerConstants.paddingSmall,
+      ),
+      decoration: BoxDecoration(
+        color: OnisViewerConstants.surfaceColor.withValues(alpha: 0.85),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: color, width: 1),
+      ),
+      child: Text(
+        _mainBackendInstanceId == null || _displayBackendInstanceId == null
+            ? label
+            : '$label (${_mainBackendInstanceId!}/${_displayBackendInstanceId!})',
+        style: TextStyle(
+          color: color,
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    );
   }
 }
 

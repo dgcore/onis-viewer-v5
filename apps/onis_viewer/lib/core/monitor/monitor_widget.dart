@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:onis_viewer/core/constants.dart';
 import 'package:onis_viewer/core/page_type.dart';
-import 'package:onis_viewer/u i/status_bar/status_bar.dart';
 import 'package:onis_viewer/ui/content_area/content_area.dart';
+import 'package:onis_viewer/ui/status_bar/status_bar.dart';
 
 class OsMonitorWidget extends StatefulWidget {
   //late final WeakReference<OsMonitorWnd>? wMonitorWnd;

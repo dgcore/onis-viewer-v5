@@ -1,6 +1,8 @@
 import "dart:io";
 
+import 'package:desktop_multi_window/desktop_multi_window.dart';
 import 'package:flutter/material.dart';
+import 'package:onis_viewer/api/core/ov_api_core.dart';
 import 'package:onis_viewer/app/onis_viewer_app.dart';
 import 'package:onis_viewer/core/constants.dart';
 import 'package:onis_viewer/core/monitor/monitor_widget.dart';
@@ -14,9 +16,13 @@ void main(List<String> args) async {
 
   WidgetsFlutterBinding.ensureInitialized();
   await windowManager.ensureInitialized();
+  debugPrint('main args: $args');
 
-  if (args.isNotEmpty) {
-    runApp(DisplayWindowApp(windowArgs: args.first));
+  // desktop_multi_window launches sub-window isolates with:
+  // [0] = "multi_window", [1] = windowId, [2] = payload
+  final isSubWindowLaunch = args.length >= 3 && args[0] == 'multi_window';
+  if (isSubWindowLaunch) {
+    runApp(DisplayWindowApp(windowArgs: args[2]));
     return;
   }
 
@@ -68,13 +74,34 @@ class DisplayWindowPage extends StatefulWidget {
 class _DisplayWindowPageState extends State<DisplayWindowPage>
     with WindowListener {
   //late final Map<String, dynamic> args;
+  final OVApi _api = OVApi();
   final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
   @override
   void initState() {
     super.initState();
-    //args = jsonDecode(widget.windowArgs) as Map<String, dynamic>;
-    _configureWindow();
+    _initializeDisplayWindow();
+  }
+
+  Future<void> _initializeDisplayWindow() async {
+    try {
+      await _api.initialize();
+      DesktopMultiWindow.setMethodHandler((call, fromWindowId) async {
+        if (call.method == 'onis/backend_identity') {
+          return <String, dynamic>{
+            'windowType': 'display',
+            'backendVersion': _api.backend.backendVersion,
+            'backendInstanceId': _api.backend.backendInstanceId,
+            'fromWindowId': fromWindowId,
+          };
+        }
+        return null;
+      });
+      await _configureWindow();
+    } catch (e, st) {
+      debugPrint('DisplayWindow initialization failed: $e\n$st');
+      rethrow;
+    }
   }
 
   Future<void> _configureWindow() async {
@@ -85,9 +112,6 @@ class _DisplayWindowPageState extends State<DisplayWindowPage>
     final double y = 100; //(args['y'] as num).toDouble();
     final double width = 800; //(args['width'] as num).toDouble();
     final double height = 600; //(args['height'] as num).toDouble();
-    final bool fullscreen = false;
-    //args['fullscreen'] as bool? ?? false;
-
     const options = WindowOptions(
       backgroundColor: Colors.black,
       skipTaskbar: false,
@@ -107,14 +131,12 @@ class _DisplayWindowPageState extends State<DisplayWindowPage>
       await windowManager.show();
       await windowManager.focus();
 
-      /*if (fullscreen) {
-        await windowManager.setFullScreen(true);
-      }*/
     });
   }
 
   @override
   void dispose() {
+    _api.dispose();
     windowManager.removeListener(this);
     super.dispose();
   }

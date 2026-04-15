@@ -7,6 +7,7 @@ import 'package:onis_viewer/api/graphics/managers/support_set_manager.dart';
 import 'package:onis_viewer/api/managers/page_type_manager.dart';
 import 'package:onis_viewer/api/services/message_service.dart';
 import 'package:onis_viewer/api/view_type/view_type_manager.dart';
+import 'package:onis_viewer/backend/backend_service.dart';
 import 'package:onis_viewer/core/monitor/monitor_config.dart';
 import 'package:onis_viewer/core/monitor/page_type.dart';
 
@@ -34,6 +35,10 @@ class OVApi {
 
   // Services
   late final OsMessageService _messageService;
+  late final OnisBackendService _backendService;
+  bool _isInitialized = false;
+  int _initializeRefCount = 0;
+  Future<void>? _initializingFuture;
 
   // Getters for API modules
   PageTypeManager get pageTypes => _pageTypeManager;
@@ -42,11 +47,29 @@ class OVApi {
   ViewTypeManager get viewTypes => _viewTypeManager;
   OsRenderTypeManager get renderTypes => _renderTypeManager;
   OsMessageService get messages => _messageService;
+  OnisBackendService get backend => _backendService;
   OsSContainerSupportSetManager get containerSupportSets =>
       _containerSupportSetManager;
 
   /// Initialize the API with all modules
   Future<void> initialize() async {
+    _initializeRefCount++;
+    if (_isInitialized) {
+      return;
+    }
+    _initializingFuture ??= _performInitialize();
+    try {
+      await _initializingFuture;
+    } catch (e) {
+      _initializeRefCount--;
+      if (_initializeRefCount < 0) {
+        _initializeRefCount = 0;
+      }
+      rethrow;
+    }
+  }
+
+  Future<void> _performInitialize() async {
     try {
       // Initialize modules
       _viewTypeManager = ViewTypeManager();
@@ -59,6 +82,7 @@ class OVApi {
 
       // Initialize services
       _messageService = OsMessageService();
+      _backendService = OnisBackendService();
 
       // Initialize modules
       _renderTypeManager.initialize();
@@ -73,18 +97,30 @@ class OVApi {
       // Sync page manager with page types registered by plugins
       //_pageManager.syncWithRegisteredTypes();
 
+      _isInitialized = true;
       debugPrint('OVApi initialized successfully');
     } catch (e) {
       debugPrint('Failed to initialize OVApi: $e');
+      rethrow;
+    } finally {
+      _initializingFuture = null;
     }
   }
 
   /// Dispose the API and all modules
   Future<void> dispose() async {
+    if (_initializeRefCount > 0) {
+      _initializeRefCount--;
+    }
+    if (_initializeRefCount > 0 || !_isInitialized) {
+      return;
+    }
     //await _pageManager.dispose();
     await _pluginManager.dispose();
     _viewTypeManager.dispose();
     _containerSupportSetManager.dispose();
+    _backendService.dispose();
+    _isInitialized = false;
     debugPrint('OVApi disposed');
   }
 
