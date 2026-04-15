@@ -15,10 +15,14 @@ std::atomic<int32_t> g_ref_count{0};
 std::mutex g_backend_mutex;
 OnisBackendHandle* g_shared_backend = nullptr;
 
-void set_last_error(const char* message) { g_last_error = message; }
+void set_last_error(const char* message) {
+  g_last_error = message;
+}
 }  // namespace
 
-int32_t onis_backend_version(void) { return 1; }
+int32_t onis_backend_version(void) {
+  return 1;
+}
 
 OnisBackendHandle* onis_backend_create(void) {
   std::lock_guard<std::mutex> lock(g_backend_mutex);
@@ -48,8 +52,7 @@ void onis_backend_destroy(OnisBackendHandle* handle) {
   }
 }
 
-OnisBackendStatus onis_backend_ping(OnisBackendHandle* handle,
-                                    int32_t value,
+OnisBackendStatus onis_backend_ping(OnisBackendHandle* handle, int32_t value,
                                     int32_t* out_value) {
   if (handle == nullptr || out_value == nullptr) {
     set_last_error("Invalid argument: handle or out_value is null.");
@@ -69,4 +72,6 @@ int32_t onis_backend_instance_id(OnisBackendHandle* handle) {
   return handle->generation;
 }
 
-const char* onis_backend_get_last_error(void) { return g_last_error.c_str(); }
+const char* onis_backend_get_last_error(void) {
+  return g_last_error.c_str();
+}
