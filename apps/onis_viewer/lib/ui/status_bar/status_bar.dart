@@ -38,12 +38,24 @@ class StatusBar extends StatelessWidget {
           ),
 
           // Additional widgets (right side)
-          if (additionalWidgets != null) ...[
-            const SizedBox(width: OnisViewerConstants.marginMedium),
-            ...additionalWidgets!,
-          ],
+          if (additionalWidgets != null && additionalWidgets!.isNotEmpty)
+            Flexible(
+              child: Align(
+                alignment: Alignment.centerRight,
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  reverse: true,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const SizedBox(width: OnisViewerConstants.marginMedium),
+                      ...additionalWidgets!,
+                    ],
+                  ),
+                ),
+              ),
+            ),
 
-          const SizedBox(width: OnisViewerConstants.marginMedium),
         ],
       ),
     );
