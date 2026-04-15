@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../../app/onis_viewer_app.dart';
 import '../../core/constants.dart';
 import '../../core/page_type.dart';
 
@@ -299,7 +298,7 @@ abstract class BasePageState<T extends BasePage> extends State<T>
 
   /// Show a snackbar message
   void showMessage(String message, {bool isError = false}) {
-    if (!mounted) return;
+    /*if (!mounted) return;
 
     // Try to get ScaffoldMessenger from context first
     final scaffoldMessenger = ScaffoldMessenger.maybeOf(context);
@@ -328,7 +327,7 @@ abstract class BasePageState<T extends BasePage> extends State<T>
         // Last resort: just print to console
         debugPrint('Message: $message');
       }
-    }
+    }*/
   }
 
   /// Show a confirmation dialog

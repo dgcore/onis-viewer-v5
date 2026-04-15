@@ -1,3 +1,117 @@
+import 'dart:convert';
+
+import 'package:desktop_multi_window/desktop_multi_window.dart';
+import 'package:flutter/material.dart';
+import 'package:onis_viewer/api/core/ov_api_core.dart';
+import 'package:onis_viewer/core/constants.dart';
+import 'package:onis_viewer/core/monitor/monitor_widget.dart';
+import 'package:screen_retriever/screen_retriever.dart';
+import 'package:window_manager/window_manager.dart';
+
+class OnisViewerApp extends StatefulWidget {
+  const OnisViewerApp({super.key});
+
+  @override
+  State<OnisViewerApp> createState() => _OnisViewerAppState();
+}
+
+class _OnisViewerAppState extends State<OnisViewerApp> with WindowListener {
+  final OVApi _api = OVApi();
+  final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+  final List<WindowController> _windows = [];
+
+  @override
+  void initState() {
+    super.initState();
+    windowManager.addListener(this);
+    _initializeApp();
+  }
+
+  Future<void> _initializeApp() async {
+    try {
+      await _api.initialize();
+      debugPrint('OnisViewerApp initialized successfully');
+
+      final displays = await screenRetriever.getAllDisplays();
+
+      final mainDisplay = displays[0];
+      final mainDisplaySize = mainDisplay.visibleSize!;
+
+      final options = WindowOptions(
+        size: mainDisplaySize,
+        center: true,
+        title: 'Main Window',
+        backgroundColor: Colors.black,
+        skipTaskbar: false,
+        titleBarStyle: TitleBarStyle.normal,
+      );
+
+      await windowManager.waitUntilReadyToShow(options, () async {
+        await windowManager.show();
+        await windowManager.focus();
+      });
+
+      final payload = {
+        'displayIndex': 1,
+        'displayId': "display 1",
+        'width': 800,
+        'height': 600,
+        'fullscreen': false,
+      };
+      final window = await DesktopMultiWindow.createWindow(
+        jsonEncode(payload),
+      );
+      await window.setTitle('Display 1');
+      await window.show();
+      _windows.add(window);
+    } catch (e) {
+      debugPrint('Error initializing OnisViewerApp: $e');
+    }
+  }
+
+  @override
+  void dispose() {
+    _api.dispose();
+    windowManager.removeListener(this);
+    super.dispose();
+  }
+
+  @override
+  Future<void> onWindowClose() async {
+    await windowManager.setPreventClose(true);
+
+    // Ferme toutes les fenêtres secondaires
+    for (final window in _windows) {
+      try {
+        await window.close();
+      } catch (_) {}
+    }
+
+    // Ferme la fenêtre principale
+    await windowManager.destroy();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+        navigatorKey: navigatorKey,
+        title: OnisViewerConstants.appName,
+        debugShowCheckedModeBanner: false,
+        theme: ThemeData(
+          colorScheme: ColorScheme.dark(
+            primary: OnisViewerConstants.primaryColor,
+            secondary: OnisViewerConstants.secondaryColor,
+            surface: OnisViewerConstants.surfaceColor,
+          ),
+          useMaterial3: true,
+        ),
+        home: OsMonitorWidget());
+  }
+}
+
+
+
+/*
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -430,3 +544,5 @@ class _OnisViewerAppState extends State<OnisViewerApp>
     }
   }
 }
+*/
+

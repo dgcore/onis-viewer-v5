@@ -24,22 +24,22 @@ class _ContentAreaState extends State<ContentArea>
   @override
   void initState() {
     super.initState();
-    _api.pages.addObserver(this);
-    _currentPage = _api.pages.currentPage;
+    //_api.pages.addObserver(this);
+    //_currentPage = _api.pages.currentPage;
     // Pre-cache available pages
     _cacheAvailablePages();
   }
 
   @override
   void dispose() {
-    _api.pages.removeObserver(this);
+    //_api.pages.removeObserver(this);
     _pageCache.clear();
     super.dispose();
   }
 
   /// Cache all available pages
   void _cacheAvailablePages() {
-    for (final pageType in _api.pages.availablePages) {
+    /*for (final pageType in _api.pages.availablePages) {
       if (!_pageCache.containsKey(pageType.id)) {
         _pageCache[pageType.id] = PageContainer(
           pageType: pageType,
@@ -47,7 +47,7 @@ class _ContentAreaState extends State<ContentArea>
           key: ValueKey(pageType.id),
         );
       }
-    }
+    }*/
   }
 
   @override
@@ -60,29 +60,32 @@ class _ContentAreaState extends State<ContentArea>
 
   /// Build the page content using IndexedStack to preserve pages
   Widget _buildPageContent() {
-    if (_api.pages.availablePages.isEmpty) {
+    /*if (_api.pages.availablePages.isEmpty) {
       return _buildNoPageWidget();
-    }
+    }*/
 
     // Ensure all pages are cached
     _cacheAvailablePages();
 
     // Find the index of the current page
-    final currentIndex = _currentPage != null
+    /*final currentIndex = _currentPage != null
         ? _api.pages.availablePages
             .indexWhere((page) => page.id == _currentPage!.id)
-        : 0;
+        : 0;*/
 
-    if (currentIndex < 0 || currentIndex >= _api.pages.availablePages.length) {
+    /*if (currentIndex < 0 || currentIndex >= _api.pages.availablePages.length) {
       return _buildNoPageWidget();
-    }
+    }*/
 
     // Use IndexedStack to preserve all pages (only the current one is visible)
-    return IndexedStack(
+    /*return IndexedStack(
       index: currentIndex,
       children: _api.pages.availablePages.map((pageType) {
         return _pageCache[pageType.id] ?? _buildNoPageWidget();
       }).toList(),
+    );*/
+    return Container(
+      color: Colors.green,
     );
   }
 

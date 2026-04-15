@@ -33,6 +33,9 @@ dependencies:
 
   image: ^4.2.0
   path_provider: ^2.1.5
+  desktop_multi_window: ^0.2.1
+  screen_retriever: ^0.2.0
+  window_manager: ^0.4.2
 
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
