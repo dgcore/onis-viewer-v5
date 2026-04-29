@@ -4,7 +4,7 @@ abstract class HasId {
   String getId();
 }
 
-class SimpleManager<T extends HasId> extends BaseManager {
+abstract class SimpleManager<T extends HasId> extends BaseManager {
   final List<T> _list = [];
 
   SimpleManager(
@@ -20,8 +20,8 @@ class SimpleManager<T extends HasId> extends BaseManager {
       }
       _list.add(element);
       if (registerMsg != 0) {
-        presendMessage(registerMsg, element);
-        sendMessage(registerMsg, element);
+        //presendMessage(registerMsg, getMessageMap());
+        sendMessage(registerMsg, getMessageMap(element));
       }
       return true;
     } else {
@@ -32,8 +32,8 @@ class SimpleManager<T extends HasId> extends BaseManager {
       final removed = _list[index];
       _list.removeAt(index);
       if (unregisterMsg != 0) {
-        presendMessage(unregisterMsg, removed);
-        sendMessage(unregisterMsg, removed);
+        //presendMessage(unregisterMsg, removed);
+        sendMessage(unregisterMsg, getMessageMap(removed));
       }
       return true;
     }
@@ -51,6 +51,8 @@ class SimpleManager<T extends HasId> extends BaseManager {
     }
     return null;
   }
+
+  Map<String, dynamic> getMessageMap(T element);
 
   void presendMessage(int message, T element) {}
 

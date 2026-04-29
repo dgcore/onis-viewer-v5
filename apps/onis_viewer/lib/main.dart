@@ -1,10 +1,11 @@
+import 'dart:convert';
 import "dart:io";
 
-import 'package:desktop_multi_window/desktop_multi_window.dart';
 import 'package:flutter/material.dart';
 import 'package:onis_viewer/api/core/ov_api_core.dart';
 import 'package:onis_viewer/app/onis_viewer_app.dart';
 import 'package:onis_viewer/core/constants.dart';
+import 'package:onis_viewer/core/monitor/monitor.dart';
 import 'package:onis_viewer/core/monitor/monitor_widget.dart';
 import 'package:window_manager/window_manager.dart';
 
@@ -22,7 +23,11 @@ void main(List<String> args) async {
   // [0] = "multi_window", [1] = windowId, [2] = payload
   final isSubWindowLaunch = args.length >= 3 && args[0] == 'multi_window';
   if (isSubWindowLaunch) {
-    runApp(DisplayWindowApp(windowArgs: args[2]));
+    final engineId = int.tryParse(args[1]) ?? 1;
+    runApp(DisplayWindowApp(
+      windowArgs: args[2],
+      flutterEngineInstanceId: engineId,
+    ));
     return;
   }
 
@@ -44,27 +49,43 @@ class _MyHttpOverrides extends HttpOverrides {
 
 class DisplayWindowApp extends StatelessWidget {
   final String windowArgs;
+  final int flutterEngineInstanceId;
 
   const DisplayWindowApp({
     super.key,
     required this.windowArgs,
+    required this.flutterEngineInstanceId,
   });
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      home: DisplayWindowPage(windowArgs: windowArgs),
+      title: OnisViewerConstants.appName,
+      theme: ThemeData(
+        colorScheme: ColorScheme.dark(
+          primary: OnisViewerConstants.primaryColor,
+          secondary: OnisViewerConstants.secondaryColor,
+          surface: OnisViewerConstants.surfaceColor,
+        ),
+        useMaterial3: true,
+      ),
+      home: DisplayWindowPage(
+        windowArgs: windowArgs,
+        flutterEngineInstanceId: flutterEngineInstanceId,
+      ),
     );
   }
 }
 
 class DisplayWindowPage extends StatefulWidget {
   final String windowArgs;
+  final int flutterEngineInstanceId;
 
   const DisplayWindowPage({
     super.key,
     required this.windowArgs,
+    required this.flutterEngineInstanceId,
   });
 
   @override
@@ -76,6 +97,7 @@ class _DisplayWindowPageState extends State<DisplayWindowPage>
   //late final Map<String, dynamic> args;
   final OVApi _api = OVApi();
   final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+  OsMonitor? _monitor;
 
   @override
   void initState() {
@@ -85,8 +107,23 @@ class _DisplayWindowPageState extends State<DisplayWindowPage>
 
   Future<void> _initializeDisplayWindow() async {
     try {
-      await _api.initialize();
-      DesktopMultiWindow.setMethodHandler((call, fromWindowId) async {
+      await _api.initialize(
+        flutterEngineInstanceId: widget.flutterEngineInstanceId,
+      );
+      final monitorArgs = jsonDecode(widget.windowArgs);
+      final labelIndex = monitorArgs['labelIndex'];
+      final monitors = _api.monitorConfiguration?.getActiveMonitors() ?? [];
+      if (monitors.isNotEmpty) {
+        _monitor = monitors
+            .firstWhere((monitor) => monitor.getLabelIndex() == labelIndex);
+        if (_monitor != null) {
+          _monitor?.createWindow();
+        }
+        if (mounted) {
+          setState(() {});
+        }
+      }
+      /*_api.attachMultiWindowMessageHandler((call, fromWindowId) async {
         if (call.method == 'onis/backend_identity') {
           return <String, dynamic>{
             'windowType': 'display',
@@ -96,7 +133,7 @@ class _DisplayWindowPageState extends State<DisplayWindowPage>
           };
         }
         return null;
-      });
+      });*/
       await _configureWindow();
     } catch (e, st) {
       debugPrint('DisplayWindow initialization failed: $e\n$st');
@@ -107,15 +144,16 @@ class _DisplayWindowPageState extends State<DisplayWindowPage>
   Future<void> _configureWindow() async {
     windowManager.addListener(this);
 
+    final monitorArgs = jsonDecode(widget.windowArgs);
+    double width = (monitorArgs["width"] as num).toDouble();
+    double height = (monitorArgs["height"] as num).toDouble();
     final double x = 100;
-    //(args['x'] as num).toDouble();
     final double y = 100; //(args['y'] as num).toDouble();
-    final double width = 800; //(args['width'] as num).toDouble();
-    final double height = 600; //(args['height'] as num).toDouble();
+
     const options = WindowOptions(
       backgroundColor: Colors.black,
       skipTaskbar: false,
-      titleBarStyle: TitleBarStyle.hidden,
+      titleBarStyle: TitleBarStyle.normal,
     );
 
     await windowManager.waitUntilReadyToShow(options, () async {
@@ -130,7 +168,6 @@ class _DisplayWindowPageState extends State<DisplayWindowPage>
       await windowManager.setClosable(false);
       await windowManager.show();
       await windowManager.focus();
-
     });
   }
 
@@ -143,18 +180,11 @@ class _DisplayWindowPageState extends State<DisplayWindowPage>
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-        navigatorKey: navigatorKey,
-        title: OnisViewerConstants.appName,
-        debugShowCheckedModeBanner: false,
-        theme: ThemeData(
-          colorScheme: ColorScheme.dark(
-            primary: OnisViewerConstants.primaryColor,
-            secondary: OnisViewerConstants.secondaryColor,
-            surface: OnisViewerConstants.surfaceColor,
-          ),
-          useMaterial3: true,
-        ),
-        home: OsMonitorWidget());
+    final monitorWnd = _monitor?.getWindow();
+    return Scaffold(
+      body: monitorWnd != null
+          ? OsMonitorWidget(monitorWnd: monitorWnd)
+          : const SizedBox.shrink(),
+    );
   }
 }

@@ -1,13 +1,7 @@
-import 'dart:async';
 
-import 'package:flutter/material.dart';
-
-import '../../core/constants.dart';
-import '../../core/page_factory.dart';
-import '../../core/page_type.dart';
 
 /// Observer interface for page manager changes
-abstract class PageManagerObserver {
+/*abstract class PageManagerObserver {
   void onPageChanged(PageType? oldPage, PageType newPage);
   void onPageAdded(PageType pageType);
   void onPageRemoved(PageType pageType);
@@ -224,3 +218,4 @@ class PageManager {
     _pageRemovedController.add(pageType);
   }
 }
+*/

@@ -53,7 +53,8 @@ class OnisBackendBindings {
         instanceId = lib.lookupFunction<_InstanceIdNative, _InstanceIdDart>(
           'onis_backend_instance_id',
         ),
-        getLastError = lib.lookupFunction<_GetLastErrorNative, _GetLastErrorDart>(
+        getLastError =
+            lib.lookupFunction<_GetLastErrorNative, _GetLastErrorDart>(
           'onis_backend_get_last_error',
         );
 

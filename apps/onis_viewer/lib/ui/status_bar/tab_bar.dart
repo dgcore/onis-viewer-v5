@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:onis_viewer/core/monitor/page.dart';
 
 import '../../core/constants.dart';
-import '../../core/page_type.dart';
 import 'tab_button.dart';
 
 /// Horizontal tab bar containing tab buttons
 class OnisTabBar extends StatelessWidget {
-  final List<PageType> availablePages;
-  final PageType? currentPage;
-  final Function(PageType) onPageSelected;
+  final List<OsPage> availablePages;
+  final OsPage? currentPage;
+  final Function(OsPage) onPageSelected;
 
   const OnisTabBar({
     super.key,
@@ -23,16 +23,16 @@ class OnisTabBar extends StatelessWidget {
       height: OnisViewerConstants.tabButtonHeight,
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
-        children: availablePages.map((pageType) {
-          final isSelected = currentPage == pageType;
+        children: availablePages.map((page) {
+          final isSelected = currentPage == page;
           return Padding(
             padding: const EdgeInsets.symmetric(
               horizontal: OnisViewerConstants.marginSmall,
             ),
             child: TabButton(
-              pageType: pageType,
+              page: page,
               isSelected: isSelected,
-              onPressed: () => onPageSelected(pageType),
+              onPressed: () => onPageSelected(page),
             ),
           );
         }).toList(),

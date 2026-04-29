@@ -1,4 +1,50 @@
-import 'package:flutter/material.dart';
+import 'package:onis_viewer/core/monitor/monitor.dart';
+import 'package:onis_viewer/core/monitor/page.dart';
+import 'package:onis_viewer/core/monitor/page_type.dart';
+import 'package:onis_viewer/core/monitor/page_widget.dart';
+import 'package:onis_viewer/core/monitor/page_wnd.dart';
+import 'package:onis_viewer/plugins/viewer/page/viewer_page_widget.dart';
+
+class OsViewerPageType extends OsPageType {
+  OsViewerPageType()
+      : super(
+            id: 'viewer',
+            name: 'Viewer',
+            pageMustExist: true,
+            singleMonitor: false);
+
+  @override
+  OsPage createPage(OsMonitor monitor) {
+    return ViewerPage(this, monitor);
+  }
+}
+
+class ViewerPage extends OsPage {
+  ViewerPage(super.type, super.monitor);
+
+  @override
+  OsPageWnd createPageWnd() {
+    return ViewerPageWnd(page: this);
+  }
+}
+
+class ViewerPageWnd extends OsPageWnd {
+  ViewerPageWnd({
+    required super.page,
+  });
+
+  @override
+  OsPageWidget? createPageWidget() {
+    OsPage? page = getPage();
+    if (page == null) {
+      return null;
+    }
+    return ViewerPageWidget(page: page);
+  }
+}
+
+/*import 'package:flutter/material.dart';
+
 import 'package:onis_viewer/api/core/ov_api_core.dart';
 import 'package:onis_viewer/core/layout/view_layout.dart';
 import 'package:onis_viewer/core/layout/view_layout_node.dart';
@@ -217,3 +263,4 @@ class _ViewerPageState extends BasePageState<ViewerPage> {
     return 'Viewer';
   }
 }
+*/

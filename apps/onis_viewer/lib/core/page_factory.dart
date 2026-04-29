@@ -1,11 +1,7 @@
-import 'package:flutter/material.dart';
 
-import '../plugins/database/page/database_page.dart';
-import '../plugins/viewer/page/viewer_page.dart';
-import 'page_type.dart';
 
 /// Factory for creating page widgets from page types
-class PageFactory {
+/*class PageFactory {
   static final PageFactory _instance = PageFactory._internal();
   factory PageFactory() => _instance;
   PageFactory._internal();
@@ -84,3 +80,4 @@ class PageFactory {
     return ids;
   }
 }
+*/

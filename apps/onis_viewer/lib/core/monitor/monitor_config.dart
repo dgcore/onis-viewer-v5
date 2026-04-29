@@ -1,13 +1,14 @@
 import 'package:onis_viewer/api/core/ov_api_core.dart';
 import 'package:onis_viewer/core/monitor/monitor.dart';
 import 'package:onis_viewer/core/monitor/page_type.dart';
+import 'package:screen_retriever/screen_retriever.dart';
 
 class OsMonitorConfig {
   bool _useVirtualMonitors = false;
-  int _virtualMonitorCount = 0;
+  int _virtualMonitorCount = 1;
   final List<OsMonitor> _physicalMonitors = [];
   final List<OsMonitor> _virtualMonitors = [];
-  OsMonitor? _current;
+  //OsMonitor? _current;
 
   bool shouldUseVirtualMonitors() {
     return _useVirtualMonitors;
@@ -27,52 +28,68 @@ class OsMonitorConfig {
         : List.unmodifiable(_physicalMonitors);
   }
 
+  List<OsMonitor> getActiveMonitors() {
+    return List.unmodifiable(
+        _physicalMonitors.where((monitor) => monitor.isActive()).toList());
+  }
+
   //operations:
   bool setShouldUseVirtualMonitors(bool useVirtual, int monitorCount) {
     if (useVirtual) {
       if (monitorCount <= 0 || monitorCount > 10) return false;
       _virtualMonitorCount = monitorCount;
       _useVirtualMonitors = true;
-      //detect_monitors();
+      detectMonitors();
       return true;
     } else {
       _useVirtualMonitors = false;
       return true;
     }
   }
-  //void detect_monitors();
-  //void resolve_conflicts();
-  //void init_from_document(onis::xml::pdoc_ptr doc);
 
-  //current monitor:
-  OsMonitor? getCurrentMonitor() {
+  /*OsMonitor? getCurrentMonitor() {
     return _current;
   }
 
   void setCurrentMonitor(OsMonitor? monitor) {
     _current = monitor;
-  }
+  }*/
 
-  void detectMonitors() {
-    List<OsMonitor> monitors = [];
+  Future<void> detectMonitors() async {
+    List<OsMonitor> realMonitors = [];
     List<OsMonitor> virtualMonitors = [];
 
-    OsMonitor monitor = OsMonitor('mon1');
-    monitor.setActive(true);
-    monitor.setArea([0, 0, 800, 600]);
-    monitor.setLabelIndex(0);
-    monitors.add(monitor);
+    // Get the real monitors:
+    final displays = await screenRetriever.getAllDisplays();
+    for (final display in displays) {
+      final displaySize = display.visibleSize!;
+      List<double> displayArea = [0, 0, displaySize.width, displaySize.height];
+      final displayLabelIndex = displays.indexOf(display);
+      final displayMonitor = OsMonitor('mon${displayLabelIndex + 1}');
+      //displayMonitor.setActive(false);
+      displayMonitor.setActive(true); // should be false for real monitors
+      displayMonitor.setArea(displayArea);
+      displayMonitor.setLabelIndex(displayLabelIndex);
+      realMonitors.add(displayMonitor);
+    }
 
-    if (monitors.isNotEmpty) {
-      OsMonitor mon = monitors.first;
+    // create one fake monitor for test:
+    OsMonitor fakeMonitor = OsMonitor('fake');
+    fakeMonitor.setActive(true);
+    fakeMonitor.setArea([0, 0, 800, 600]);
+    fakeMonitor.setLabelIndex(1);
+    realMonitors.add(fakeMonitor);
+
+    // Get the virtual monitors:
+    if (realMonitors.isNotEmpty) {
+      OsMonitor mon = realMonitors.first;
       List<double> area = [0, 0, 0, 0];
       mon.getArea(area);
-
       if (area[2] >= area[3]) {
         double width =
             (area[2] / _virtualMonitorCount.toDouble()).floorToDouble();
         for (int i = 0; i < _virtualMonitorCount; i++) {
-          List<double> monitorArea = [];
+          List<double> monitorArea = [0, 0, 0, 0];
           monitorArea[0] = i * width + area[0];
           monitorArea[1] = area[1];
           monitorArea[2] = (i == _virtualMonitorCount - 1)
@@ -91,7 +108,7 @@ class OsMonitorConfig {
         double height =
             (area[3] / _virtualMonitorCount.toDouble()).floorToDouble();
         for (int i = 0; i < _virtualMonitorCount; i++) {
-          List<double> monitorArea = [];
+          List<double> monitorArea = [0, 0, 0, 0];
           monitorArea[0] = area[0];
           monitorArea[1] = i * height + area[1];
           monitorArea[2] = area[2];
@@ -110,7 +127,8 @@ class OsMonitorConfig {
     }
 
     for (int i = 0; i < 2; i++) {
-      List<OsMonitor> sourceMonitors = (i == 0) ? monitors : virtualMonitors;
+      List<OsMonitor> sourceMonitors =
+          (i == 0) ? realMonitors : virtualMonitors;
       List<OsMonitor> targetMonitors =
           (i == 0) ? _physicalMonitors : _virtualMonitors;
 
@@ -145,21 +163,13 @@ class OsMonitorConfig {
     resolveConflicts();
   }
 
-  //init:
-  /*void initDefault(List<OsPageType> pageTypes) {
-    _useVirtualMonitors = false;
-    _physicalMonitors.clear();
-    OsMonitor monitor = OsMonitor('mon1');
-    _physicalMonitors.add(monitor);
-    resolveConflicts(pageTypes);
-    //this._current = monitor;
-  }*/
-
   void resolveConflicts() {
     for (int i = 0; i < 2; i++) {
       List<OsMonitor> monitors =
           (i == 0) ? _physicalMonitors : _virtualMonitors;
       if (monitors.isEmpty) continue;
+
+      // Get the active monitors:
       List<OsMonitor> activeMonitors = [];
       for (int j = 0; j < monitors.length; j++) {
         if (monitors[j].isActive()) {
@@ -169,11 +179,9 @@ class OsMonitorConfig {
         }
       }
       //Make sure that we have at least one active monitor:
-      if (activeMonitors.isEmpty) {
-        if (monitors.isNotEmpty) {
-          monitors[0].setActive(true);
-          activeMonitors.add(monitors[0]);
-        }
+      if (activeMonitors.isEmpty && monitors.isNotEmpty) {
+        monitors[0].setActive(true);
+        activeMonitors.add(monitors[0]);
       }
       //Analyze the pages:
       List<OsPageType> pageTypes = OVApi().pageTypes.getList();

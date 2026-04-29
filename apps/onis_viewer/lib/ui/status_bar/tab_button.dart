@@ -1,17 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:onis_viewer/core/monitor/page.dart';
 
 import '../../core/constants.dart';
-import '../../core/page_type.dart';
 
 /// Individual tab button widget
 class TabButton extends StatefulWidget {
-  final PageType pageType;
+  final OsPage page;
   final bool isSelected;
   final VoidCallback onPressed;
 
   const TabButton({
     super.key,
-    required this.pageType,
+    required this.page,
     required this.isSelected,
     required this.onPressed,
   });
@@ -25,6 +25,7 @@ class _TabButtonState extends State<TabButton> {
 
   @override
   Widget build(BuildContext context) {
+    final pageType = widget.page.getType();
     return MouseRegion(
       onEnter: (_) => setState(() => _isHovered = true),
       onExit: (_) => setState(() => _isHovered = false),
@@ -45,7 +46,7 @@ class _TabButtonState extends State<TabButton> {
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16.0),
               child: Text(
-                widget.pageType.name,
+                pageType == null ? '' : pageType.name,
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight:

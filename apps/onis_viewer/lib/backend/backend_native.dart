@@ -107,7 +107,8 @@ class OnisBackendNative {
       for (int i = 0; i < maxDepth; i++) {
         candidates.add(p.join(cursor, 'native', 'backend', 'build', fileName));
         candidates.add(
-          p.join(cursor, 'apps', 'onis_viewer', 'native', 'backend', 'build', fileName),
+          p.join(cursor, 'apps', 'onis_viewer', 'native', 'backend', 'build',
+              fileName),
         );
         final parent = p.dirname(cursor);
         if (parent == cursor) {

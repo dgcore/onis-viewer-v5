@@ -8,4 +8,7 @@ class OSMSG {
 
   static const int imageContainerToolVisibility = 5;
   static const int imageContainerToolSet = 6;
+
+  static const int pageTypeRegistered = 7;
+  static const int pageTypeUnregistered = 8;
 }

@@ -1,12 +1,13 @@
-import 'dart:convert';
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:desktop_multi_window/desktop_multi_window.dart';
 import 'package:flutter/material.dart';
 import 'package:onis_viewer/api/core/ov_api_core.dart';
 import 'package:onis_viewer/core/constants.dart';
+import 'package:onis_viewer/core/monitor/monitor.dart';
+import 'package:onis_viewer/core/monitor/monitor_config.dart';
 import 'package:onis_viewer/core/monitor/monitor_widget.dart';
-import 'package:screen_retriever/screen_retriever.dart';
 import 'package:window_manager/window_manager.dart';
 
 class OnisViewerApp extends StatefulWidget {
@@ -23,52 +24,87 @@ class _OnisViewerAppState extends State<OnisViewerApp> with WindowListener {
   bool? _backendSharedAcrossWindows;
   int? _mainBackendInstanceId;
   int? _displayBackendInstanceId;
+  OsMonitor? _monitor;
 
   @override
   void initState() {
     super.initState();
+
+    /// listen to window events (window close, etc.)
     windowManager.addListener(this);
     _initializeApp();
   }
 
+  @override
+  void dispose() {
+    _api.dispose();
+
+    /// stop listening to window events
+    windowManager.removeListener(this);
+    super.dispose();
+  }
+
+  /// initialize the app
   Future<void> _initializeApp() async {
     try {
+      /// initialize the API
       await _api.initialize();
-      debugPrint('OnisViewerApp initialized successfully');
 
-      final displays = await screenRetriever.getAllDisplays();
+      /// get the monitor configuration
+      OsMonitorConfig? monitorConfig = _api.monitorConfiguration;
+      if (monitorConfig != null) {
+        /// create main and secondary windows:
+        List<OsMonitor> monitors = monitorConfig.getActiveMonitors();
+        for (OsMonitor monitor in monitors) {
+          if (monitor.isActive()) {
+            List<double> area = [0, 0, 0, 0];
+            monitor.getArea(area);
 
-      final mainDisplay = displays[0];
-      final mainDisplaySize = mainDisplay.visibleSize!;
-
-      final options = WindowOptions(
-        size: mainDisplaySize,
-        center: true,
-        title: 'Main Window',
-        backgroundColor: Colors.black,
-        skipTaskbar: false,
-        titleBarStyle: TitleBarStyle.normal,
-      );
-
-      await windowManager.waitUntilReadyToShow(options, () async {
-        await windowManager.show();
-        await windowManager.focus();
-      });
-
-      final payload = {
-        'displayIndex': 1,
-        'displayId': "display 1",
-        'width': 800,
-        'height': 600,
-        'fullscreen': false,
-      };
-      final window = await DesktopMultiWindow.createWindow(
-        jsonEncode(payload),
-      );
-      await window.setTitle('Display 1');
-      await window.show();
-      _windows.add(window);
-      await _runSharedBackendSelfTest(window);
+            if (monitor == monitors.first) {
+              if (mounted) {
+                setState(() {
+                  _monitor = monitor;
+                });
+              } else {
+                _monitor = monitor;
+              }
+              final options = WindowOptions(
+                size: Size(area[2], area[3]),
+                center: true,
+                title: monitor == monitors.first
+                    ? 'Main Window'
+                    : 'Monitor ${monitor.getLabelIndex()}',
+                backgroundColor: Colors.black,
+                skipTaskbar: false,
+                titleBarStyle: TitleBarStyle.normal,
+              );
+              await windowManager.waitUntilReadyToShow(options, () async {
+                await windowManager.show();
+                await windowManager.focus();
+              });
+            } else {
+              final payload = {
+                'labelIndex': monitor.getLabelIndex(),
+                'displayId': monitor.id,
+                'width': area[2],
+                'height': area[3],
+                'fullscreen': false,
+              };
+              final window = await DesktopMultiWindow.createWindow(
+                jsonEncode(payload),
+              );
+              await window.setTitle(monitor.id);
+              await window.show();
+              _windows.add(window);
+            }
+          }
+        }
+      }
+      _monitor?.createWindow();
+      // Ensure UI rebuilds after monitor window is actually created.
+      if (mounted) {
+        setState(() {});
+      }
     } catch (e, st) {
       if (mounted) {
         setState(() {
@@ -79,7 +115,7 @@ class _OnisViewerAppState extends State<OnisViewerApp> with WindowListener {
     }
   }
 
-  Future<void> _runSharedBackendSelfTest(WindowController window) async {
+  /*Future<void> _runSharedBackendSelfTest(WindowController window) async {
     final mainInstanceId = _api.backend.backendInstanceId;
     final mainVersion = _api.backend.backendVersion;
     const int maxAttempts = 8;
@@ -87,13 +123,11 @@ class _OnisViewerAppState extends State<OnisViewerApp> with WindowListener {
 
     for (int attempt = 1; attempt <= maxAttempts; attempt++) {
       try {
-        final result = await DesktopMultiWindow
-            .invokeMethod(
-              window.windowId,
-              'onis/backend_identity',
-              <String, dynamic>{},
-            )
-            .timeout(const Duration(milliseconds: 700));
+        final result = await DesktopMultiWindow.invokeMethod(
+          window.windowId,
+          'onis/backend_identity',
+          <String, dynamic>{},
+        ).timeout(const Duration(milliseconds: 700));
         if (result is Map) {
           response = result;
           break;
@@ -134,32 +168,27 @@ class _OnisViewerAppState extends State<OnisViewerApp> with WindowListener {
       '(main: version=$mainVersion instance=$mainInstanceId, '
       'display: version=$displayVersion instance=$displayInstanceId)',
     );
-  }
-
-  @override
-  void dispose() {
-    _api.dispose();
-    windowManager.removeListener(this);
-    super.dispose();
-  }
+  }*/
 
   @override
   Future<void> onWindowClose() async {
+    /// prevent the main window from being closed
     await windowManager.setPreventClose(true);
 
-    // Ferme toutes les fenêtres secondaires
+    /// close all secondary windows
     for (final window in _windows) {
       try {
         await window.close();
       } catch (_) {}
     }
 
-    // Ferme la fenêtre principale
+    /// close the main window
     await windowManager.destroy();
   }
 
   @override
   Widget build(BuildContext context) {
+    final monitorWnd = _monitor?.getWindow();
     return MaterialApp(
         navigatorKey: navigatorKey,
         title: OnisViewerConstants.appName,
@@ -172,49 +201,10 @@ class _OnisViewerAppState extends State<OnisViewerApp> with WindowListener {
           ),
           useMaterial3: true,
         ),
-        home: Stack(
-          children: [
-            const OsMonitorWidget(),
-            Positioned(
-              top: OnisViewerConstants.marginMedium,
-              right: OnisViewerConstants.marginMedium,
-              child: _buildBackendSharedIndicator(),
-            ),
-          ],
-        ));
-  }
-
-  Widget _buildBackendSharedIndicator() {
-    final status = _backendSharedAcrossWindows;
-    final bool isOk = status == true;
-    final Color color = status == null
-        ? OnisViewerConstants.textSecondaryColor
-        : (isOk ? Colors.green : Colors.redAccent);
-    final String label = status == null
-        ? 'Backend link: testing...'
-        : (isOk ? 'Backend shared: OK' : 'Backend shared: KO');
-
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: OnisViewerConstants.paddingMedium,
-        vertical: OnisViewerConstants.paddingSmall,
-      ),
-      decoration: BoxDecoration(
-        color: OnisViewerConstants.surfaceColor.withValues(alpha: 0.85),
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: color, width: 1),
-      ),
-      child: Text(
-        _mainBackendInstanceId == null || _displayBackendInstanceId == null
-            ? label
-            : '$label (${_mainBackendInstanceId!}/${_displayBackendInstanceId!})',
-        style: TextStyle(
-          color: color,
-          fontSize: 12,
-          fontWeight: FontWeight.w600,
-        ),
-      ),
-    );
+        home: Scaffold(
+            body: monitorWnd != null
+                ? OsMonitorWidget(monitorWnd: monitorWnd)
+                : const SizedBox.shrink()));
   }
 }
 

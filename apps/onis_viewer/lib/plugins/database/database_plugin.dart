@@ -1,18 +1,18 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:onis_viewer/api/core/ov_api_core.dart';
+import 'package:onis_viewer/api/managers/page_type_manager.dart';
+import 'package:onis_viewer/core/monitor/page_type.dart';
 import 'package:onis_viewer/plugins/database/controller/download/download_controller.dart';
 import 'package:onis_viewer/plugins/database/controller/patient_controller.dart';
 import 'package:onis_viewer/plugins/database/controller/source_controller.dart';
+import 'package:onis_viewer/plugins/database/page/database_page.dart';
 import 'package:onis_viewer/plugins/database/public/download_controller_interface.dart';
 import 'package:onis_viewer/plugins/database/public/patient_controller_interface.dart';
 import 'package:onis_viewer/plugins/database/public/source_controller_interface.dart';
 
-//import '../../api/core/ov_api_core.dart';
-//import '../../core/database_source.dart';
-import '../../core/page_type.dart';
 import '../../core/plugin_interface.dart';
-import 'page/database_page.dart';
 import 'public/database_api.dart';
 //import 'ui/database_source_bar.dart';
 
@@ -161,19 +161,19 @@ class _DatabaseApiImpl implements DatabaseApi {
 }
 
 /// Database page type constant
-const PageType databasePageType = PageType(
+/*const PageType databasePageType = PageType(
   id: 'database',
   name: 'Database',
   description: 'Manage and browse medical image databases',
   icon: Icons.storage,
   color: Colors.blue,
   pageCreator: _createDatabasePage,
-);
+);*/
 
 /// Create database page widget
-Widget _createDatabasePage(PageType pageType) {
+/*Widget _createDatabasePage(PageType pageType) {
   return const DatabasePage();
-}
+}*/
 
 /// Built-in database plugin
 class DatabasePlugin implements OnisViewerPlugin {
@@ -202,8 +202,13 @@ class DatabasePlugin implements OnisViewerPlugin {
 
   @override
   Future<void> initialize() async {
+    // Register the Database page type:
+    OsPageType databasePageType = OsDatabasePageType();
+    OsPageTypeManager pageTypeManager = OVApi().pageTypes;
+    pageTypeManager.registerItem(databasePageType, true);
+
     // Register the page type (includes page creator)
-    PageType.register(databasePageType);
+    //PageType.register(databasePageType);
     // Create public API implementation
     _api = _DatabaseApiImpl();
     await _api!.initialize();
@@ -212,9 +217,16 @@ class DatabasePlugin implements OnisViewerPlugin {
   @override
   Future<void> dispose() async {
     debugPrint('---------- DatabasePlugin.dispose() called');
+
+    OsPageTypeManager pageTypeManager = OVApi().pageTypes;
+    OsPageType? databasePageType = pageTypeManager.find('database');
+    if (databasePageType != null) {
+      pageTypeManager.registerItem(databasePageType, false);
+    }
+
     // Unregister the page type (includes page creator)
-    PageType.unregister(databasePageType.id);
-    debugPrint('---------- Calling _api.dispose()');
+    //PageType.unregister(databasePageType.id);
+    //debugPrint('---------- Calling _api.dispose()');
     await _api!.dispose();
     debugPrint('---------- _api.dispose() completed');
     _api = null;

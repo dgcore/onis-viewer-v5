@@ -1,8 +1,8 @@
 import 'package:onis_viewer/core/manager/simple_manager.dart';
-import 'package:onis_viewer/core/monitor/monitor_wnd.dart';
+import 'package:onis_viewer/core/monitor/monitor.dart';
 import 'package:onis_viewer/core/monitor/page.dart';
 
-class OsPageType extends HasId {
+abstract class OsPageType extends HasId {
   final String _id;
   final String _name;
   final bool _pageMustExist;
@@ -27,7 +27,5 @@ class OsPageType extends HasId {
     return _id;
   }
 
-  OsPage createPage(OsMonitorWnd parent) {
-    return OsPage(this, parent);
-  }
+  OsPage createPage(OsMonitor monitor);
 }

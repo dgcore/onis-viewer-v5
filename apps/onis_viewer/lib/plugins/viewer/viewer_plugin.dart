@@ -1,16 +1,18 @@
 import 'package:flutter/material.dart';
+import 'package:onis_viewer/api/core/ov_api_core.dart';
+import 'package:onis_viewer/api/managers/page_type_manager.dart';
 import 'package:onis_viewer/core/layout/view_layout.dart';
+import 'package:onis_viewer/core/monitor/page_type.dart';
 import 'package:onis_viewer/core/toolbar/toolbar_item.dart';
 import 'package:onis_viewer/plugins/viewer/public/viewer_api.dart';
 import 'package:onis_viewer/plugins/viewer/toolbar_items/layout_toolbar_item.dart';
 import 'package:onis_viewer/plugins/viewer/toolbar_items/tools_toolbar_item.dart';
 
-import '../../core/page_type.dart';
 import '../../core/plugin_interface.dart';
 import 'page/viewer_page.dart';
 
 /// Viewer page type constant
-const PageType viewerPageType = PageType(
+/*const PageType viewerPageType = PageType(
   id: 'viewer',
   name: 'Viewer',
   description: 'View and analyze medical images',
@@ -22,7 +24,7 @@ const PageType viewerPageType = PageType(
 /// Create viewer page widget
 Widget _createViewerPage(PageType pageType) {
   return const ViewerPage();
-}
+}*/
 
 class _ViewerApiImpl implements ViewerApi {
   //final _layoutController = LayoutController();
@@ -75,18 +77,32 @@ class ViewerPlugin implements OnisViewerPlugin {
 
   @override
   Future<void> initialize() async {
+    // Register the Database page type:
+    OsPageType viewerPageType = OsViewerPageType();
+    OsPageTypeManager pageTypeManager = OVApi().pageTypes;
+    pageTypeManager.registerItem(viewerPageType, true);
+
     // Create public API implementation
     _api = _ViewerApiImpl();
     await _api!.initialize();
 
+    /*OsPageType viewerPageType = OsPageType(id: 'viewer', name: 'Viewer');
+    OsPageTypeManager pageTypeManager = OVApi().pageTypes;
+    pageTypeManager.registerItem(viewerPageType, true);*/
+
     // Register the page type (includes page creator)
-    PageType.register(viewerPageType);
+    //PageType.register(viewerPageType);
   }
 
   @override
   Future<void> dispose() async {
     // Unregister the page type (includes page creator)
-    PageType.unregister(viewerPageType.id);
+    //PageType.unregister(viewerPageType.id);
+    OsPageTypeManager pageTypeManager = OVApi().pageTypes;
+    OsPageType? viewerPageType = pageTypeManager.find('viewer');
+    if (viewerPageType != null) {
+      pageTypeManager.registerItem(viewerPageType, false);
+    }
     await _api!.dispose();
     _api = null;
   }
