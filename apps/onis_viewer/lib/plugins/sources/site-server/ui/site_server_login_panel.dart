@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/constants.dart';
+import '../../../../plugins/database/ui/database_theme.dart';
 import 'site_server_connection_panel.dart';
 
 class SiteServerLoginPanel extends StatefulWidget {
@@ -41,6 +42,8 @@ class _SiteServerLoginPanelState extends State<SiteServerLoginPanel>
     with TickerProviderStateMixin {
   final TextEditingController _userController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
+  final FocusNode _userFocusNode = FocusNode();
+  final FocusNode _passwordFocusNode = FocusNode();
   bool _isPasswordHidden = true;
   bool _showSettings = false;
   bool _remember = false;
@@ -79,6 +82,8 @@ class _SiteServerLoginPanelState extends State<SiteServerLoginPanel>
     _recomputeCanSubmit();
     _userController.addListener(_recomputeCanSubmit);
     _passwordController.addListener(_recomputeCanSubmit);
+    _userFocusNode.addListener(_onFocusChanged);
+    _passwordFocusNode.addListener(_onFocusChanged);
     // Mark as initialized after the first frame to prevent callbacks during build
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
@@ -125,13 +130,24 @@ class _SiteServerLoginPanelState extends State<SiteServerLoginPanel>
   void dispose() {
     _userController.removeListener(_recomputeCanSubmit);
     _passwordController.removeListener(_recomputeCanSubmit);
+    _userFocusNode.removeListener(_onFocusChanged);
+    _passwordFocusNode.removeListener(_onFocusChanged);
     _userController.dispose();
     _passwordController.dispose();
+    _userFocusNode.dispose();
+    _passwordFocusNode.dispose();
     super.dispose();
+  }
+
+  void _onFocusChanged() {
+    if (mounted) {
+      setState(() {});
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    final dbTheme = context.databaseTheme;
     return Center(
       child: LayoutBuilder(
         builder: (context, constraints) {
@@ -141,36 +157,44 @@ class _SiteServerLoginPanelState extends State<SiteServerLoginPanel>
             constraints: BoxConstraints(maxWidth: maxWidth),
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 4),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  AnimatedCrossFade(
-                    duration: const Duration(milliseconds: 250),
-                    reverseDuration: const Duration(milliseconds: 250),
-                    firstCurve: Curves.easeOutCubic,
-                    secondCurve: Curves.easeOutCubic,
-                    sizeCurve: Curves.decelerate,
-                    firstChild: _buildHeaderLoginOnly(),
-                    secondChild: _buildHeaderSettingsOnly(),
-                    crossFadeState: _showSettings
-                        ? CrossFadeState.showSecond
-                        : CrossFadeState.showFirst,
-                  ),
-                  const SizedBox(height: 16),
-                  AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 250),
-                    switchInCurve: Curves.easeOutCubic,
-                    switchOutCurve: Curves.easeInCubic,
-                    transitionBuilder: (child, animation) {
-                      return FadeTransition(opacity: animation, child: child);
-                    },
-                    child: _showSettings
-                        ? _buildConnectionSettings()
-                            .withKey(const ValueKey('settings'))
-                        : _buildLoginForm().withKey(const ValueKey('login')),
-                  ),
-                ],
+              child: Container(
+                decoration: BoxDecoration(
+                  color: dbTheme.surfaceRaised,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: dbTheme.panelBorder),
+                ),
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    AnimatedCrossFade(
+                      duration: const Duration(milliseconds: 250),
+                      reverseDuration: const Duration(milliseconds: 250),
+                      firstCurve: Curves.easeOutCubic,
+                      secondCurve: Curves.easeOutCubic,
+                      sizeCurve: Curves.decelerate,
+                      firstChild: _buildHeaderLoginOnly(),
+                      secondChild: _buildHeaderSettingsOnly(),
+                      crossFadeState: _showSettings
+                          ? CrossFadeState.showSecond
+                          : CrossFadeState.showFirst,
+                    ),
+                    const SizedBox(height: 16),
+                    AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 250),
+                      switchInCurve: Curves.easeOutCubic,
+                      switchOutCurve: Curves.easeInCubic,
+                      transitionBuilder: (child, animation) {
+                        return FadeTransition(opacity: animation, child: child);
+                      },
+                      child: _showSettings
+                          ? _buildConnectionSettings()
+                              .withKey(const ValueKey('settings'))
+                          : _buildLoginForm().withKey(const ValueKey('login')),
+                    ),
+                  ],
+                ),
               ),
             ),
           );
@@ -181,26 +205,27 @@ class _SiteServerLoginPanelState extends State<SiteServerLoginPanel>
 
   // Headers (separated for smooth cross-fade)
   Widget _buildHeaderSettingsOnly() {
+    final scheme = Theme.of(context).colorScheme;
     return Row(
       children: [
         Container(
           height: 36,
           width: 36,
           decoration: BoxDecoration(
-            color: OnisViewerConstants.primaryColor.withValues(alpha: 0.18),
+            color: scheme.primary.withValues(alpha: 0.18),
             borderRadius: BorderRadius.circular(8),
           ),
-          child: const Icon(
+          child: Icon(
             Icons.settings_outlined,
-            color: OnisViewerConstants.primaryColor,
+            color: scheme.primary,
             size: 20,
           ),
         ),
         const SizedBox(width: 12),
-        const Text(
+        Text(
           'Connection settings',
           style: TextStyle(
-            color: OnisViewerConstants.textColor,
+            color: scheme.onSurface,
             fontSize: 16,
             fontWeight: FontWeight.w700,
           ),
@@ -210,6 +235,7 @@ class _SiteServerLoginPanelState extends State<SiteServerLoginPanel>
   }
 
   Widget _buildHeaderLoginOnly() {
+    final scheme = Theme.of(context).colorScheme;
     final subtitle =
         widget.instanceName != null && widget.instanceName!.isNotEmpty
             ? 'Sign in to ${widget.instanceName}'
@@ -220,11 +246,10 @@ class _SiteServerLoginPanelState extends State<SiteServerLoginPanel>
           height: 36,
           width: 36,
           decoration: BoxDecoration(
-            color: OnisViewerConstants.primaryColor.withValues(alpha: 0.18),
+            color: scheme.primary.withValues(alpha: 0.18),
             borderRadius: BorderRadius.circular(8),
           ),
-          child: const Icon(Icons.lock_outline,
-              color: OnisViewerConstants.primaryColor, size: 20),
+          child: Icon(Icons.lock_outline, color: scheme.primary, size: 20),
         ),
         const SizedBox(width: 12),
         Expanded(
@@ -232,10 +257,10 @@ class _SiteServerLoginPanelState extends State<SiteServerLoginPanel>
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text(
+              Text(
                 'Login',
                 style: TextStyle(
-                  color: OnisViewerConstants.textColor,
+                  color: scheme.onSurface,
                   fontSize: 18,
                   fontWeight: FontWeight.w700,
                 ),
@@ -243,8 +268,8 @@ class _SiteServerLoginPanelState extends State<SiteServerLoginPanel>
               const SizedBox(height: 2),
               Text(
                 subtitle,
-                style: const TextStyle(
-                  color: OnisViewerConstants.textSecondaryColor,
+                style: TextStyle(
+                  color: scheme.onSurfaceVariant,
                   fontSize: 13,
                 ),
               ),
@@ -263,12 +288,14 @@ class _SiteServerLoginPanelState extends State<SiteServerLoginPanel>
         _buildTextField(
           label: 'User name',
           controller: _userController,
+          focusNode: _userFocusNode,
           icon: Icons.person_outline,
         ),
         const SizedBox(height: 14),
         _buildTextField(
           label: 'Password',
           controller: _passwordController,
+          focusNode: _passwordFocusNode,
           icon: Icons.lock_outline,
           obscure: _isPasswordHidden,
           trailing: IconButton(
@@ -374,10 +401,21 @@ class _SiteServerLoginPanelState extends State<SiteServerLoginPanel>
   Widget _buildTextField({
     required String label,
     required TextEditingController controller,
+    required FocusNode focusNode,
     required IconData icon,
     bool obscure = false,
     Widget? trailing,
   }) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+    final fillColor =
+        isDark ? const Color(0xFF0B1018) : scheme.surfaceContainerLowest;
+    final borderColor =
+        isDark ? const Color(0xFF1F2632) : scheme.outline.withValues(alpha: 0.55);
+    final focusedBorderColor =
+        isDark ? const Color(0xFF2B7FCC) : scheme.primary.withValues(alpha: 0.9);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -393,9 +431,25 @@ class _SiteServerLoginPanelState extends State<SiteServerLoginPanel>
         Container(
           height: 44,
           decoration: BoxDecoration(
-            color: const Color(0xFF2C2A2B),
+            color: fillColor,
             borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: Colors.grey.shade800),
+            border: Border.all(
+              color: focusNode.hasFocus
+                  ? focusedBorderColor
+                  : (_isSubmitting
+                      ? borderColor.withValues(alpha: 0.7)
+                      : borderColor),
+              width: focusNode.hasFocus ? 1.2 : 1.0,
+            ),
+            boxShadow: isDark
+                ? const [
+                    BoxShadow(
+                      color: Color(0x33000000),
+                      blurRadius: 4,
+                      offset: Offset(0, 1),
+                    ),
+                  ]
+                : null,
           ),
           child: Row(
             children: [
@@ -406,12 +460,17 @@ class _SiteServerLoginPanelState extends State<SiteServerLoginPanel>
               Expanded(
                 child: TextField(
                   controller: controller,
+                  focusNode: focusNode,
                   obscureText: obscure,
                   enabled: !_isSubmitting,
                   textAlignVertical: TextAlignVertical.center,
                   decoration: const InputDecoration(
                     isDense: true,
                     border: InputBorder.none,
+                    focusedBorder: InputBorder.none,
+                    enabledBorder: InputBorder.none,
+                    disabledBorder: InputBorder.none,
+                    contentPadding: EdgeInsets.symmetric(vertical: 10),
                     hintText: '',
                   ),
                   style: const TextStyle(

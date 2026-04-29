@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../../core/constants.dart';
+import 'database_theme.dart';
 
 class DatabaseToolbar extends StatelessWidget {
   final VoidCallback? onPreferences;
@@ -34,12 +34,14 @@ class DatabaseToolbar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final dbTheme = context.databaseTheme;
     return Container(
       height: 64,
       decoration: BoxDecoration(
-        color: OnisViewerConstants.surfaceColor,
+        color: dbTheme.appBarBg,
         border: Border(
-          bottom: BorderSide(color: Colors.grey.shade800, width: 1),
+          bottom: BorderSide(color: dbTheme.panelBorder, width: 1),
         ),
       ),
       child: Padding(
@@ -49,25 +51,25 @@ class DatabaseToolbar extends StatelessWidget {
             Row(
               children: [
                 _buildButton('Open', Icons.folder_open_outlined,
-                    canOpen ? onOpen : null, true),
+                    canOpen ? onOpen : null, true, scheme, dbTheme),
                 const SizedBox(width: 12),
                 _buildButton('Import', Icons.download_outlined,
-                    canImport ? onImport : null),
+                    canImport ? onImport : null, false, scheme, dbTheme),
                 const SizedBox(width: 12),
                 _buildButton('Export', Icons.upload_outlined,
-                    canExport ? onExport : null),
+                    canExport ? onExport : null, false, scheme, dbTheme),
                 const SizedBox(width: 12),
                 _buildButton('Transfer', Icons.swap_horiz_outlined,
-                    canTransfer ? onTransfer : null),
+                    canTransfer ? onTransfer : null, false, scheme, dbTheme),
               ],
             ),
             const Spacer(),
             Row(
               children: [
                 _buildIconButton(
-                    Icons.search_outlined, canSearch ? onSearch : null),
+                    Icons.search_outlined, canSearch ? onSearch : null, dbTheme, scheme),
                 const SizedBox(width: 8),
-                _buildIconButton(Icons.settings_outlined, onPreferences),
+                _buildIconButton(Icons.settings_outlined, onPreferences, dbTheme, scheme),
               ],
             ),
           ],
@@ -76,9 +78,16 @@ class DatabaseToolbar extends StatelessWidget {
     );
   }
 
-  Widget _buildButton(String label, IconData icon, VoidCallback? onPressed,
-      [bool isPrimary = false]) {
+  Widget _buildButton(
+    String label,
+    IconData icon,
+    VoidCallback? onPressed,
+    bool isPrimary,
+    ColorScheme scheme,
+    DatabaseTheme dbTheme,
+  ) {
     final isEnabled = onPressed != null;
+    final disabledColor = scheme.onSurface.withValues(alpha: 0.45);
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -88,15 +97,15 @@ class DatabaseToolbar extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           decoration: BoxDecoration(
             color: isPrimary && isEnabled
-                ? OnisViewerConstants.primaryColor
+                ? scheme.primary
                 : Colors.transparent,
             borderRadius: BorderRadius.circular(8),
             border: isPrimary
                 ? null
                 : Border.all(
                     color: isEnabled
-                        ? Colors.grey.shade600
-                        : Colors.grey.shade700),
+                        ? dbTheme.panelBorder
+                        : dbTheme.panelBorder.withValues(alpha: 0.6)),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
@@ -106,18 +115,16 @@ class DatabaseToolbar extends StatelessWidget {
                   color: isEnabled
                       ? (isPrimary
                           ? Colors.white
-                          : OnisViewerConstants.textColor)
-                      : OnisViewerConstants.textSecondaryColor
-                          .withValues(alpha: 0.5)),
+                          : scheme.onSurface)
+                      : disabledColor),
               const SizedBox(width: 8),
               Text(label,
                   style: TextStyle(
                       color: isEnabled
                           ? (isPrimary
                               ? Colors.white
-                              : OnisViewerConstants.textColor)
-                          : OnisViewerConstants.textSecondaryColor
-                              .withValues(alpha: 0.5),
+                              : scheme.onSurface)
+                          : disabledColor,
                       fontSize: 14,
                       fontWeight: FontWeight.w500)),
             ],
@@ -127,7 +134,12 @@ class DatabaseToolbar extends StatelessWidget {
     );
   }
 
-  Widget _buildIconButton(IconData icon, VoidCallback? onPressed) {
+  Widget _buildIconButton(
+    IconData icon,
+    VoidCallback? onPressed,
+    DatabaseTheme dbTheme,
+    ColorScheme scheme,
+  ) {
     final isEnabled = onPressed != null;
     return Material(
       color: Colors.transparent,
@@ -138,16 +150,15 @@ class DatabaseToolbar extends StatelessWidget {
           width: 40,
           height: 40,
           decoration: BoxDecoration(
-            color: Colors.grey.shade800,
+            color: dbTheme.mutedIconBg,
             borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: Colors.grey.shade700),
+            border: Border.all(color: dbTheme.panelBorder),
           ),
           child: Icon(icon,
               size: 20,
               color: isEnabled
-                  ? OnisViewerConstants.textSecondaryColor
-                  : OnisViewerConstants.textSecondaryColor
-                      .withValues(alpha: 0.5)),
+                  ? scheme.onSurfaceVariant
+                  : scheme.onSurface.withValues(alpha: 0.45)),
         ),
       ),
     );

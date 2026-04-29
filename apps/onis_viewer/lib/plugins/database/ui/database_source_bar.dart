@@ -4,6 +4,7 @@ import 'package:onis_viewer/plugins/database/public/database_api.dart';
 import '../../../api/core/ov_api_core.dart';
 import '../../../core/constants.dart';
 import '../../../core/database_source.dart';
+import 'database_theme.dart';
 
 class DatabaseSourceBar extends StatefulWidget {
   //final DatabaseSource? selectedSource;
@@ -101,53 +102,59 @@ class _DatabaseSourceBarState extends State<DatabaseSourceBar> {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        _buildHeader(),
-        Expanded(child: _buildSourcesTree()),
-        _buildFooter(),
-      ],
+    final dbTheme = context.databaseTheme;
+    return Container(
+      color: dbTheme.panelBg,
+      child: Column(
+        children: [
+          _buildHeader(),
+          Expanded(child: _buildSourcesTree()),
+          _buildFooter(),
+        ],
+      ),
     );
   }
 
   Widget _buildHeader() {
+    final scheme = Theme.of(context).colorScheme;
+    final dbTheme = context.databaseTheme;
     return Container(
       height: 50,
       padding: const EdgeInsets.symmetric(
         horizontal: OnisViewerConstants.paddingMedium,
       ),
       decoration: BoxDecoration(
-        color: OnisViewerConstants.tabBarColor,
+        color: dbTheme.panelBg,
         border: Border(
           bottom: BorderSide(
-            color: OnisViewerConstants.tabButtonColor,
+            color: dbTheme.panelBorder,
             width: 1,
           ),
         ),
       ),
       child: Row(
         children: [
-          const Icon(
+          Icon(
             Icons.folder,
-            color: OnisViewerConstants.textColor,
+            color: scheme.onSurface,
             size: 20,
           ),
           const SizedBox(width: OnisViewerConstants.marginSmall),
-          const Expanded(
+          Expanded(
             child: Text(
               'Sources',
               style: TextStyle(
                 fontWeight: FontWeight.bold,
-                color: OnisViewerConstants.textColor,
+                color: scheme.onSurface,
                 fontSize: 16,
               ),
             ),
           ),
           IconButton(
             onPressed: null, //widget.onRefreshSources,
-            icon: const Icon(
+            icon: Icon(
               Icons.refresh,
-              color: OnisViewerConstants.textSecondaryColor,
+              color: scheme.onSurfaceVariant,
               size: 18,
             ),
             tooltip: 'Refresh sources',
@@ -156,9 +163,9 @@ class _DatabaseSourceBarState extends State<DatabaseSourceBar> {
           ),
           IconButton(
             onPressed: null, //widget.onAddSource,
-            icon: const Icon(
+            icon: Icon(
               Icons.add,
-              color: OnisViewerConstants.textSecondaryColor,
+              color: scheme.onSurfaceVariant,
               size: 18,
             ),
             tooltip: 'Add source',
@@ -171,14 +178,15 @@ class _DatabaseSourceBarState extends State<DatabaseSourceBar> {
   }
 
   Widget _buildSourcesTree() {
+    final scheme = Theme.of(context).colorScheme;
     final sourceController = _dbApi?.sourceController;
     final roots =
         sourceController == null ? [] : sourceController.sources.rootSources;
     if (roots.isEmpty) {
-      return const Center(
+      return Center(
         child: Text(
           'No sources',
-          style: TextStyle(color: OnisViewerConstants.textSecondaryColor),
+          style: TextStyle(color: scheme.onSurfaceVariant),
         ),
       );
     }
@@ -191,6 +199,8 @@ class _DatabaseSourceBarState extends State<DatabaseSourceBar> {
   }
 
   Widget _buildSourceNode(DatabaseSource source, {required int depth}) {
+    final scheme = Theme.of(context).colorScheme;
+    final dbTheme = context.databaseTheme;
     final isSelected = _dbApi?.sourceController.selectedSource == source;
     final isExpanded = _expanded.contains(source.uid);
     final hasChildren = source.subSources.isNotEmpty;
@@ -223,8 +233,8 @@ class _DatabaseSourceBarState extends State<DatabaseSourceBar> {
                         ? Icons.keyboard_arrow_down
                         : Icons.keyboard_arrow_right,
                     color: isSelected
-                        ? OnisViewerConstants.primaryColor
-                        : OnisViewerConstants.textSecondaryColor,
+                        ? dbTheme.sourceSelectedText
+                        : scheme.onSurfaceVariant,
                   ),
                 )
               : const SizedBox(width: 18),
@@ -232,15 +242,14 @@ class _DatabaseSourceBarState extends State<DatabaseSourceBar> {
             source.name,
             style: TextStyle(
               color: isSelected
-                  ? OnisViewerConstants.primaryColor
-                  : OnisViewerConstants.textColor,
+                  ? dbTheme.sourceSelectedText
+                  : scheme.onSurface,
               fontWeight: isSelected ? FontWeight.w700 : FontWeight.normal,
               fontSize: 14,
             ),
           ),
           selected: isSelected,
-          selectedTileColor:
-              OnisViewerConstants.surfaceColor.withValues(alpha: 0.12),
+          selectedTileColor: dbTheme.sourceSelectedBg,
           onTap: () {
             _dbApi?.sourceController.selectSourceByUid(source.uid);
 
@@ -258,6 +267,8 @@ class _DatabaseSourceBarState extends State<DatabaseSourceBar> {
   }
 
   Widget _buildFooter() {
+    final scheme = Theme.of(context).colorScheme;
+    final dbTheme = context.databaseTheme;
     final sourceController = _dbApi?.sourceController;
     final total = sourceController == null
         ? 0
@@ -268,26 +279,26 @@ class _DatabaseSourceBarState extends State<DatabaseSourceBar> {
         horizontal: OnisViewerConstants.paddingMedium,
       ),
       decoration: BoxDecoration(
-        color: OnisViewerConstants.tabBarColor,
+        color: dbTheme.panelBg,
         border: Border(
           top: BorderSide(
-            color: OnisViewerConstants.tabButtonColor,
+            color: dbTheme.panelBorder,
             width: 1,
           ),
         ),
       ),
       child: Row(
         children: [
-          const Icon(
+          Icon(
             Icons.info_outline,
-            color: OnisViewerConstants.textSecondaryColor,
+            color: scheme.onSurfaceVariant,
             size: 16,
           ),
           const SizedBox(width: OnisViewerConstants.marginSmall),
           Text(
             '$total sources',
-            style: const TextStyle(
-              color: OnisViewerConstants.textSecondaryColor,
+            style: TextStyle(
+              color: scheme.onSurfaceVariant,
               fontSize: 12,
             ),
           ),

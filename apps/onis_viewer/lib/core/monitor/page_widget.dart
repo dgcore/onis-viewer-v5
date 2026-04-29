@@ -134,10 +134,10 @@ abstract class OsPageWidgetState<T extends OsPageWidget> extends State<T>
     return Container(
       height: 60,
       color: OnisViewerConstants.surfaceColor,
-      padding: const EdgeInsets.symmetric(
+      /*padding: const EdgeInsets.symmetric(
         horizontal: OnisViewerConstants.paddingMedium,
         vertical: OnisViewerConstants.paddingSmall,
-      ),
+      ),*/
       child: Row(
         children: [
           // Page icon and title
@@ -167,7 +167,7 @@ abstract class OsPageWidgetState<T extends OsPageWidget> extends State<T>
   Widget _buildPageBody() {
     return Container(
       color: OnisViewerConstants.backgroundColor,
-      padding: const EdgeInsets.all(OnisViewerConstants.paddingMedium),
+      //padding: const EdgeInsets.all(OnisViewerConstants.paddingMedium),
       child: buildPageContent(),
     );
   }
