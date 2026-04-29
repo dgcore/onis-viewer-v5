@@ -1,13 +1,5 @@
-import 'package:flutter/material.dart';
-
-import '../../api/core/page_manager.dart';
-import '../../api/ov_api.dart';
-import '../../core/constants.dart';
-import '../../core/page_type.dart';
-import 'page_container.dart';
-
 /// Main content area that displays the current page
-class ContentArea extends StatefulWidget {
+/*class ContentArea extends StatefulWidget {
   const ContentArea({super.key});
 
   @override
@@ -175,4 +167,4 @@ class _ContentAreaState extends State<ContentArea>
     // Handle error event
     debugPrint('Error in ContentArea: $message');
   }
-}
+}*/

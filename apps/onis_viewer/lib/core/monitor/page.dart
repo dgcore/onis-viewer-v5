@@ -1,25 +1,29 @@
-import 'package:onis_viewer/core/monitor/monitor_wnd.dart';
+import 'package:onis_viewer/core/monitor/monitor.dart';
 import 'package:onis_viewer/core/monitor/page_type.dart';
 import 'package:onis_viewer/core/monitor/page_wnd.dart';
 
-class OsPage {
+abstract class OsPage {
   final WeakReference<OsPageType>? _wtype;
-  final WeakReference<OsMonitorWnd>? _wmonitor;
+  final WeakReference<OsMonitor>? _wmonitor;
   OsPageWnd? _wnd;
 
-  OsPage(OsPageType type, OsMonitorWnd monitorWnd)
+  OsPage(OsPageType type, OsMonitor monitor)
       : _wtype = WeakReference(type),
-        _wmonitor = WeakReference(monitorWnd);
+        _wmonitor = WeakReference(monitor) {
+    _wnd = createPageWnd();
+  }
 
   OsPageType? getType() {
     return _wtype?.target;
   }
 
-  OsMonitorWnd? getMonitor() {
+  OsPageWnd? getWnd() {
+    return _wnd;
+  }
+
+  OsMonitor? getMonitor() {
     return _wmonitor?.target;
   }
 
-  OsPageWnd? getWindow() {
-    return _wnd;
-  }
+  OsPageWnd createPageWnd();
 }

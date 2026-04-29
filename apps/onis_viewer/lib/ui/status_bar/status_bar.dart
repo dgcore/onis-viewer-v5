@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:onis_viewer/core/monitor/page.dart';
 
 import '../../core/constants.dart';
-import '../../core/page_type.dart';
 import 'tab_bar.dart';
 
 /// Status bar widget that contains tab buttons at the bottom
 class StatusBar extends StatelessWidget {
-  final List<PageType> availablePages;
-  final PageType? currentPage;
-  final Function(PageType) onPageSelected;
+  final List<OsPage> availablePages;
+  final OsPage? currentPage;
+  final Function(OsPage) onPageSelected;
   final List<Widget>? additionalWidgets;
 
   const StatusBar({
@@ -55,7 +55,6 @@ class StatusBar extends StatelessWidget {
                 ),
               ),
             ),
-
         ],
       ),
     );

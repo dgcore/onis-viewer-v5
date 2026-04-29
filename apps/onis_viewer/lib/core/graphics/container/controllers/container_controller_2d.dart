@@ -1,7 +1,6 @@
 import 'package:onis_viewer/api/graphics/renderers/renderer_2d.dart';
 import 'package:onis_viewer/api/ov_api.dart';
 import 'package:onis_viewer/api/services/message_codes.dart';
-import 'package:onis_viewer/api/services/message_service.dart';
 import 'package:onis_viewer/core/error_codes.dart';
 import 'package:onis_viewer/core/graphics/container/container_wnd.dart';
 import 'package:onis_viewer/core/graphics/container/controllers/container_controller.dart';
@@ -42,14 +41,17 @@ class OsContainerController2D extends OsContainerController {
   final OsIncomingImageProperties _incomingImageProperties =
       OsIncomingImageProperties();
   final String _stateId = "";
-  OsMessageSubscription? _messageSubscription;
+  int? _messageSubscription;
 
   OsContainerController2D() {
     _messageSubscription = OVApi().messages.subscribe(onReceivedMessage);
   }
 
   void dispose() {
-    _messageSubscription?.cancel();
+    if (_messageSubscription != null) {
+      OVApi().messages.unsubscribe(_messageSubscription!);
+      _messageSubscription = null;
+    }
   }
 
   @override
@@ -293,10 +295,10 @@ class OsContainerController2D extends OsContainerController {
     return null;
   }
 
-  void onReceivedMessage(OsMessage? message) {
-    if (message?.id == OSMSG.seriesDownloadReceivedInfo) {
+  void onReceivedMessage(int id, dynamic message) {
+    if (id == OSMSG.seriesDownloadReceivedInfo) {
       _onReceivedSeriesInfo(message!.data["series"] as entities.Series);
-    } else if (message?.id == OSMSG.seriesImagesReceived) {
+    } else if (id == OSMSG.seriesImagesReceived) {
       _onReceivedImages(message!.data as List<entities.Image>, false);
     }
   }
