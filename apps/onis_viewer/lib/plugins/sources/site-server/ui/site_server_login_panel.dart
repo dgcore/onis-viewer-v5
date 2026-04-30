@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/constants.dart';
-import '../../../../plugins/database/ui/database_theme.dart';
+import '../../../../core/theme/app_theme.dart';
 import 'site_server_connection_panel.dart';
 
 class SiteServerLoginPanel extends StatefulWidget {
@@ -147,7 +147,7 @@ class _SiteServerLoginPanelState extends State<SiteServerLoginPanel>
 
   @override
   Widget build(BuildContext context) {
-    final dbTheme = context.databaseTheme;
+    final appTheme = context.appTheme;
     return Center(
       child: LayoutBuilder(
         builder: (context, constraints) {
@@ -159,9 +159,9 @@ class _SiteServerLoginPanelState extends State<SiteServerLoginPanel>
               padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 4),
               child: Container(
                 decoration: BoxDecoration(
-                  color: dbTheme.surfaceRaised,
+                  color: appTheme.surfaceRaised,
                   borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: dbTheme.panelBorder),
+                  border: Border.all(color: appTheme.panelBorder),
                 ),
                 padding: const EdgeInsets.all(20),
                 child: Column(
@@ -206,6 +206,7 @@ class _SiteServerLoginPanelState extends State<SiteServerLoginPanel>
   // Headers (separated for smooth cross-fade)
   Widget _buildHeaderSettingsOnly() {
     final scheme = Theme.of(context).colorScheme;
+    final appTheme = context.appTheme;
     return Row(
       children: [
         Container(
@@ -225,7 +226,7 @@ class _SiteServerLoginPanelState extends State<SiteServerLoginPanel>
         Text(
           'Connection settings',
           style: TextStyle(
-            color: scheme.onSurface,
+            color: appTheme.textPrimary,
             fontSize: 16,
             fontWeight: FontWeight.w700,
           ),
@@ -236,6 +237,7 @@ class _SiteServerLoginPanelState extends State<SiteServerLoginPanel>
 
   Widget _buildHeaderLoginOnly() {
     final scheme = Theme.of(context).colorScheme;
+    final appTheme = context.appTheme;
     final subtitle =
         widget.instanceName != null && widget.instanceName!.isNotEmpty
             ? 'Sign in to ${widget.instanceName}'
@@ -260,7 +262,7 @@ class _SiteServerLoginPanelState extends State<SiteServerLoginPanel>
               Text(
                 'Login',
                 style: TextStyle(
-                  color: scheme.onSurface,
+                  color: appTheme.textPrimary,
                   fontSize: 18,
                   fontWeight: FontWeight.w700,
                 ),
@@ -269,7 +271,7 @@ class _SiteServerLoginPanelState extends State<SiteServerLoginPanel>
               Text(
                 subtitle,
                 style: TextStyle(
-                  color: scheme.onSurfaceVariant,
+                  color: appTheme.textSecondary,
                   fontSize: 13,
                 ),
               ),
@@ -408,21 +410,24 @@ class _SiteServerLoginPanelState extends State<SiteServerLoginPanel>
   }) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
+    final appTheme = context.appTheme;
     final isDark = theme.brightness == Brightness.dark;
     final fillColor =
         isDark ? const Color(0xFF0B1018) : scheme.surfaceContainerLowest;
-    final borderColor =
-        isDark ? const Color(0xFF1F2632) : scheme.outline.withValues(alpha: 0.55);
-    final focusedBorderColor =
-        isDark ? const Color(0xFF2B7FCC) : scheme.primary.withValues(alpha: 0.9);
+    final borderColor = isDark
+        ? const Color(0xFF1F2632)
+        : scheme.outline.withValues(alpha: 0.55);
+    final focusedBorderColor = isDark
+        ? const Color(0xFF2B7FCC)
+        : scheme.primary.withValues(alpha: 0.9);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           label,
-          style: const TextStyle(
-            color: OnisViewerConstants.textSecondaryColor,
+          style: TextStyle(
+            color: appTheme.textSecondary,
             fontSize: 13,
             fontWeight: FontWeight.w600,
           ),
@@ -454,8 +459,7 @@ class _SiteServerLoginPanelState extends State<SiteServerLoginPanel>
           child: Row(
             children: [
               const SizedBox(width: 12),
-              Icon(icon,
-                  size: 18, color: OnisViewerConstants.textSecondaryColor),
+              Icon(icon, size: 18, color: appTheme.textSecondary),
               const SizedBox(width: 8),
               Expanded(
                 child: TextField(
@@ -473,8 +477,8 @@ class _SiteServerLoginPanelState extends State<SiteServerLoginPanel>
                     contentPadding: EdgeInsets.symmetric(vertical: 10),
                     hintText: '',
                   ),
-                  style: const TextStyle(
-                    color: OnisViewerConstants.textColor,
+                  style: TextStyle(
+                    color: appTheme.textPrimary,
                     fontSize: 15,
                   ),
                 ),
@@ -509,9 +513,9 @@ class _SiteServerLoginPanelState extends State<SiteServerLoginPanel>
                 ),
               ),
               const SizedBox(width: 8),
-              const Text('Remember me',
+              Text('Remember me',
                   style: TextStyle(
-                    color: OnisViewerConstants.textSecondaryColor,
+                    color: appTheme.textSecondary,
                     fontSize: 13,
                   )),
             ],
@@ -569,20 +573,20 @@ class _SiteServerLoginPanelState extends State<SiteServerLoginPanel>
       {required IconData icon,
       required String label,
       VoidCallback? onPressed}) {
+    final appTheme = context.appTheme;
     return SizedBox(
       height: 44,
       child: OutlinedButton.icon(
         style: OutlinedButton.styleFrom(
-          backgroundColor: Colors.grey.shade900,
-          foregroundColor: OnisViewerConstants.textColor,
-          side: BorderSide(color: Colors.grey.shade800),
+          backgroundColor: appTheme.mutedIconBg,
+          foregroundColor: appTheme.textPrimary,
+          side: BorderSide(color: appTheme.panelBorder),
           shape:
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
           padding: const EdgeInsets.symmetric(horizontal: 14),
         ),
         onPressed: onPressed,
-        icon:
-            Icon(icon, size: 18, color: OnisViewerConstants.textSecondaryColor),
+        icon: Icon(icon, size: 18, color: appTheme.textSecondary),
         label: Text(
           label,
           style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),

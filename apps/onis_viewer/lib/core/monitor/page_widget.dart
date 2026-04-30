@@ -52,15 +52,30 @@ abstract class OsPageWidgetState<T extends OsPageWidget> extends State<T>
   Widget build(BuildContext context) {
     super.build(context);
 
-    if (_errorMessage != null) {
-      return _buildErrorWidget();
-    }
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // Some hosts briefly layout page widgets with near-zero constraints
+        // (e.g. 1x1). Building full page content in that state causes
+        // RenderFlex overflows; render a clipped placeholder instead.
+        final hasTinyBoundedWidth =
+            constraints.hasBoundedWidth && constraints.maxWidth <= 8;
+        final hasTinyBoundedHeight =
+            constraints.hasBoundedHeight && constraints.maxHeight <= 8;
+        if (hasTinyBoundedWidth || hasTinyBoundedHeight) {
+          return const ColoredBox(color: OnisViewerConstants.backgroundColor);
+        }
 
-    if (!_isInitialized) {
-      return _buildLoadingWidget();
-    }
+        if (_errorMessage != null) {
+          return _buildErrorWidget();
+        }
 
-    return _buildPageContent();
+        if (!_isInitialized) {
+          return _buildLoadingWidget();
+        }
+
+        return _buildPageContent();
+      },
+    );
   }
 
   /// Initialize the page
@@ -111,7 +126,7 @@ abstract class OsPageWidgetState<T extends OsPageWidget> extends State<T>
             ),
 
             // Page footer/status
-            _buildPageFooter(),
+            //_buildPageFooter(),
           ],
         ),
       ),
@@ -173,7 +188,7 @@ abstract class OsPageWidgetState<T extends OsPageWidget> extends State<T>
   }
 
   /// Build the page footer/status
-  Widget _buildPageFooter() {
+  /*Widget _buildPageFooter() {
     return Container(
       height: 30,
       color: OnisViewerConstants.surfaceColor,
@@ -196,7 +211,7 @@ abstract class OsPageWidgetState<T extends OsPageWidget> extends State<T>
         ],
       ),
     );
-  }
+  }*/
 
   /// Build loading widget
   Widget _buildLoadingWidget() {

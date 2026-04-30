@@ -10,10 +10,10 @@ import 'package:onis_viewer/plugins/database/ui/study_list_view.dart';
 import '../../../api/core/ov_api_core.dart';
 import '../../../core/constants.dart';
 import '../../../core/database_source.dart';
+import '../../../core/theme/app_theme.dart';
 import '../public/database_api.dart';
 import '../ui/database_source_bar.dart';
 import '../ui/database_toolbar.dart';
-import '../ui/database_theme.dart';
 import '../ui/resizable_source_bar.dart';
 
 /// Database management page
@@ -131,7 +131,7 @@ class _DatabasePageWidgetState extends OsPageWidgetState<DatabasePageWidget> {
 
   /// Build the main content area
   Widget _buildContent() {
-    final dbTheme = context.databaseTheme;
+    final appTheme = context.appTheme;
     final sourceController = _dbApi?.sourceController;
     final selected = sourceController?.selectedSource;
     Widget? loginPanel;
@@ -145,7 +145,7 @@ class _DatabasePageWidgetState extends OsPageWidgetState<DatabasePageWidget> {
         : (loginPanel ?? _buildDatabaseDetails(sourceController!, selected));
 
     return Container(
-      color: dbTheme.contentBg,
+      color: appTheme.contentBg,
       child: Row(
         children: [
           // Resizable source bar (left panel)
@@ -167,7 +167,7 @@ class _DatabasePageWidgetState extends OsPageWidgetState<DatabasePageWidget> {
                 ),
           ),
 
-          Container(width: 1, color: dbTheme.panelBorder),
+          Container(width: 1, color: appTheme.panelBorder),
 
           // Right panel
           Expanded(child: rightPanel),

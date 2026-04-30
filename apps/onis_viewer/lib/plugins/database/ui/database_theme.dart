@@ -11,6 +11,8 @@ class DatabaseTheme extends ThemeExtension<DatabaseTheme> {
     required this.sourceSelectedBg,
     required this.sourceSelectedText,
     required this.mutedIconBg,
+    required this.textPrimary,
+    required this.textSecondary,
   });
 
   final Color appBarBg;
@@ -21,6 +23,8 @@ class DatabaseTheme extends ThemeExtension<DatabaseTheme> {
   final Color sourceSelectedBg;
   final Color sourceSelectedText;
   final Color mutedIconBg;
+  final Color textPrimary;
+  final Color textSecondary;
 
   @override
   DatabaseTheme copyWith({
@@ -32,6 +36,8 @@ class DatabaseTheme extends ThemeExtension<DatabaseTheme> {
     Color? sourceSelectedBg,
     Color? sourceSelectedText,
     Color? mutedIconBg,
+    Color? textPrimary,
+    Color? textSecondary,
   }) {
     return DatabaseTheme(
       appBarBg: appBarBg ?? this.appBarBg,
@@ -42,6 +48,8 @@ class DatabaseTheme extends ThemeExtension<DatabaseTheme> {
       sourceSelectedBg: sourceSelectedBg ?? this.sourceSelectedBg,
       sourceSelectedText: sourceSelectedText ?? this.sourceSelectedText,
       mutedIconBg: mutedIconBg ?? this.mutedIconBg,
+      textPrimary: textPrimary ?? this.textPrimary,
+      textSecondary: textSecondary ?? this.textSecondary,
     );
   }
 
@@ -56,24 +64,31 @@ class DatabaseTheme extends ThemeExtension<DatabaseTheme> {
       contentBg: Color.lerp(contentBg, other.contentBg, t)!,
       panelBorder: Color.lerp(panelBorder, other.panelBorder, t)!,
       surfaceRaised: Color.lerp(surfaceRaised, other.surfaceRaised, t)!,
-      sourceSelectedBg: Color.lerp(sourceSelectedBg, other.sourceSelectedBg, t)!,
+      sourceSelectedBg:
+          Color.lerp(sourceSelectedBg, other.sourceSelectedBg, t)!,
       sourceSelectedText:
           Color.lerp(sourceSelectedText, other.sourceSelectedText, t)!,
       mutedIconBg: Color.lerp(mutedIconBg, other.mutedIconBg, t)!,
+      textPrimary: Color.lerp(textPrimary, other.textPrimary, t)!,
+      textSecondary: Color.lerp(textSecondary, other.textSecondary, t)!,
     );
   }
 
   static DatabaseTheme fallback(Brightness brightness, ColorScheme scheme) {
     if (brightness == Brightness.dark) {
       return DatabaseTheme(
-        appBarBg: const Color(0xFF171A21),
-        panelBg: const Color(0xFF101621),
-        contentBg: const Color(0xFF070C14),
+        appBarBg: const Color(0xFF141518),
+        panelBg: const Color(0xFF141518),
+        contentBg: const Color(0xFF0E0F11),
         panelBorder: const Color(0xFF222A37),
-        surfaceRaised: const Color(0xFF1A212D),
+        surfaceRaised: const Color(0xFF1A1C20),
         sourceSelectedBg: scheme.primary.withValues(alpha: 0.16),
         sourceSelectedText: scheme.primary,
         mutedIconBg: const Color(0xFF1F2530),
+        //textPrimary: const Color(0xFFD5D9E0),
+        //textSecondary: const Color(0xFFA2ABB9),
+        textPrimary: const Color(0xFFFF0000),
+        textSecondary: const Color(0xFF00FF00),
       );
     }
     return DatabaseTheme(
@@ -85,6 +100,8 @@ class DatabaseTheme extends ThemeExtension<DatabaseTheme> {
       sourceSelectedBg: scheme.primary.withValues(alpha: 0.12),
       sourceSelectedText: scheme.primary,
       mutedIconBg: const Color(0xFFE9EEF6),
+      textPrimary: const Color(0xFF1F2937),
+      textSecondary: const Color(0xFF5B6474),
     );
   }
 }

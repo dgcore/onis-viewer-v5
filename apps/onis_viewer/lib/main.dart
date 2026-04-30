@@ -7,6 +7,7 @@ import 'package:onis_viewer/app/onis_viewer_app.dart';
 import 'package:onis_viewer/core/constants.dart';
 import 'package:onis_viewer/core/monitor/monitor.dart';
 import 'package:onis_viewer/core/monitor/monitor_widget.dart';
+import 'package:onis_viewer/core/theme/app_theme.dart';
 import 'package:window_manager/window_manager.dart';
 
 void main(List<String> args) async {
@@ -68,6 +69,16 @@ class DisplayWindowApp extends StatelessWidget {
           secondary: OnisViewerConstants.secondaryColor,
           surface: OnisViewerConstants.surfaceColor,
         ),
+        extensions: [
+          AppTheme.fallback(
+            Brightness.dark,
+            const ColorScheme.dark(
+              primary: OnisViewerConstants.primaryColor,
+              secondary: OnisViewerConstants.secondaryColor,
+              surface: OnisViewerConstants.surfaceColor,
+            ),
+          ),
+        ],
         useMaterial3: true,
       ),
       home: DisplayWindowPage(
