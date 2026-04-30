@@ -4,6 +4,7 @@ import 'package:onis_viewer/plugins/database/public/database_api.dart';
 import '../../../api/core/ov_api_core.dart';
 import '../../../core/constants.dart';
 import '../../../core/database_source.dart';
+import '../../../core/theme/app_theme.dart';
 
 class DatabaseSourceBar extends StatefulWidget {
   //final DatabaseSource? selectedSource;
@@ -101,53 +102,58 @@ class _DatabaseSourceBarState extends State<DatabaseSourceBar> {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        _buildHeader(),
-        Expanded(child: _buildSourcesTree()),
-        _buildFooter(),
-      ],
+    final appTheme = context.appTheme;
+    return Container(
+      color: appTheme.panelBg,
+      child: Column(
+        children: [
+          _buildHeader(),
+          Expanded(child: _buildSourcesTree()),
+          _buildFooter(),
+        ],
+      ),
     );
   }
 
   Widget _buildHeader() {
+    final appTheme = context.appTheme;
     return Container(
       height: 50,
       padding: const EdgeInsets.symmetric(
         horizontal: OnisViewerConstants.paddingMedium,
       ),
       decoration: BoxDecoration(
-        color: OnisViewerConstants.tabBarColor,
+        color: appTheme.panelBg,
         border: Border(
           bottom: BorderSide(
-            color: OnisViewerConstants.tabButtonColor,
+            color: appTheme.panelBorder,
             width: 1,
           ),
         ),
       ),
       child: Row(
         children: [
-          const Icon(
+          Icon(
             Icons.folder,
-            color: OnisViewerConstants.textColor,
+            color: appTheme.textPrimary,
             size: 20,
           ),
           const SizedBox(width: OnisViewerConstants.marginSmall),
-          const Expanded(
+          Expanded(
             child: Text(
               'Sources',
               style: TextStyle(
                 fontWeight: FontWeight.bold,
-                color: OnisViewerConstants.textColor,
+                color: appTheme.textPrimary,
                 fontSize: 16,
               ),
             ),
           ),
           IconButton(
             onPressed: null, //widget.onRefreshSources,
-            icon: const Icon(
+            icon: Icon(
               Icons.refresh,
-              color: OnisViewerConstants.textSecondaryColor,
+              color: appTheme.textSecondary,
               size: 18,
             ),
             tooltip: 'Refresh sources',
@@ -156,9 +162,9 @@ class _DatabaseSourceBarState extends State<DatabaseSourceBar> {
           ),
           IconButton(
             onPressed: null, //widget.onAddSource,
-            icon: const Icon(
+            icon: Icon(
               Icons.add,
-              color: OnisViewerConstants.textSecondaryColor,
+              color: appTheme.textSecondary,
               size: 18,
             ),
             tooltip: 'Add source',
@@ -171,14 +177,15 @@ class _DatabaseSourceBarState extends State<DatabaseSourceBar> {
   }
 
   Widget _buildSourcesTree() {
+    final appTheme = context.appTheme;
     final sourceController = _dbApi?.sourceController;
     final roots =
         sourceController == null ? [] : sourceController.sources.rootSources;
     if (roots.isEmpty) {
-      return const Center(
+      return Center(
         child: Text(
           'No sources',
-          style: TextStyle(color: OnisViewerConstants.textSecondaryColor),
+          style: TextStyle(color: appTheme.textSecondary),
         ),
       );
     }
@@ -191,64 +198,141 @@ class _DatabaseSourceBarState extends State<DatabaseSourceBar> {
   }
 
   Widget _buildSourceNode(DatabaseSource source, {required int depth}) {
+    final scheme = Theme.of(context).colorScheme;
+    final appTheme = context.appTheme;
+    final sourceController = _dbApi?.sourceController;
     final isSelected = _dbApi?.sourceController.selectedSource == source;
     final isExpanded = _expanded.contains(source.uid);
     final hasChildren = source.subSources.isNotEmpty;
+    final showStatusDot = depth == 0;
+    final studiesCount =
+        sourceController?.getStudiesForSource(source.uid).length ?? 0;
+
+    final Color statusColor;
+    switch (source.loginState.status) {
+      case ConnectionStatus.loggedIn:
+        statusColor = const Color(0xFF2ECC71);
+        break;
+      case ConnectionStatus.loggingIn:
+      case ConnectionStatus.disconnecting:
+        statusColor = scheme.tertiary;
+        break;
+      case ConnectionStatus.disconnected:
+        statusColor = scheme.onSurfaceVariant.withValues(alpha: 0.5);
+        break;
+    }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        ListTile(
-          dense: true,
-          contentPadding: EdgeInsets.only(
-            left: OnisViewerConstants.paddingMedium + (depth * 20),
-            right: OnisViewerConstants.paddingMedium,
-          ),
-          leading: hasChildren
-              ? IconButton(
-                  iconSize: 18,
-                  padding: EdgeInsets.zero,
-                  visualDensity: VisualDensity.compact,
-                  onPressed: () {
-                    setState(() {
-                      if (isExpanded) {
-                        _expanded.remove(source.uid);
-                      } else {
-                        _expanded.add(source.uid);
-                      }
-                    });
-                  },
-                  icon: Icon(
-                    isExpanded
-                        ? Icons.keyboard_arrow_down
-                        : Icons.keyboard_arrow_right,
-                    color: isSelected
-                        ? OnisViewerConstants.primaryColor
-                        : OnisViewerConstants.textSecondaryColor,
-                  ),
-                )
-              : const SizedBox(width: 18),
-          title: Text(
-            source.name,
-            style: TextStyle(
-              color: isSelected
-                  ? OnisViewerConstants.primaryColor
-                  : OnisViewerConstants.textColor,
-              fontWeight: isSelected ? FontWeight.w700 : FontWeight.normal,
-              fontSize: 14,
-            ),
-          ),
-          selected: isSelected,
-          selectedTileColor:
-              OnisViewerConstants.surfaceColor.withValues(alpha: 0.12),
+        InkWell(
           onTap: () {
             _dbApi?.sourceController.selectSourceByUid(source.uid);
-
-            /*setState(() {
-              _selected = source;
-            });
-            widget.onSourceSelected?.call(source);*/
           },
+          child: Container(
+            height: 50,
+            decoration: BoxDecoration(
+              color: isSelected ? appTheme.selectionBg : Colors.transparent,
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 3,
+                  color:
+                      isSelected ? appTheme.selectionText : Colors.transparent,
+                ),
+                Expanded(
+                  child: Padding(
+                    padding: EdgeInsets.only(
+                      left: 10 + (depth * 14),
+                      right: OnisViewerConstants.paddingMedium,
+                    ),
+                    child: Row(
+                      children: [
+                        if (hasChildren)
+                          IconButton(
+                            iconSize: 18,
+                            padding: EdgeInsets.zero,
+                            visualDensity: VisualDensity.compact,
+                            onPressed: () {
+                              setState(() {
+                                if (isExpanded) {
+                                  _expanded.remove(source.uid);
+                                } else {
+                                  _expanded.add(source.uid);
+                                }
+                              });
+                            },
+                            icon: Icon(
+                              isExpanded
+                                  ? Icons.keyboard_arrow_down
+                                  : Icons.keyboard_arrow_right,
+                              color: isSelected
+                                  ? appTheme.selectionText
+                                  : appTheme.textSecondary,
+                            ),
+                          )
+                        else
+                          const SizedBox(width: 18),
+                        if (showStatusDot) ...[
+                          const SizedBox(width: 6),
+                          Container(
+                            width: 16,
+                            height: 16,
+                            alignment: Alignment.center,
+                            child: Container(
+                              width: 9,
+                              height: 9,
+                              decoration: BoxDecoration(
+                                color: statusColor,
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                        ] else
+                          const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            source.name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: isSelected
+                                  ? appTheme.selectionText
+                                  : appTheme.textPrimary,
+                              fontWeight:
+                                  isSelected ? FontWeight.w700 : FontWeight.w600,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ),
+                        if (studiesCount > 0) ...[
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: appTheme.textSecondary.withValues(alpha: 0.2),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Text(
+                              '$studiesCount',
+                              style: TextStyle(
+                                color: appTheme.textSecondary,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
         if (hasChildren && isExpanded)
           for (final child in source.subSources)
@@ -258,6 +342,7 @@ class _DatabaseSourceBarState extends State<DatabaseSourceBar> {
   }
 
   Widget _buildFooter() {
+    final appTheme = context.appTheme;
     final sourceController = _dbApi?.sourceController;
     final total = sourceController == null
         ? 0
@@ -268,26 +353,26 @@ class _DatabaseSourceBarState extends State<DatabaseSourceBar> {
         horizontal: OnisViewerConstants.paddingMedium,
       ),
       decoration: BoxDecoration(
-        color: OnisViewerConstants.tabBarColor,
+        color: appTheme.panelBg,
         border: Border(
           top: BorderSide(
-            color: OnisViewerConstants.tabButtonColor,
+            color: appTheme.panelBorder,
             width: 1,
           ),
         ),
       ),
       child: Row(
         children: [
-          const Icon(
+          Icon(
             Icons.info_outline,
-            color: OnisViewerConstants.textSecondaryColor,
+            color: appTheme.textSecondary,
             size: 16,
           ),
           const SizedBox(width: OnisViewerConstants.marginSmall),
           Text(
             '$total sources',
-            style: const TextStyle(
-              color: OnisViewerConstants.textSecondaryColor,
+            style: TextStyle(
+              color: appTheme.textSecondary,
               fontSize: 12,
             ),
           ),

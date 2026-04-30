@@ -3,6 +3,7 @@ import 'package:onis_viewer/core/responses/find_study_response.dart';
 import 'package:onis_viewer/plugins/database/ui/resizable_data_table.dart';
 
 import '../../../core/constants.dart';
+import '../../../core/theme/app_theme.dart';
 
 /// Study list view using resizable data table
 class StudyListView extends StatefulWidget {
@@ -98,6 +99,7 @@ class _StudyListViewState extends State<StudyListView> {
 
   /// Build the header section
   Widget _buildHeader() {
+    final appTheme = context.appTheme;
     return Container(
       padding: const EdgeInsets.symmetric(
         horizontal: OnisViewerConstants.paddingMedium,
@@ -105,20 +107,20 @@ class _StudyListViewState extends State<StudyListView> {
       ),
       decoration: BoxDecoration(
         color: widget.isDisconnecting
-            ? OnisViewerConstants.tabBarColor.withOpacity(0.5)
-            : OnisViewerConstants.tabBarColor,
+            ? appTheme.listHeaderBg.withValues(alpha: 0.6)
+            : appTheme.listHeaderBg,
         border: Border(
           bottom: BorderSide(
-            color: OnisViewerConstants.tabButtonColor,
+            color: appTheme.listHeaderBorder,
             width: 1,
           ),
         ),
       ),
       child: Row(
         children: [
-          const Icon(
+          Icon(
             Icons.medical_services,
-            color: OnisViewerConstants.textColor,
+            color: appTheme.textPrimary,
             size: 20,
           ),
           const SizedBox(width: OnisViewerConstants.marginSmall),
@@ -129,8 +131,8 @@ class _StudyListViewState extends State<StudyListView> {
               style: TextStyle(
                 fontWeight: FontWeight.bold,
                 color: widget.isDisconnecting
-                    ? OnisViewerConstants.textSecondaryColor
-                    : OnisViewerConstants.textColor,
+                    ? appTheme.listHeaderMutedText
+                    : appTheme.textPrimary,
                 fontSize: 16,
               ),
             ),
@@ -138,8 +140,8 @@ class _StudyListViewState extends State<StudyListView> {
           if (widget.username != null) ...[
             Text(
               'Logged in as: ${widget.username}',
-              style: const TextStyle(
-                color: OnisViewerConstants.textSecondaryColor,
+              style: TextStyle(
+                color: appTheme.listHeaderMutedText,
                 fontSize: 12,
               ),
             ),
@@ -168,13 +170,13 @@ class _StudyListViewState extends State<StudyListView> {
                     height: 16,
                     child: CircularProgressIndicator(
                       strokeWidth: 2,
-                      valueColor: const AlwaysStoppedAnimation<Color>(
-                          OnisViewerConstants.textSecondaryColor),
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                          appTheme.listHeaderMutedText),
                     ),
                   )
-                : const Icon(
+                : Icon(
                     Icons.logout,
-                    color: OnisViewerConstants.textSecondaryColor,
+                    color: appTheme.listHeaderMutedText,
                     size: 18,
                   ),
             tooltip: widget.isDisconnecting ? 'Disconnecting...' : 'Disconnect',
@@ -191,8 +193,7 @@ class _StudyListViewState extends State<StudyListView> {
 
   /// Build the study table
   Widget _buildStudyTable() {
-    final sortedStudies =
-        List<FindPatientStudyItem>.from(widget.studies);
+    final sortedStudies = List<FindPatientStudyItem>.from(widget.studies);
 
     /*if (_sortColumnIndex != null) {
       sortedStudies.sort((a, b) {

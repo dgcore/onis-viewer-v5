@@ -6,6 +6,7 @@ import 'package:onis_viewer/core/models/database/study.dart' as database;
 import 'package:onis_viewer/core/responses/find_study_response.dart';
 
 import '../../../core/constants.dart';
+import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/column_configuration.dart';
 import 'database_table_column_config.dart';
 
@@ -337,12 +338,13 @@ class _ResizableDataTableState extends State<ResizableDataTable>
 
   /// Build the header row with resizable columns
   Widget _buildHeaderRow({bool shouldFillSpace = false}) {
+    final appTheme = context.appTheme;
     return Container(
       decoration: BoxDecoration(
-        color: OnisViewerConstants.tabBarColor,
+        color: appTheme.listHeaderBg,
         border: Border(
           bottom: BorderSide(
-            color: OnisViewerConstants.tabButtonColor,
+            color: appTheme.listHeaderBorder,
             width: 1,
           ),
         ),
@@ -511,12 +513,13 @@ class _ResizableDataTableState extends State<ResizableDataTable>
 
   /// Build the filter bar
   Widget _buildFilterBar({bool shouldFillSpace = false}) {
+    final appTheme = context.appTheme;
     return Container(
       decoration: BoxDecoration(
-        color: OnisViewerConstants.surfaceColor,
+        color: appTheme.listFilterBg,
         border: Border(
           bottom: BorderSide(
-            color: OnisViewerConstants.tabButtonColor,
+            color: appTheme.listRowBorder,
             width: 1,
           ),
         ),
@@ -615,6 +618,7 @@ class _ResizableDataTableState extends State<ResizableDataTable>
 
   /// Build a filter cell
   Widget _buildFilterCell(int displayIndex, String hintText) {
+    final appTheme = context.appTheme;
     return Container(
       width: _getColumnWidth(displayIndex),
       padding: const EdgeInsets.symmetric(
@@ -623,28 +627,28 @@ class _ResizableDataTableState extends State<ResizableDataTable>
       ),
       child: TextField(
         controller: _filterControllers[displayIndex],
-        style: const TextStyle(
-          color: OnisViewerConstants.textColor,
+        style: TextStyle(
+          color: appTheme.listRowText,
           fontSize: 12,
         ),
         decoration: InputDecoration(
           hintText: hintText,
-          hintStyle: const TextStyle(
-            color: OnisViewerConstants.textSecondaryColor,
+          hintStyle: TextStyle(
+            color: appTheme.listFilterHintText,
             fontSize: 12,
           ),
           filled: true,
-          fillColor: OnisViewerConstants.tabBarColor,
+          fillColor: appTheme.listFilterFieldBg,
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(4),
             borderSide: BorderSide(
-              color: OnisViewerConstants.tabButtonColor,
+              color: appTheme.listFilterFieldBorder,
             ),
           ),
           enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(4),
             borderSide: BorderSide(
-              color: OnisViewerConstants.tabButtonColor,
+              color: appTheme.listFilterFieldBorder,
             ),
           ),
           focusedBorder: OutlineInputBorder(
@@ -666,6 +670,7 @@ class _ResizableDataTableState extends State<ResizableDataTable>
   /// Build a header cell
   Widget _buildHeaderCell(String label, int displayIndex,
       {bool isNumeric = false}) {
+    final appTheme = context.appTheme;
     return GestureDetector(
       onTap: () {
         widget.onSort?.call(
@@ -683,9 +688,9 @@ class _ResizableDataTableState extends State<ResizableDataTable>
           children: [
             Expanded(
               child: Text(
-                label,
-                style: const TextStyle(
-                  color: OnisViewerConstants.textColor,
+                label.toUpperCase(),
+                style: TextStyle(
+                  color: appTheme.listHeaderText,
                   fontWeight: FontWeight.w600,
                   fontSize: 14,
                 ),
@@ -712,6 +717,7 @@ class _ResizableDataTableState extends State<ResizableDataTable>
   Widget _buildResizeHandle(int displayIndex) {
     if (displayIndex >= _columnOrder.length) return const SizedBox.shrink();
     final columnId = _columnOrder[displayIndex];
+    final appTheme = context.appTheme;
 
     return GestureDetector(
       onPanStart: (details) {
@@ -755,7 +761,7 @@ class _ResizableDataTableState extends State<ResizableDataTable>
                 color: (displayIndex < _isDragging.length &&
                         _isDragging[displayIndex])
                     ? OnisViewerConstants.primaryColor
-                    : OnisViewerConstants.tabButtonColor,
+                    : appTheme.listCellSeparator,
                 borderRadius: BorderRadius.circular(1),
               ),
             ),
@@ -768,6 +774,7 @@ class _ResizableDataTableState extends State<ResizableDataTable>
   /// Build a data row
   Widget _buildDataRow(FindPatientStudyItem study,
       {bool shouldFillSpace = false}) {
+    final appTheme = context.appTheme;
     final isSelected = widget.selectedStudies.contains(study);
 
     return GestureDetector(
@@ -777,12 +784,10 @@ class _ResizableDataTableState extends State<ResizableDataTable>
       },
       child: Container(
         decoration: BoxDecoration(
-          color: isSelected
-              ? OnisViewerConstants.primaryColor.withValues(alpha: 0.1)
-              : OnisViewerConstants.surfaceColor,
+          color: isSelected ? appTheme.listRowSelectedBg : appTheme.listRowBg,
           border: Border(
             bottom: BorderSide(
-              color: OnisViewerConstants.tabButtonColor,
+              color: appTheme.listRowBorder,
               width: 1,
             ),
           ),
@@ -919,6 +924,7 @@ class _ResizableDataTableState extends State<ResizableDataTable>
   /// Build a data cell
   Widget _buildDataCell(String text, int displayIndex, bool isSelected,
       database.Patient patient, database.Study study) {
+    final appTheme = context.appTheme;
     return Container(
       width: _getColumnWidth(displayIndex),
       padding: const EdgeInsets.symmetric(
@@ -928,9 +934,8 @@ class _ResizableDataTableState extends State<ResizableDataTable>
       child: Text(
         text,
         style: TextStyle(
-          color: isSelected
-              ? OnisViewerConstants.primaryColor
-              : OnisViewerConstants.textColor,
+          color:
+              isSelected ? appTheme.listRowSelectedText : appTheme.listRowText,
           fontSize: 14,
           fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
         ),

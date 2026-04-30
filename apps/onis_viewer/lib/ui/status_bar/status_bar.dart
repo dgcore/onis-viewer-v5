@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:onis_viewer/core/monitor/page.dart';
+import 'package:onis_viewer/core/theme/app_theme.dart';
 
 import '../../core/constants.dart';
 import 'tab_bar.dart';
@@ -21,9 +22,18 @@ class StatusBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final appTheme = context.appTheme;
     return Container(
       height: OnisViewerConstants.statusBarHeight,
-      color: OnisViewerConstants.statusBarColor,
+      decoration: BoxDecoration(
+        color: appTheme.statusBarBg,
+        border: Border(
+          top: BorderSide(
+            color: appTheme.panelBorder,
+            width: 1,
+          ),
+        ),
+      ),
       child: Row(
         children: [
           // Tab bar (centered)

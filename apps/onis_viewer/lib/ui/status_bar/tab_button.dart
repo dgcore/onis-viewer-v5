@@ -36,7 +36,7 @@ class _TabButtonState extends State<TabButton> {
           decoration: BoxDecoration(
             color: _getBackgroundColor(),
             border: Border(
-              top: BorderSide(
+              bottom: BorderSide(
                 color: _getBorderColor(),
                 width: 2,
               ),

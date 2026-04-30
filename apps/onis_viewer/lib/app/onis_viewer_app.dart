@@ -8,6 +8,7 @@ import 'package:onis_viewer/core/constants.dart';
 import 'package:onis_viewer/core/monitor/monitor.dart';
 import 'package:onis_viewer/core/monitor/monitor_config.dart';
 import 'package:onis_viewer/core/monitor/monitor_widget.dart';
+import 'package:onis_viewer/core/theme/app_theme.dart';
 import 'package:window_manager/window_manager.dart';
 
 class OnisViewerApp extends StatefulWidget {
@@ -199,6 +200,16 @@ class _OnisViewerAppState extends State<OnisViewerApp> with WindowListener {
             secondary: OnisViewerConstants.secondaryColor,
             surface: OnisViewerConstants.surfaceColor,
           ),
+          extensions: [
+            AppTheme.fallback(
+              Brightness.dark,
+              const ColorScheme.dark(
+                primary: OnisViewerConstants.primaryColor,
+                secondary: OnisViewerConstants.secondaryColor,
+                surface: OnisViewerConstants.surfaceColor,
+              ),
+            ),
+          ],
           useMaterial3: true,
         ),
         home: Scaffold(

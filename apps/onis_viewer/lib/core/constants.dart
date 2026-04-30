@@ -15,7 +15,7 @@ class OnisViewerConstants {
   static const double minWindowHeight = 600.0;
 
   // UI dimensions
-  static const double statusBarHeight = 30.0;
+  static const double statusBarHeight = 40.0;
   static const double tabButtonHeight = 30.0;
   static const double tabButtonWidth = 120.0;
   static const double windowControlSize = 30.0;
@@ -25,7 +25,8 @@ class OnisViewerConstants {
   static const Color primaryColor = Color(0xFF2196F3);
   static const Color secondaryColor = Color(0xFF4CAF50);
   static const Color backgroundColor = Color(0xFF1E1E1E);
-  static const Color surfaceColor = Color(0xFF2D2D2D);
+  //static const Color surfaceColor = Color(0xFF2D2D2D);
+  static const Color surfaceColor = Color(0xFF141518);
   static const Color statusBarColor = Color(0xFF3C3C3C);
   static const Color tabBarColor = Color(0xFF4A4A4A);
   static const Color tabButtonColor = Color(0xFF5A5A5A);
@@ -36,7 +37,7 @@ class OnisViewerConstants {
 
   // Spacing
   static const double paddingSmall = 8.0;
-  static const double paddingMedium = 10.0;
+  static const double paddingMedium = 20.0;
   static const double paddingLarge = 24.0;
   static const double marginSmall = 4.0;
   static const double marginMedium = 8.0;

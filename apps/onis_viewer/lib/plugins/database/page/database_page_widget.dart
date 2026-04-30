@@ -10,6 +10,7 @@ import 'package:onis_viewer/plugins/database/ui/study_list_view.dart';
 import '../../../api/core/ov_api_core.dart';
 import '../../../core/constants.dart';
 import '../../../core/database_source.dart';
+import '../../../core/theme/app_theme.dart';
 import '../public/database_api.dart';
 import '../ui/database_source_bar.dart';
 import '../ui/database_toolbar.dart';
@@ -130,6 +131,7 @@ class _DatabasePageWidgetState extends OsPageWidgetState<DatabasePageWidget> {
 
   /// Build the main content area
   Widget _buildContent() {
+    final appTheme = context.appTheme;
     final sourceController = _dbApi?.sourceController;
     final selected = sourceController?.selectedSource;
     Widget? loginPanel;
@@ -142,33 +144,35 @@ class _DatabasePageWidgetState extends OsPageWidgetState<DatabasePageWidget> {
         ? _buildNoSelectionPlaceholder()
         : (loginPanel ?? _buildDatabaseDetails(sourceController!, selected));
 
-    return Row(
-      children: [
-        // Resizable source bar (left panel)
-        ResizableSourceBar(
-          initialWidth: 300,
-          minWidth: 250,
-          maxWidth: 500,
-          child: DatabaseSourceBar(
-              //selectedSource: selected,
-              //onSourceSelected: (source) {
-              //_dbApi?.selectSourceByUid(source.uid);
-              //},
-              //onAddSource: () {
-              // TODO: Handle add source
-              //},
-              //onRefreshSources: () {
-              // TODO: Handle refresh sources
-              //},
-              ),
-        ),
+    return Container(
+      color: appTheme.contentBg,
+      child: Row(
+        children: [
+          // Resizable source bar (left panel)
+          ResizableSourceBar(
+            initialWidth: 300,
+            minWidth: 250,
+            maxWidth: 500,
+            child: DatabaseSourceBar(
+                //selectedSource: selected,
+                //onSourceSelected: (source) {
+                //_dbApi?.selectSourceByUid(source.uid);
+                //},
+                //onAddSource: () {
+                // TODO: Handle add source
+                //},
+                //onRefreshSources: () {
+                // TODO: Handle refresh sources
+                //},
+                ),
+          ),
 
-        // Spacing between source bar and right panel
-        const SizedBox(width: OnisViewerConstants.paddingMedium),
+          Container(width: 1, color: appTheme.panelBorder),
 
-        // Right panel
-        Expanded(child: rightPanel),
-      ],
+          // Right panel
+          Expanded(child: rightPanel),
+        ],
+      ),
     );
   }
 
