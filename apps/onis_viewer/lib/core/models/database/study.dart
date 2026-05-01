@@ -206,4 +206,37 @@ class Study {
           : '',
     );
   }
+
+  /// JSON shape matches [fromJson] (API / local persistence).
+  Map<String, dynamic> toJson() {
+    final json = <String, dynamic>{
+      'flags': flags,
+      'seq': id,
+      'uid': uid,
+      'charset': charset,
+      'date': studyDate,
+      'time': studyTime,
+      'modalities': modalities,
+      'bodyparts': bodyParts,
+      'accnum': accnum,
+      'study_id': studyId,
+      'desc': desc,
+      'age': age,
+      'institution': institution,
+      'comment': comment,
+      'stations': stations,
+      'srcnt': srcnt,
+      'imcnt': imcnt,
+      'rptcnt': rptcnt,
+      'status': status,
+      'conflict': conflict,
+      'originId': originId,
+      'originName': originName,
+      'originIp': originIp,
+    };
+    if ((flags & infoStudyCreation) != 0 && crdate != null) {
+      json['crdate'] = crdate!.toIso8601String();
+    }
+    return json;
+  }
 }

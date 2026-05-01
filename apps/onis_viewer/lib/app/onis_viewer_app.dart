@@ -27,6 +27,9 @@ class _OnisViewerAppState extends State<OnisViewerApp> with WindowListener {
   int? _displayBackendInstanceId;
   OsMonitor? _monitor;
 
+  bool _startupFinished = false;
+  Object? _startupError;
+
   @override
   void initState() {
     super.initState();
@@ -69,8 +72,9 @@ class _OnisViewerAppState extends State<OnisViewerApp> with WindowListener {
               } else {
                 _monitor = monitor;
               }
+              final safeSize = _clampWindowSize(area[2], area[3]);
               final options = WindowOptions(
-                size: Size(area[2], area[3]),
+                size: safeSize,
                 center: true,
                 title: monitor == monitors.first
                     ? 'Main Window'
@@ -87,6 +91,8 @@ class _OnisViewerAppState extends State<OnisViewerApp> with WindowListener {
               final payload = {
                 'labelIndex': monitor.getLabelIndex(),
                 'displayId': monitor.id,
+                'left': area[0],
+                'top': area[1],
                 'width': area[2],
                 'height': area[3],
                 'fullscreen': false,
@@ -94,7 +100,8 @@ class _OnisViewerAppState extends State<OnisViewerApp> with WindowListener {
               final window = await DesktopMultiWindow.createWindow(
                 jsonEncode(payload),
               );
-              await window.setTitle(monitor.id);
+              await window.setTitle(
+                  '${OnisViewerConstants.appName} — Monitor ${monitor.getLabelIndex()}');
               await window.show();
               _windows.add(window);
             }
@@ -104,16 +111,39 @@ class _OnisViewerAppState extends State<OnisViewerApp> with WindowListener {
       _monitor?.createWindow();
       // Ensure UI rebuilds after monitor window is actually created.
       if (mounted) {
-        setState(() {});
+        setState(() {
+          _startupFinished = true;
+          _startupError = null;
+        });
       }
     } catch (e, st) {
       if (mounted) {
         setState(() {
           _backendSharedAcrossWindows = false;
+          _startupFinished = true;
+          _startupError = e;
         });
       }
       debugPrint('Error initializing OnisViewerApp: $e\n$st');
     }
+  }
+
+  Size _clampWindowSize(double width, double height) {
+    var w = width;
+    var h = height;
+    if (w.isNaN ||
+        w <= 0 ||
+        w.isInfinite ||
+        w > 16384) {
+      w = OnisViewerConstants.defaultWindowWidth;
+    }
+    if (h.isNaN ||
+        h <= 0 ||
+        h.isInfinite ||
+        h > 16384) {
+      h = OnisViewerConstants.defaultWindowHeight;
+    }
+    return Size(w, h);
   }
 
   /*Future<void> _runSharedBackendSelfTest(WindowController window) async {
@@ -190,6 +220,32 @@ class _OnisViewerAppState extends State<OnisViewerApp> with WindowListener {
   @override
   Widget build(BuildContext context) {
     final monitorWnd = _monitor?.getWindow();
+    final Widget body;
+    if (!_startupFinished) {
+      body = const Center(
+        child: CircularProgressIndicator(),
+      );
+    } else if (_startupError != null) {
+      body = Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: SelectableText(
+            'Startup failed:\n$_startupError',
+            style: const TextStyle(color: Colors.white70),
+          ),
+        ),
+      );
+    } else if (monitorWnd != null) {
+      body = OsMonitorWidget(monitorWnd: monitorWnd);
+    } else {
+      body = const Center(
+        child: SelectableText(
+          'No monitor UI (configuration empty).',
+          style: TextStyle(color: Colors.white70),
+        ),
+      );
+    }
+
     return MaterialApp(
         navigatorKey: navigatorKey,
         title: OnisViewerConstants.appName,
@@ -213,9 +269,9 @@ class _OnisViewerAppState extends State<OnisViewerApp> with WindowListener {
           useMaterial3: true,
         ),
         home: Scaffold(
-            body: monitorWnd != null
-                ? OsMonitorWidget(monitorWnd: monitorWnd)
-                : const SizedBox.shrink()));
+          backgroundColor: Colors.black,
+          body: body,
+        ));
   }
 }
 

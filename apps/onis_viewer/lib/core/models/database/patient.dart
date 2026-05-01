@@ -104,6 +104,7 @@ class Patient {
 
     return Patient(
       flags: flags,
+      sourceUid: json['sourceUid'] as String? ?? sourceUid ?? '',
       id: json['seq'] as String? ?? '',
       pid: json['pid'] as String? ?? json['uid'] as String? ?? '',
       name:
@@ -143,4 +144,48 @@ class Patient {
           : '',
     );
   }
+
+  /// JSON shape matches [fromJson] (API / local persistence).
+  Map<String, dynamic> toJson() {
+    final json = <String, dynamic>{
+      'flags': flags,
+      'seq': id,
+      'pid': pid,
+      'uid': pid,
+      'sourceUid': sourceUid,
+      'name': name,
+      'ideogram': ideogram,
+      'phonetic': phonetic,
+      'charset': charset,
+      'sex': sex,
+      'stcnt': stcnt,
+      'srcnt': srcnt,
+      'imcnt': imcnt,
+      'status': status,
+      'originId': originId,
+      'originName': originName,
+      'originIp': originIp,
+    };
+    if ((flags & infoPatientBirthdate) != 0 && birthDate != null) {
+      json['birthdate'] = _patientToDicomDate(birthDate!);
+      final time = _patientToDicomTime(birthDate!);
+      if (time != null) {
+        json['birthtime'] = time;
+      }
+    }
+    if ((flags & infoPatientCreation) != 0 && crdate != null) {
+      json['crdate'] = crdate!.toIso8601String();
+    }
+    return json;
+  }
+}
+
+String _patientToDicomDate(DateTime d) =>
+    '${d.year.toString().padLeft(4, '0')}${d.month.toString().padLeft(2, '0')}${d.day.toString().padLeft(2, '0')}';
+
+String? _patientToDicomTime(DateTime d) {
+  if (d.hour == 0 && d.minute == 0 && d.second == 0 && d.millisecond == 0) {
+    return null;
+  }
+  return '${d.hour.toString().padLeft(2, '0')}${d.minute.toString().padLeft(2, '0')}${d.second.toString().padLeft(2, '0')}.${d.millisecond.toString().padLeft(3, '0')}';
 }
