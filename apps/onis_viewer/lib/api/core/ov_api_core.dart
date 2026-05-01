@@ -8,9 +8,11 @@ import 'package:onis_viewer/api/graphics/managers/render_type_manager.dart';
 import 'package:onis_viewer/api/graphics/managers/support_set_manager.dart';
 import 'package:onis_viewer/api/managers/page_type_manager.dart';
 import 'package:onis_viewer/api/services/message_service.dart';
+import 'package:onis_viewer/api/services/opened_patients_service.dart';
 import 'package:onis_viewer/api/view_type/view_type_manager.dart';
 import 'package:onis_viewer/backend/backend_service.dart';
 import 'package:onis_viewer/core/monitor/monitor_config.dart';
+import 'package:onis_viewer/api/services/patient_controller_interface.dart';
 
 /// Core OVApi singleton that coordinates all API modules
 class OVApi {
@@ -37,6 +39,7 @@ class OVApi {
   // Services
   late final OsMessageService _messageService;
   late final OnisBackendService _backendService;
+  late final OpenedPatientsService _openedPatientsService;
 
   /// This Flutter engine's [WindowController.windowId] (`0` = main window).
   /// Set during [initialize]; reads as `0` before that.
@@ -54,6 +57,7 @@ class OVApi {
   OsRenderTypeManager get renderTypes => _renderTypeManager;
   OsMessageService get messages => _messageService;
   OnisBackendService get backend => _backendService;
+  IPatientController get openedPatients => _openedPatientsService;
 
   /// Same as the `flutterEngineInstanceId` argument passed to [initialize] in this isolate.
   int get flutterEngineInstanceId => _flutterEngineInstanceId;
@@ -95,6 +99,7 @@ class OVApi {
       // Initialize services
       _messageService = OsMessageService();
       _backendService = OnisBackendService();
+      _openedPatientsService = OpenedPatientsService();
 
       // Initialize modules
       _renderTypeManager.initialize();
@@ -125,6 +130,7 @@ class OVApi {
     _viewTypeManager.dispose();
     _containerSupportSetManager.dispose();
     _messageService.dispose();
+    _openedPatientsService.dispose();
     _backendService.dispose();
     _isInitialized = false;
     debugPrint('OVApi disposed');

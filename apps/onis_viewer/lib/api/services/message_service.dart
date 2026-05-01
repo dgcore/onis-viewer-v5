@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:io';
-import 'dart:typed_data';
 
 import 'package:desktop_multi_window/desktop_multi_window.dart';
 import 'package:flutter/foundation.dart';
@@ -60,34 +59,6 @@ class OsMessageService {
       listener(id, data);
     }
   }
-
-  /// Called from [DesktopMultiWindow.setMethodHandler] for `onis/os_message`
-  /// — notifies listeners only (no re‑broadcast to peers).
-  /*void deliverFromRemoteWindow(int id, dynamic data) {
-    _dispatchLocal(id, data);
-  }*/
-
-  /// Returns `true` if the call was consumed.
-  /*bool tryHandleWindowMethodCall(MethodCall call) {
-    if (call.method != windowMethodName) {
-      return false;
-    }
-    final args = call.arguments;
-    if (args is! Map) {
-      return true;
-    }
-    final msgId = args['msgId'];
-    if (msgId is! int) {
-      return true;
-    }
-    final payload = args['payload'];
-    dynamic data;
-    if (payload is Uint8List && payload.isNotEmpty) {
-      data = _decodePayload(payload);
-    }
-    deliverFromRemoteWindow(msgId, data);
-    return true;
-  }*/
 
   Future<void> _deliverToOtherWindows(int id, dynamic data) async {
     if (kIsWeb) {

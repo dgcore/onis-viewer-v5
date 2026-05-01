@@ -1,5 +1,5 @@
 import 'package:onis_viewer/plugins/database/public/download_controller_interface.dart';
-import 'package:onis_viewer/plugins/database/public/patient_controller_interface.dart';
+import 'package:onis_viewer/api/services/patient_controller_interface.dart';
 import 'package:onis_viewer/plugins/database/public/source_controller_interface.dart';
 
 /// Public API exposed by the database plugin

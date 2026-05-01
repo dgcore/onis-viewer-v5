@@ -134,6 +134,7 @@ class Series {
       flags: flags,
       id: json['seq'] as String? ?? '',
       uid: json['uid'] as String? ?? '',
+      charset: json['charset'] as String? ?? '',
       crdate: crdate,
       modality: json['modality'] as String? ?? '',
       seriesNum: json['seriesNum'] as String? ?? '',
@@ -152,4 +153,49 @@ class Series {
       status: json['status'] as int? ?? 0,
     );
   }
+
+  /// JSON shape matches [fromJson] (API / local persistence).
+  Map<String, dynamic> toJson() {
+    final json = <String, dynamic>{
+      'flags': flags,
+      'seq': id,
+      'uid': uid,
+      'charset': charset,
+      'modality': modality,
+      'seriesNum': seriesNum,
+      'description': description,
+      'bodyPart': bodyPart,
+      'station': station,
+      'haveIcon': haveIcon,
+      'iconMedia': iconMedia,
+      'iconPath': iconPath,
+      'haveProperties': haveProperties,
+      'propertyMedia': propertyMedia,
+      'propertyPath': propertyPath,
+      'transferSyntax': transferSyntax,
+      'imcnt': imcnt,
+      'status': status,
+    };
+    if ((flags & infoSeriesDate) != 0 && date != null) {
+      json['date'] = _seriesToDicomDate(date!);
+      final time = _seriesToDicomTime(date!);
+      if (time != null) {
+        json['time'] = time;
+      }
+    }
+    if ((flags & infoSeriesCreation) != 0 && crdate != null) {
+      json['crdate'] = crdate!.toIso8601String();
+    }
+    return json;
+  }
+}
+
+String _seriesToDicomDate(DateTime d) =>
+    '${d.year.toString().padLeft(4, '0')}${d.month.toString().padLeft(2, '0')}${d.day.toString().padLeft(2, '0')}';
+
+String? _seriesToDicomTime(DateTime d) {
+  if (d.hour == 0 && d.minute == 0 && d.second == 0 && d.millisecond == 0) {
+    return null;
+  }
+  return '${d.hour.toString().padLeft(2, '0')}${d.minute.toString().padLeft(2, '0')}${d.second.toString().padLeft(2, '0')}.${d.millisecond.toString().padLeft(3, '0')}';
 }

@@ -156,27 +156,35 @@ class _DisplayWindowPageState extends State<DisplayWindowPage>
     windowManager.addListener(this);
 
     final monitorArgs = jsonDecode(widget.windowArgs);
-    double width = (monitorArgs["width"] as num).toDouble();
-    double height = (monitorArgs["height"] as num).toDouble();
-    final double x = 100;
-    final double y = 100; //(args['y'] as num).toDouble();
+    final width = (monitorArgs['width'] as num).toDouble();
+    final height = (monitorArgs['height'] as num).toDouble();
+    final left = (monitorArgs['left'] as num?)?.toDouble() ?? 100;
+    final top = (monitorArgs['top'] as num?)?.toDouble() ?? 100;
+    final labelIndex = monitorArgs['labelIndex'];
+    final title =
+        '${OnisViewerConstants.appName} — Monitor $labelIndex';
 
-    const options = WindowOptions(
+    final options = WindowOptions(
+      size: Size(width, height),
+      center: false,
+      title: title,
       backgroundColor: Colors.black,
       skipTaskbar: false,
       titleBarStyle: TitleBarStyle.normal,
     );
 
     await windowManager.waitUntilReadyToShow(options, () async {
-      // Pseudo fullscreen robuste
-      await windowManager.setBounds(
-        Rect.fromLTWH(x, y, width, height),
+      await windowManager.setBounds(Rect.fromLTWH(left, top, width, height));
+      await windowManager.setMinimumSize(
+        const Size(
+          OnisViewerConstants.minWindowWidth,
+          OnisViewerConstants.minWindowHeight,
+        ),
       );
-
-      await windowManager.setResizable(false);
-      await windowManager.setMaximizable(false);
-      await windowManager.setMinimizable(false);
-      await windowManager.setClosable(false);
+      await windowManager.setResizable(true);
+      await windowManager.setMaximizable(true);
+      await windowManager.setMinimizable(true);
+      await windowManager.setClosable(true);
       await windowManager.show();
       await windowManager.focus();
     });

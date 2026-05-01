@@ -83,6 +83,8 @@ class Patient {
   database.Patient? _patient;
   final List<Study> _studies = [];
 
+  Patient();
+
   // Getters
   database.Patient? get databaseInfo => _patient;
   List<Study> get studies => List.unmodifiable(_studies);
@@ -190,6 +192,32 @@ class Patient {
     }
     return null;
   }
+
+  Map<String, dynamic> toJson() {
+    return <String, dynamic>{
+      'databaseInfo': _patient?.toJson(),
+      'studies':
+          _studies.map((s) => s.toJson()).toList(growable: false),
+    };
+  }
+
+  factory Patient.fromJson(Map<String, dynamic> map) {
+    final patient = Patient();
+    final dbRaw = map['databaseInfo'];
+    if (dbRaw is Map) {
+      patient.databaseInfo = database.Patient.fromJson(
+          Map<String, dynamic>.from(dbRaw));
+    }
+    final studies = map['studies'];
+    if (studies is List) {
+      for (final rawStudy in studies) {
+        if (rawStudy is! Map) continue;
+        patient.addStudy(
+            Study.fromJson(Map<String, dynamic>.from(rawStudy)));
+      }
+    }
+    return patient;
+  }
 }
 
 /// Opened study entity with series and reports
@@ -199,6 +227,8 @@ class Study {
   final List<Series> _series = []; // Series not yet implemented
   // final List<Report> _reports = []; // Reports not yet implemented
   String guid = UUIDv4().toString();
+
+  Study();
 
   // Getters:
   database.Study? get databaseInfo => _study;
@@ -262,6 +292,32 @@ class Study {
       dbStudy.bodyParts = bodyParts.join(', ');
     }
   }
+
+  Map<String, dynamic> toJson() {
+    return <String, dynamic>{
+      'databaseInfo': _study?.toJson(),
+      'series':
+          _series.map((s) => s.toJson()).toList(growable: false),
+    };
+  }
+
+  factory Study.fromJson(Map<String, dynamic> map) {
+    final study = Study();
+    final dbRaw = map['databaseInfo'];
+    if (dbRaw is Map) {
+      study.databaseInfo =
+          database.Study.fromJson(Map<String, dynamic>.from(dbRaw));
+    }
+    final seriesList = map['series'];
+    if (seriesList is List) {
+      for (final rawSeries in seriesList) {
+        if (rawSeries is! Map) continue;
+        study.addSeries(
+            Series.fromJson(Map<String, dynamic>.from(rawSeries)));
+      }
+    }
+    return study;
+  }
 }
 
 /// Opened study entity with series and reports
@@ -310,6 +366,22 @@ class Series {
         addImage(image);
       }
     }
+  }
+
+  Map<String, dynamic> toJson() {
+    return <String, dynamic>{
+      'databaseInfo': _series?.toJson(),
+    };
+  }
+
+  factory Series.fromJson(Map<String, dynamic> map) {
+    final series = Series();
+    final dbRaw = map['databaseInfo'];
+    if (dbRaw is Map) {
+      series.databaseInfo =
+          database.Series.fromJson(Map<String, dynamic>.from(dbRaw));
+    }
+    return series;
   }
 }
 

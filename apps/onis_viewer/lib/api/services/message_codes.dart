@@ -11,4 +11,6 @@ class OSMSG {
 
   static const int pageTypeRegistered = 7;
   static const int pageTypeUnregistered = 8;
+  static const int openedPatientsSnapshot = 9;
+  static const int openedPatientsSyncRequest = 10;
 }

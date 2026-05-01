@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:onis_viewer/api/core/ov_api_core.dart';
 import 'package:onis_viewer/core/monitor/monitor.dart';
 import 'package:onis_viewer/core/monitor/page_type.dart';
@@ -59,10 +60,18 @@ class OsMonitorConfig {
     List<OsMonitor> realMonitors = [];
     List<OsMonitor> virtualMonitors = [];
 
-    // Get the real monitors:
-    final displays = await screenRetriever.getAllDisplays();
+    // Get the real monitors (release/sandbox failures fall back to fake below).
+    List<Display> displays = [];
+    try {
+      displays = await screenRetriever.getAllDisplays();
+    } catch (e, st) {
+      debugPrint('detectMonitors: getAllDisplays failed: $e\n$st');
+    }
     for (final display in displays) {
-      final displaySize = display.visibleSize!;
+      final displaySize = display.visibleSize ?? display.size;
+      if (displaySize.width <= 0 || displaySize.height <= 0) {
+        continue;
+      }
       List<double> displayArea = [0, 0, displaySize.width, displaySize.height];
       final displayLabelIndex = displays.indexOf(display);
       final displayMonitor = OsMonitor('mon${displayLabelIndex + 1}');
