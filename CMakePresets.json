@@ -1,0 +1,45 @@
+{
+  "version": 3,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 20,
+    "patch": 0
+  },
+  "configurePresets": [
+    {
+      "name": "macos-clang-debug",
+      "displayName": "macOS — Apple Clang (Debug)",
+      "description": "Pins /usr/bin/clang so CMake does not reuse a stale Homebrew gcc path from an old CMakeCache.",
+      "generator": "Unix Makefiles",
+      "binaryDir": "${sourceDir}/build",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_C_COMPILER": "/usr/bin/clang",
+        "CMAKE_CXX_COMPILER": "/usr/bin/clang++"
+      }
+    },
+    {
+      "name": "macos-clang-release",
+      "displayName": "macOS — Apple Clang (Release)",
+      "generator": "Unix Makefiles",
+      "binaryDir": "${sourceDir}/build",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_C_COMPILER": "/usr/bin/clang",
+        "CMAKE_CXX_COMPILER": "/usr/bin/clang++"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "onis-backend-debug",
+      "configurePreset": "macos-clang-debug",
+      "targets": ["onis_backend"]
+    },
+    {
+      "name": "onis-backend-release",
+      "configurePreset": "macos-clang-release",
+      "targets": ["onis_backend"]
+    }
+  ]
+}

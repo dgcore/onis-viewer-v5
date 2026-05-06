@@ -34,6 +34,15 @@ ONIS_BACKEND_EXPORT int32_t onis_backend_instance_id(OnisBackendHandle* handle);
 
 ONIS_BACKEND_EXPORT const char* onis_backend_get_last_error(void);
 
+/// Load a DICOM Part 10 file from disk (UTF-8 path). Returns a stable id for this session.
+ONIS_BACKEND_EXPORT OnisBackendStatus
+onis_backend_dicom_load_file(OnisBackendHandle* handle, const char* utf8_path,
+                             int32_t* out_id);
+
+/// Release a DICOM instance previously returned by onis_backend_dicom_load_file.
+ONIS_BACKEND_EXPORT OnisBackendStatus
+onis_backend_dicom_release(OnisBackendHandle* handle, int32_t id);
+
 #ifdef __cplusplus
 }
 #endif

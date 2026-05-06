@@ -253,6 +253,18 @@ static_cast<std::int16_t>(original_raw); if (decoded_s16 != original_s16) {
 
 void request_service::process_download_images_request(
     const request_data_ptr& req) {
+  auto get_file_size = [](const std::string& path) -> std::int64_t {
+    std::ifstream ifs(path, std::ios::binary | std::ios::ate);
+    if (!ifs.is_open()) {
+      return -1;
+    }
+    const auto pos = ifs.tellg();
+    if (pos < 0) {
+      return -1;
+    }
+    return static_cast<std::int64_t>(pos);
+  };
+
   // verify the input:
   onis::database::item::verify_integer_value(req->input_json, "max_bytes",
                                              false);
@@ -271,7 +283,6 @@ void request_service::process_download_images_request(
       std::string dlseq = image["dl"].asString();
       DlItem* dlitem = new DlItem(dlseq);
       dlitems.push_back(dlitem);
-      dlitem->cur_res = image["from"].asInt();
       dlitem->index = image["index"].asInt();
 
       // get the series download information:
@@ -298,7 +309,56 @@ void request_service::process_download_images_request(
 
       // init path and resolution offset:
       dlitem->cloud_decode_image_j2k_offsets(db, dlseq);
-      total_bytes += dlitem->cloud_increase_image_resolution();
+      if (dlitem->res.good() && dlitem->type != 0) {
+        dlitem->cur_res = image["from"].asInt();
+      }
+      if (dlitem->res.good() && dlitem->type == 0) {  // dicom file format
+        if (image.isMember("byte_offset")) {
+          dlitem->dicom_byte_offset = image["byte_offset"].asInt64();
+        } else {
+          dlitem->dicom_byte_offset = 0;
+        }
+        if (dlitem->dicom_byte_offset < 0) {
+          dlitem->dicom_byte_offset = 0;
+        }
+
+        const std::int64_t file_size = get_file_size(dlitem->path);
+        if (file_size <= 0) {
+          dlitem->res.set(OSRSP_FAILURE, EOS_FILE_OPEN,
+                          "Failed to open DICOM file", false);
+          continue;
+        }
+
+        std::int64_t from_offset = dlitem->dicom_byte_offset;
+        if (from_offset >= file_size) {
+          dlitem->dicom_byte_end = -1;
+          continue;
+        }
+
+        std::int64_t chunk_len = file_size - from_offset;
+        if (max_bytes > 0) {
+          if (total_bytes == 0) {
+            chunk_len =
+                std::min<std::int64_t>(chunk_len, static_cast<std::int64_t>(max_bytes));
+          } else {
+            std::int64_t remaining_budget =
+                static_cast<std::int64_t>(max_bytes - total_bytes);
+            if (remaining_budget <= 0) {
+              break;
+            }
+            chunk_len = std::min<std::int64_t>(chunk_len, remaining_budget);
+          }
+        }
+
+        if (chunk_len <= 0) {
+          break;
+        }
+
+        dlitem->dicom_byte_end = from_offset + chunk_len;
+        total_bytes += static_cast<std::int32_t>(chunk_len);
+      } else {
+        total_bytes += dlitem->cloud_increase_image_resolution();
+      }
       if (total_bytes > max_bytes)
         break;
     }
@@ -308,8 +368,17 @@ void request_service::process_download_images_request(
   std::int32_t total_length = 0;
   for (std::list<DlItem*>::iterator it = dlitems.begin(); it != dlitems.end();
        it++) {
-    if ((*it)->res.good() && (*it)->new_res == -1)
+    if ((*it)->res.good()) {
+      if ((*it)->type == 0) {
+        if ((*it)->dicom_byte_end <= (*it)->dicom_byte_offset) {
+          continue;
+        }
+      } else if ((*it)->new_res == -1) {
+        continue;
+      }
+    } else {
       continue;
+    }
 
     // we will write the series id:
     total_length += sizeof(std::uint8_t) + (*it)->srdlid.length();
@@ -321,6 +390,7 @@ void request_service::process_download_images_request(
     if ((*it)->res.good()) {
       if ((*it)->type == 1) {  // raw format
         (*it)->type = 3;       // png format
+        (*it)->type = 0;       // dicom format
       }
       if ((*it)->type == 1 || (*it)->type == 3) {  // raw or png format
         // raw format or png!
@@ -485,7 +555,6 @@ void request_service::process_download_images_request(
             }
           }
         }
-
       } else if ((*it)->type == 2) {  // stream format
 
         if ((*it)->cur_res == -1) {
@@ -514,6 +583,29 @@ void request_service::process_download_images_request(
                             (*it)->offsets[(*it)->new_res * 2 + 1] -
                             (*it)->offsets[((*it)->cur_res + 1) * 2];
           }
+        }
+      } else if ((*it)->type == 0) {  // dicom format
+        std::int64_t data_offset = (*it)->dicom_byte_offset;
+        std::int64_t data_end = (*it)->dicom_byte_end;
+        if (data_end > data_offset) {
+          std::int64_t data_length = data_end - data_offset;
+          std::int64_t file_size = get_file_size((*it)->path);
+          if (file_size <= 0) {
+            (*it)->res.set(OSRSP_FAILURE, EOS_FILE_OPEN,
+                           "Failed to open DICOM file", false);
+            continue;
+          }
+
+          if (data_offset == 0) {
+            // first packet for this image: announce file format and full size.
+            total_length += sizeof(std::int32_t);  // image format = 0
+            total_length += sizeof(std::int32_t);  // total file size
+          }
+
+          // write next offset and bytes for this packet.
+          total_length += sizeof(std::int32_t);  // next offset
+          total_length += sizeof(std::int32_t);  // data length
+          total_length += static_cast<std::int32_t>(data_length);  // data
         }
       }
     }
@@ -570,8 +662,17 @@ void request_service::process_download_images_request(
         // write each image data:
         for (std::list<DlItem*>::iterator it = dlitems.begin();
              it != dlitems.end(); it++) {
-          if ((*it)->res.good() && (*it)->new_res == -1)
+          if ((*it)->res.good()) {
+            if ((*it)->type == 0) {
+              if ((*it)->dicom_byte_end <= (*it)->dicom_byte_offset) {
+                continue;
+              }
+            } else if ((*it)->new_res == -1) {
+              continue;
+            }
+          } else {
             continue;
+          }
 
           // write the series id:
           *((std::uint8_t*)&binary_output[current_offset]) =
@@ -758,6 +859,74 @@ void request_service::process_download_images_request(
                 // write the data length:
                 *((std::int32_t*)&binary_output[current_offset]) = 0;
                 current_offset += sizeof(std::int32_t);
+              }
+            } else if ((*it)->type == 0) {  // dicom file data
+              std::int64_t data_offset = (*it)->dicom_byte_offset;
+              std::int64_t data_end = (*it)->dicom_byte_end;
+              std::int64_t data_length = 0;
+              if (data_end > data_offset)
+                data_length = data_end - data_offset;
+
+              if (data_length > 0) {
+                onis::file_ptr fp = onis::file::open_file(
+                    (*it)->path, onis::fflags::read | onis::fflags::binary);
+                if (fp != NULL) {
+                  if (data_offset == 0) {
+                    const std::int64_t file_size_i64 = get_file_size((*it)->path);
+                    std::int32_t file_size =
+                        file_size_i64 > std::numeric_limits<std::int32_t>::max()
+                            ? std::numeric_limits<std::int32_t>::max()
+                            : static_cast<std::int32_t>(file_size_i64);
+                    // first packet: image format and full size
+                    *((std::int32_t*)&binary_output[current_offset]) = 0;
+                    current_offset += sizeof(std::int32_t);
+                    *((std::int32_t*)&binary_output[current_offset]) = file_size;
+                    current_offset += sizeof(std::int32_t);
+                  }
+
+                  // next offset
+                  *((std::int32_t*)&binary_output[current_offset]) =
+                      data_end > std::numeric_limits<std::int32_t>::max()
+                          ? std::numeric_limits<std::int32_t>::max()
+                          : static_cast<std::int32_t>(data_end);
+                  current_offset += sizeof(std::int32_t);
+                  // data length
+                  *((std::int32_t*)&binary_output[current_offset]) =
+                      data_length > std::numeric_limits<std::int32_t>::max()
+                          ? std::numeric_limits<std::int32_t>::max()
+                          : static_cast<std::int32_t>(data_length);
+                  current_offset += sizeof(std::int32_t);
+
+                  fp->seek(data_offset, onis::fflags::begin);
+                  const std::int32_t read_len =
+                      data_length > std::numeric_limits<std::int32_t>::max()
+                          ? std::numeric_limits<std::int32_t>::max()
+                          : static_cast<std::int32_t>(data_length);
+                  std::int32_t read =
+                      fp->read(&binary_output[current_offset], read_len);
+                  fp->close();
+                  if (read == read_len) {
+                    current_offset += read_len;
+                  } else {
+                    // keep framing coherent: empty payload and rollback copy size.
+                    *((std::int32_t*)&binary_output[current_offset - sizeof(std::int32_t)]) =
+                        0;
+                  }
+                } else {
+                  if (data_offset == 0) {
+                    *((std::int32_t*)&binary_output[current_offset]) = 0;
+                    current_offset += sizeof(std::int32_t);
+                    *((std::int32_t*)&binary_output[current_offset]) = 0;
+                    current_offset += sizeof(std::int32_t);
+                  }
+                  *((std::int32_t*)&binary_output[current_offset]) =
+                      data_offset > std::numeric_limits<std::int32_t>::max()
+                          ? std::numeric_limits<std::int32_t>::max()
+                          : static_cast<std::int32_t>(data_offset);
+                  current_offset += sizeof(std::int32_t);
+                  *((std::int32_t*)&binary_output[current_offset]) = 0;
+                  current_offset += sizeof(std::int32_t);
+                }
               }
             }
           }

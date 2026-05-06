@@ -13,5 +13,10 @@ class OnisBackendService {
   /// Smoke-test style call to validate Dart <-> native plumbing.
   int ping(int value) => _native.ping(value);
 
+  /// Loads a DICOM Part 10 file from disk via DCMTK; returns a backend-held id.
+  int loadDicomFile(String utf8Path) => _native.dicomLoadFile(utf8Path);
+
+  void releaseDicom(int id) => _native.dicomRelease(id);
+
   void dispose() => _native.close();
 }

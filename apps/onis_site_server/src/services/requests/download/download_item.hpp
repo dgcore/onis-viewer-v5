@@ -36,6 +36,10 @@ struct DlItem {
   std::int32_t frame_index;   // frame index of the image.
   std::int32_t cur_res;       // current resolution of the image
   std::int32_t new_res;       // the resolution we should send
+  std::int64_t dicom_byte_offset =
+      0;  // next byte to read for type==0 (full DICOM file transfer)
+  std::int64_t dicom_byte_end =
+      -1;  // exclusive end byte for this response packet (type==0), -1 = skip
   std::int32_t offset_count;  // length of the offset array
   std::int32_t* offsets;      // offets to decode each available j2k resolution
   std::string path;           // path of the dicom or streaming file

@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart';
 import 'package:image/image.dart' as img;
 import 'package:onis_viewer/api/ov_api.dart';
 import 'package:onis_viewer/api/request/async_request.dart';
@@ -219,9 +220,15 @@ class DownloadController extends IDownloadController {
     };
     info.request = source.createRequest(RequestType.initSeriesDownload, data);
     if (info.request != null) {
-      info.request?.send().then((response) {
-        _onInitSeriesDownloadResponse(info, response);
-      });
+      info.request!
+          .send()
+          .then((response) {
+            _onInitSeriesDownloadResponse(info, response);
+          })
+          .catchError((Object error, StackTrace stackTrace) {
+            _handleDownloadException(info, error, stackTrace,
+                phase: 'initSeriesDownload');
+          });
     }
     return info.request != null;
   }
@@ -306,9 +313,15 @@ class DownloadController extends IDownloadController {
       };
       info.request = source.createRequest(RequestType.downloadImages, data);
       if (info.request != null) {
-        info.request?.send().then((response) {
-          _onDownloadImagesResponse(info, response);
-        });
+        info.request!
+            .send()
+            .then((response) {
+              _onDownloadImagesResponse(info, response);
+            })
+            .catchError((Object error, StackTrace stackTrace) {
+              _handleDownloadException(info, error, stackTrace,
+                  phase: 'downloadImages');
+            });
       }
 
       //info.request = this._onis.viewerService.downloadImages(server, source.session, source.subType, source.sourceId, items, candidates.pendingRanges, info.maxBytes, _onDownloadImagesResponse, this, info.guid);
@@ -850,6 +863,34 @@ class DownloadController extends IDownloadController {
     series.loadStatus.status = status;
     series.loadStatus.reason = reason;
     return -1;
+  }
+
+  void _handleDownloadException(
+    DownloadSeries info,
+    Object error,
+    StackTrace stackTrace, {
+    required String phase,
+  }) {
+    final series = info.getSeries();
+    debugPrint(
+      'DownloadController: uncaught exception during $phase: $error\n$stackTrace',
+    );
+
+    // Ensure request is released so queue processing can continue.
+    try {
+      info.request?.cancel();
+    } catch (_) {}
+    info.request = null;
+
+    if (series != null) {
+      _interruptSeriesDownload(
+        series,
+        ResultStatus.failure,
+        OnisErrorCodes.invalidResponse,
+        <entities.Image>[],
+      );
+    }
+    processLoadingQueue();
   }
 
   void _setImageLoadStatus(

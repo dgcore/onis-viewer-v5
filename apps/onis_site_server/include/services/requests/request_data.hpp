@@ -59,7 +59,6 @@ public:
     func(output_json_, output_binary_);
   }
 
-  // Method to read from output_json using a lambda (thread-safe)
   template <typename Func>
   void read_output(Func&& func) const {
     std::lock_guard<std::mutex> lock(output_mutex_);

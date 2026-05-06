@@ -296,11 +296,27 @@ class OsContainerController2D extends OsContainerController {
   }
 
   void onReceivedMessage(int id, dynamic message) {
+    final payload = _extractMessagePayload(message);
     if (id == OSMSG.seriesDownloadReceivedInfo) {
-      _onReceivedSeriesInfo(message!.data["series"] as entities.Series);
+      if (payload is Map && payload['series'] is entities.Series) {
+        _onReceivedSeriesInfo(payload['series'] as entities.Series);
+      }
     } else if (id == OSMSG.seriesImagesReceived) {
-      _onReceivedImages(message!.data as List<entities.Image>, false);
+      if (payload is List<entities.Image>) {
+        _onReceivedImages(payload, false);
+      } else if (payload is List) {
+        _onReceivedImages(payload.whereType<entities.Image>().toList(), false);
+      }
     }
+  }
+
+  dynamic _extractMessagePayload(dynamic message) {
+    // Current message service forwards the payload directly.
+    // Keep only a safe legacy fallback for map wrappers carrying `data`.
+    if (message is Map && message.containsKey('data')) {
+      return message['data'];
+    }
+    return message;
   }
 
   void _onReceivedSeriesInfo(entities.Series series) {
