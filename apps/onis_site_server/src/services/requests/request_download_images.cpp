@@ -4,6 +4,7 @@
 #include <cstring>
 #include <fstream>
 #include <iomanip>
+#include <iostream>
 #include <limits>
 #include <sstream>
 #include <vector>
@@ -19,6 +20,57 @@
 #include "onis_kit/include/utilities/string.hpp"
 #include "onis_kit/include/utilities/uuid.hpp"
 
+void request_service::process_download_images_request(
+    const request_data_ptr& req) {
+  // verify the input:
+  onis::database::item::verify_integer_value(req->input_json, "max_bytes",
+                                             false);
+  onis::database::item::verify_array_value(req->input_json, "images", false);
+
+  // prepare the download items array:
+  // std::unordered_map<std::string, Json::Value> dlmap;
+  std::vector<std::unique_ptr<DlItem>> dlitems;
+  std::size_t dlitems_index = 0;
+  std::size_t max_bytes = req->input_json["max_bytes"].asInt();
+  std::size_t total_bytes = 0;
+
+  // Fill the download items array:
+  {
+    request_database db(this);
+    for (const auto& image : req->input_json["images"]) {
+      std::string download_seq = image["dl"].asString();
+      // get the series download information:
+      /*if (dlmap.find(dlseq) == dlmap.end()) {
+        dlmap[dlseq] = Json::Value(Json::objectValue);
+        try {
+          db->find_download_series_by_seq(
+              dlseq, onis::database::lock_mode::NO_LOCK, dlmap[dlseq]);
+        } catch (const onis::exception& e) {
+          dlitem->res.set(OSRSP_FAILURE, e.get_code(), e.what(), false);
+          dlmap.erase(dlseq);
+          continue;
+        } catch (...) {
+          dlitem->res.set(OSRSP_FAILURE, EOS_UNKNOWN, "Unknown error", false);
+          dlmap.erase(dlseq);
+          continue;
+        }
+      }*/
+
+      // prepare a download item for the image:
+      std::unique_ptr<DlItem> dlitem = std::make_unique<DlItem>();
+      dlitem->index = image["index"].asInt();
+      dlitem->init(db, download_seq);
+      if (!dlitem->res.good()) {
+        continue;
+      }
+      dlitems.emplace_back(std::move(dlitem));
+      if (total_bytes > max_bytes)
+        break;
+    }
+  }
+}
+
+#ifdef _BEFORE_FILE_STREAMING_SUPPORT_
 namespace {
 void my_png_write_data(png_structp png_ptr, png_bytep data, png_size_t length) {
   /* with libpng15 next line causes pointer deference error; use libpng12 */
@@ -253,6 +305,8 @@ static_cast<std::int16_t>(original_raw); if (decoded_s16 != original_s16) {
 
 void request_service::process_download_images_request(
     const request_data_ptr& req) {
+  const bool stream_response =
+      req->input_json.isMember("stream") && req->input_json["stream"].asBool();
   auto get_file_size = [](const std::string& path) -> std::int64_t {
     std::ifstream ifs(path, std::ios::binary | std::ios::ate);
     if (!ifs.is_open()) {
@@ -338,8 +392,8 @@ void request_service::process_download_images_request(
         std::int64_t chunk_len = file_size - from_offset;
         if (max_bytes > 0) {
           if (total_bytes == 0) {
-            chunk_len =
-                std::min<std::int64_t>(chunk_len, static_cast<std::int64_t>(max_bytes));
+            chunk_len = std::min<std::int64_t>(
+                chunk_len, static_cast<std::int64_t>(max_bytes));
           } else {
             std::int64_t remaining_budget =
                 static_cast<std::int64_t>(max_bytes - total_bytes);
@@ -691,6 +745,8 @@ void request_service::process_download_images_request(
           if ((*it)->res.good()) {
             if ((*it)->type == 1 || (*it)->type == 3) {  // raw or png format
 
+              printf("bordel1¥n");
+
               std::size_t width, height;
               (*it)->frame->get_dimensions(&width, &height);
 
@@ -814,8 +870,10 @@ void request_service::process_download_images_request(
               }
 
             } else if ((*it)->type == 3) {  // png format
+              printf("bordel2¥n");
 
             } else if ((*it)->type == 2) {  // stream data
+              printf("bordel3¥n");
 
               std::int32_t data_offset = 0;
               std::int32_t data_length = 0;
@@ -861,6 +919,7 @@ void request_service::process_download_images_request(
                 current_offset += sizeof(std::int32_t);
               }
             } else if ((*it)->type == 0) {  // dicom file data
+              printf("bordel4¥n");
               std::int64_t data_offset = (*it)->dicom_byte_offset;
               std::int64_t data_end = (*it)->dicom_byte_end;
               std::int64_t data_length = 0;
@@ -872,7 +931,8 @@ void request_service::process_download_images_request(
                     (*it)->path, onis::fflags::read | onis::fflags::binary);
                 if (fp != NULL) {
                   if (data_offset == 0) {
-                    const std::int64_t file_size_i64 = get_file_size((*it)->path);
+                    const std::int64_t file_size_i64 =
+                        get_file_size((*it)->path);
                     std::int32_t file_size =
                         file_size_i64 > std::numeric_limits<std::int32_t>::max()
                             ? std::numeric_limits<std::int32_t>::max()
@@ -880,8 +940,17 @@ void request_service::process_download_images_request(
                     // first packet: image format and full size
                     *((std::int32_t*)&binary_output[current_offset]) = 0;
                     current_offset += sizeof(std::int32_t);
-                    *((std::int32_t*)&binary_output[current_offset]) = file_size;
+                    *((std::int32_t*)&binary_output[current_offset]) =
+                        file_size;
                     current_offset += sizeof(std::int32_t);
+                    printf("coucou1¥n");
+                    std::cerr
+                        << "request_download_images: dicom first packet"
+                        << " dl=" << (*it)->srdlid << " index=" << (*it)->index
+                        << " path=" << (*it)->path << " file_size=" << file_size
+                        << " data_offset=" << data_offset
+                        << " data_end=" << data_end
+                        << " data_length=" << data_length << std::endl;
                   }
 
                   // next offset
@@ -908,11 +977,20 @@ void request_service::process_download_images_request(
                   if (read == read_len) {
                     current_offset += read_len;
                   } else {
-                    // keep framing coherent: empty payload and rollback copy size.
-                    *((std::int32_t*)&binary_output[current_offset - sizeof(std::int32_t)]) =
-                        0;
+                    // keep framing coherent: empty payload and rollback copy
+                    // size.
+                    *((std::int32_t*)&binary_output[current_offset -
+                                                    sizeof(std::int32_t)]) = 0;
                   }
                 } else {
+                  printf("coucou2¥n");
+                  std::cerr
+                      << "request_download_images: failed to open dicom file"
+                      << " dl=" << (*it)->srdlid << " index=" << (*it)->index
+                      << " path=" << (*it)->path
+                      << " data_offset=" << data_offset
+                      << " data_end=" << data_end
+                      << " data_length=" << data_length << std::endl;
                   if (data_offset == 0) {
                     *((std::int32_t*)&binary_output[current_offset]) = 0;
                     current_offset += sizeof(std::int32_t);
@@ -946,4 +1024,30 @@ void request_service::process_download_images_request(
           *((std::int32_t*)&binary_output[0]) = req->res.reason;
         }*/
       });
+
+  if (stream_response) {
+    auto stream_payload = std::make_shared<std::vector<std::uint8_t>>();
+    req->read_output([&](const json& output,
+                         const std::vector<std::uint8_t>& binary_output) {
+      stream_payload->assign(binary_output.begin(), binary_output.end());
+    });
+
+    req->write_stream_output(
+        [stream_payload](const request_data::stream_send_fn& send,
+                         const request_data::stream_close_fn& close) {
+          static constexpr std::size_t kChunkSize = 64 * 1024;
+          std::size_t offset = 0;
+          while (offset < stream_payload->size()) {
+            const std::size_t len =
+                std::min(kChunkSize, stream_payload->size() - offset);
+            send(std::string_view(
+                reinterpret_cast<const char*>(stream_payload->data() + offset),
+                len));
+            offset += len;
+          }
+          close();
+        });
+  }
 }
+
+#endif

@@ -101,16 +101,15 @@ add_executable(onis_site_server
     ${SERVER_HEADERS}
 )
 
-# Get the project root directory - CMAKE_SOURCE_DIR is the root of the source tree
-# Since this is a subdirectory, CMAKE_SOURCE_DIR points to the root CMakeLists.txt location
-set(PROJECT_ROOT "${CMAKE_SOURCE_DIR}")
+# Resolve repository root robustly (works both standalone and from top-level).
+get_filename_component(PROJECT_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../.." ABSOLUTE)
 
 # Include directories
 target_include_directories(onis_site_server PRIVATE
-    ${CMAKE_SOURCE_DIR}/shared/cpp
-    ${CMAKE_SOURCE_DIR}/../../libs/onis_kit/include
-    ${CMAKE_SOURCE_DIR}/../../libs
-    ${CMAKE_SOURCE_DIR}/include
+    ${PROJECT_ROOT}/shared/cpp
+    ${PROJECT_ROOT}/libs/onis_kit/include
+    ${PROJECT_ROOT}/libs
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
     "/Applications/Postgres.app/Contents/Versions/15/include"
     ${DROGON_INCLUDE_DIRS}
     ${JSONCPP_INCLUDE_DIRS}
@@ -155,8 +154,8 @@ target_link_libraries(onis_site_server PRIVATE
 
 # Add library search directories
 target_link_directories(onis_site_server PRIVATE
-    ${CMAKE_SOURCE_DIR}/../../build/lib
-    ${CMAKE_SOURCE_DIR}/../../libs/onis_kit/build
+    ${PROJECT_ROOT}/build/lib
+    ${PROJECT_ROOT}/libs/onis_kit/build
     "/Applications/Postgres.app/Contents/Versions/15/lib"
     # DICOM libraries will be built in the build directory
 )

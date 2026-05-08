@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
@@ -30,7 +31,9 @@ class DownloadController extends IDownloadController {
   final List<DownloadSeries> _waitingList = [];
   final List<DownloadSeries> _downloadingList = [];
   int _maxConcurrentDownload = 4;
+  int _dicomImageMemoryThresholdBytes = 8 * 1024 * 1024;
   final List<DownloadPerformance> _performanceSources = [];
+  final Map<entities.Image, _DicomChunkState> _dicomChunks = {};
   int _containerIndex = -1;
   //final List<OsJ2kDecodeItem> _j2kItems = [];
   //final List<OsJ2kDecoder> _j2kDecoders = [];
@@ -81,12 +84,19 @@ class DownloadController extends IDownloadController {
     }*/
 
   get maxConcurrentDownload => _maxConcurrentDownload;
+  int get dicomImageMemoryThresholdBytes => _dicomImageMemoryThresholdBytes;
   //get maxImageDecoders => _maxImageDecoders;
 
   set maxConcurrentDownload(count) {
     if (count >= 1 && count <= 10) {
       _maxConcurrentDownload = count;
       processLoadingQueue();
+    }
+  }
+
+  set dicomImageMemoryThresholdBytes(int value) {
+    if (value > 0) {
+      _dicomImageMemoryThresholdBytes = value;
     }
   }
 
@@ -220,15 +230,12 @@ class DownloadController extends IDownloadController {
     };
     info.request = source.createRequest(RequestType.initSeriesDownload, data);
     if (info.request != null) {
-      info.request!
-          .send()
-          .then((response) {
-            _onInitSeriesDownloadResponse(info, response);
-          })
-          .catchError((Object error, StackTrace stackTrace) {
-            _handleDownloadException(info, error, stackTrace,
-                phase: 'initSeriesDownload');
-          });
+      info.request!.send().then((response) {
+        _onInitSeriesDownloadResponse(info, response);
+      }).catchError((Object error, StackTrace stackTrace) {
+        _handleDownloadException(info, error, stackTrace,
+            phase: 'initSeriesDownload');
+      });
     }
     return info.request != null;
   }
@@ -289,8 +296,16 @@ class DownloadController extends IDownloadController {
       entities.Image image = candidates.images[j];
       DicomFile? dcm = image.dicomFile;
       if (dcm == null) {
-        items.add(
-            {"dl": info.downloadSeq, "index": image.loadIndex, "from": -1});
+        final chunkState = _dicomChunks[image];
+        final item = <String, dynamic>{
+          "dl": info.downloadSeq,
+          "index": image.loadIndex,
+          "from": -1
+        };
+        if (chunkState != null && chunkState.nextOffset > 0) {
+          item["byte_offset"] = chunkState.nextOffset;
+        }
+        items.add(item);
       } else {
         IntermediatePixelData? interData = dcm.getIntermediatePixelData(0);
         if (interData != null) {
@@ -313,15 +328,12 @@ class DownloadController extends IDownloadController {
       };
       info.request = source.createRequest(RequestType.downloadImages, data);
       if (info.request != null) {
-        info.request!
-            .send()
-            .then((response) {
-              _onDownloadImagesResponse(info, response);
-            })
-            .catchError((Object error, StackTrace stackTrace) {
-              _handleDownloadException(info, error, stackTrace,
-                  phase: 'downloadImages');
-            });
+        info.request!.send().then((response) {
+          _onDownloadImagesResponse(info, response);
+        }).catchError((Object error, StackTrace stackTrace) {
+          _handleDownloadException(info, error, stackTrace,
+              phase: 'downloadImages');
+        });
       }
 
       //info.request = this._onis.viewerService.downloadImages(server, source.session, source.subType, source.sourceId, items, candidates.pendingRanges, info.maxBytes, _onDownloadImagesResponse, this, info.guid);
@@ -608,6 +620,15 @@ class DownloadController extends IDownloadController {
       } else {
         //we got some binary data to analyze.
         Uint8List bytes = response.data!['binary'] as Uint8List;
+        if (bytes.length < 8) {
+          _interruptSeriesDownload(series, ResultStatus.failure,
+              OnisErrorCodes.invalidResponse, completedImages);
+          if (info.request != null) {
+            info.request!.cancel();
+            info.request = null;
+          }
+          return;
+        }
 
         int offset = 0;
         //this._analyzeBandwidth(srinfo, series, bytes);
@@ -645,8 +666,86 @@ class DownloadController extends IDownloadController {
             } else {
               //read the images information:
               while (offset < bytes.length) {
-                if (offset == -1)
+                //read image information:
+                List<dynamic> imageInfo =
+                    _readImageInformation(series, bytes, offset);
+                offset = imageInfo[0];
+                if (offset == -1) {
+                  _interruptSeriesDownload(series, ResultStatus.failure,
+                      OnisErrorCodes.invalidResponse, completedImages);
+                  break;
+                }
+
+                entities.Image image = imageInfo[2];
+                int imageIndex = imageInfo[3];
+                int imageResult = imageInfo[4];
+
+                //update the download range index (to prevent to redownload the same image twice)
+                _updateImageRangeIndex(info, imageIndex);
+                //analyze the image result:
+                if (imageResult != 0) {
+                  //if the image is not found but the download is not complete, the server may need more time to get the image (this is no an error in this case, we will have to resend the download request later)
+                  if (imageResult == OnisErrorCodes.notFound &&
+                      !info.completed) {
+                    delayNextDownload = true;
+                  } else {
+                    _setImageLoadStatus(info, image, completedImages,
+                        ResultStatus.failure, imageResult, "");
+                  }
+                } else {
+                  final dicomChunkState = _dicomChunks[image];
+                  if (dicomChunkState == null) {
+                    //read the format of the image:
+                    int imageFormat = ((bytes[offset + 3] << 24) |
+                            (bytes[offset + 2] << 16) |
+                            (bytes[offset + 1] << 8) |
+                            bytes[offset]) >>>
+                        0;
+                    offset += 4;
+
+                    if (imageFormat == 0) {
+                      offset = _readDicomChunkData(
+                        info,
+                        image,
+                        bytes,
+                        offset,
+                        completedImages,
+                        startsWithTotalSize: true,
+                      );
+                      if (offset == -1) {
+                        offset = _interruptSeriesDownload(
+                            series,
+                            ResultStatus.failure,
+                            OnisErrorCodes.invalidResponse,
+                            completedImages);
+                        break;
+                      }
+                    } else {
+                      _interruptSeriesDownload(series, ResultStatus.failure,
+                          OnisErrorCodes.invalidResponse, completedImages);
+                      break;
+                    }
+                  } else {
+                    offset = _readDicomChunkData(
+                      info,
+                      image,
+                      bytes,
+                      offset,
+                      completedImages,
+                    );
+                    if (offset == -1) {
+                      offset = _interruptSeriesDownload(
+                          series,
+                          ResultStatus.failure,
+                          OnisErrorCodes.invalidResponse,
+                          completedImages);
+                    }
+                  }
+                }
+
+                /*if (offset == -1) {
                   break; //offset equals -1 when an error occurred.
+                }
                 List<dynamic> imageInfo =
                     _readImageInformation(series, bytes, offset);
                 offset = imageInfo[0];
@@ -677,6 +776,26 @@ class DownloadController extends IDownloadController {
                     DicomFile? dcm = image!.dicomFile;
                     if (dcm == null) {
                       //we don't have a dicom file yet
+                      final dicomChunkState = _dicomChunks[image];
+                      if (dicomChunkState != null &&
+                          dicomChunkState.nextOffset > 0) {
+                        offset = _readDicomChunkData(
+                          info,
+                          image,
+                          bytes,
+                          offset,
+                          completedImages,
+                        );
+                        if (offset == -1) {
+                          offset = _interruptSeriesDownload(
+                              series,
+                              ResultStatus.failure,
+                              OnisErrorCodes.invalidResponse,
+                              completedImages);
+                        }
+                        continue;
+                      }
+
                       //read the format of the image:
                       int imageFormat = ((bytes[offset + 3] << 24) |
                               (bytes[offset + 2] << 16) |
@@ -684,6 +803,24 @@ class DownloadController extends IDownloadController {
                               bytes[offset]) >>>
                           0;
                       offset += 4;
+                      if (imageFormat == 0) {
+                        offset = _readDicomChunkData(
+                          info,
+                          image,
+                          bytes,
+                          offset,
+                          completedImages,
+                          startsWithTotalSize: true,
+                        );
+                        if (offset == -1) {
+                          offset = _interruptSeriesDownload(
+                              series,
+                              ResultStatus.failure,
+                              OnisErrorCodes.invalidResponse,
+                              completedImages);
+                        }
+                        continue;
+                      }
                       EncodedFormat encodedFormat =
                           EncodedFormatExtension.fromInt(imageFormat);
                       if (encodedFormat != EncodedFormat.raw &&
@@ -830,7 +967,7 @@ class DownloadController extends IDownloadController {
                         if (offset == -1) offset = this._interruptSeriesDownload(series, RESULT.OSRSP_FAILURE, RESULT.EOS_INVALID_RESPONSE, completedImages);*/
                     }
                   }
-                }
+                }*/
               }
             }
           }
@@ -854,6 +991,7 @@ class DownloadController extends IDownloadController {
   int _interruptSeriesDownload(entities.Series series, ResultStatus status,
       int reason, List<entities.Image> completedImages) {
     for (entities.Image image in series.images) {
+      _removeDicomChunkState(image);
       if (image.loadStatus.status == ResultStatus.pending) {
         image.loadStatus.status = status;
         image.loadStatus.reason = reason;
@@ -1125,6 +1263,112 @@ class DownloadController extends IDownloadController {
       }
     }
     return valid ? offset : -1;
+  }
+
+  int _readDicomChunkData(
+    DownloadSeries srinfo,
+    entities.Image image,
+    Uint8List bytes,
+    int offset,
+    List<entities.Image> completedImages, {
+    bool startsWithTotalSize = false,
+  }) {
+    if (offset + 8 > bytes.length) {
+      return -1;
+    }
+
+    final state = _dicomChunks.putIfAbsent(image, _DicomChunkState.new);
+
+    if (startsWithTotalSize) {
+      if (offset + 4 > bytes.length) {
+        return -1;
+      }
+      state.totalSize = ((bytes[offset + 3] << 24) |
+              (bytes[offset + 2] << 16) |
+              (bytes[offset + 1] << 8) |
+              bytes[offset]) >>>
+          0;
+      debugPrint(
+        'DICOM chunk header: imageIndex=${image.loadIndex}, '
+        'downloadSeq=${srinfo.downloadSeq}, totalSize=${state.totalSize}, '
+        'offset=$offset, packetBytes=${bytes.length}',
+      );
+      offset += 4;
+      if (state.totalSize <= 0) {
+        debugPrint(
+          'DICOM chunk invalid totalSize: imageIndex=${image.loadIndex}, '
+          'downloadSeq=${srinfo.downloadSeq}, totalSize=${state.totalSize}',
+        );
+        return -1;
+      }
+      state.memoryThresholdBytes = _dicomImageMemoryThresholdBytes;
+      try {
+        state.resetData();
+      } catch (_) {
+        return -1;
+      }
+    }
+
+    if (offset + 8 > bytes.length) {
+      return -1;
+    }
+
+    final int nextOffset = ((bytes[offset + 3] << 24) |
+            (bytes[offset + 2] << 16) |
+            (bytes[offset + 1] << 8) |
+            bytes[offset]) >>>
+        0;
+    offset += 4;
+    final int dataLen = ((bytes[offset + 3] << 24) |
+            (bytes[offset + 2] << 16) |
+            (bytes[offset + 1] << 8) |
+            bytes[offset]) >>>
+        0;
+    offset += 4;
+    debugPrint(
+      'DICOM chunk payload: imageIndex=${image.loadIndex}, '
+      'downloadSeq=${srinfo.downloadSeq}, nextOffset=$nextOffset, '
+      'dataLen=$dataLen, totalSize=${state.totalSize}',
+    );
+
+    if (dataLen < 0 || offset + dataLen > bytes.length) {
+      return -1;
+    }
+
+    if (dataLen > 0) {
+      try {
+        state.appendData(bytes, offset, dataLen);
+      } catch (_) {
+        return -1;
+      }
+      offset += dataLen;
+    }
+
+    state.nextOffset = nextOffset;
+
+    if (state.totalSize > 0 && state.nextOffset >= state.totalSize) {
+      _removeDicomChunkState(image);
+      _setImageLoadStatus(
+        srinfo,
+        image,
+        completedImages,
+        ResultStatus.success,
+        OnisErrorCodes.none,
+        "",
+      );
+    } else {
+      image.loadStatus.status = ResultStatus.streaming;
+      image.loadStatus.reason = OnisErrorCodes.none;
+    }
+
+    return offset;
+  }
+
+  void _removeDicomChunkState(entities.Image image) {
+    final state = _dicomChunks.remove(image);
+    if (state != null) {
+      state.dispose();
+    }
   }
 
   int _readMonochromeRawData(entities.Image image, int width, int height,
@@ -2001,4 +2245,84 @@ class DownloadController extends IDownloadController {
         }
         this._retrieveNextIcons();
     }*/
+}
+
+class _DicomChunkState {
+  int memoryThresholdBytes = 8 * 1024 * 1024;
+  int totalSize = -1;
+  int nextOffset = 0;
+  final BytesBuilder _receivedData = BytesBuilder(copy: false);
+  File? _tempFile;
+  RandomAccessFile? _tempHandle;
+  int _memoryBytes = 0;
+
+  void resetData() {
+    _receivedData.clear();
+    _memoryBytes = 0;
+    _closeTempHandle();
+    final file = _tempFile;
+    _tempFile = null;
+    if (file != null && file.existsSync()) {
+      file.deleteSync();
+    }
+  }
+
+  void appendData(Uint8List bytes, int offset, int length) {
+    if (length <= 0) {
+      return;
+    }
+
+    if (_tempHandle == null && _memoryBytes + length > memoryThresholdBytes) {
+      _promoteToTempFile();
+    }
+
+    if (_tempHandle != null) {
+      _tempHandle!.writeFromSync(bytes, offset, offset + length);
+      return;
+    }
+
+    _receivedData.add(Uint8List.view(
+      bytes.buffer,
+      bytes.offsetInBytes + offset,
+      length,
+    ));
+    _memoryBytes += length;
+  }
+
+  void _promoteToTempFile() {
+    final tempDir = Directory.systemTemp.path;
+    final tmpPath =
+        '$tempDir/onis_dicom_${DateTime.now().microsecondsSinceEpoch}_${identityHashCode(this)}.tmp';
+    final tmpFile = File(tmpPath);
+    final handle = tmpFile.openSync(mode: FileMode.writeOnlyAppend);
+    final inMemory = _receivedData.toBytes();
+    if (inMemory.isNotEmpty) {
+      handle.writeFromSync(inMemory);
+    }
+    _receivedData.clear();
+    _memoryBytes = 0;
+    _tempFile = tmpFile;
+    _tempHandle = handle;
+  }
+
+  void _closeTempHandle() {
+    final handle = _tempHandle;
+    _tempHandle = null;
+    if (handle != null) {
+      handle.closeSync();
+    }
+  }
+
+  void dispose() {
+    _closeTempHandle();
+    final file = _tempFile;
+    _tempFile = null;
+    if (file != null && file.existsSync()) {
+      file.deleteSync();
+    }
+    _receivedData.clear();
+    _memoryBytes = 0;
+    totalSize = -1;
+    nextOffset = 0;
+  }
 }

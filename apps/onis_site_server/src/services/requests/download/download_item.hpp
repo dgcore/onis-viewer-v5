@@ -6,6 +6,59 @@
 #include "onis_kit/include/core/exception.hpp"
 #include "onis_kit/include/core/result.hpp"
 #include "onis_kit/include/dicom/dicom.hpp"
+#include "onis_kit/include/utilities/filesystem.hpp"
+
+enum class DlItemType {
+  kDicomFile,
+  kJ2kStreamFile,
+  kUnknown,
+};
+
+struct DlItem {
+  onis::result res;
+  std::int32_t index{-1};
+  DlItemType type{DlItemType::kUnknown};
+  std::string path;
+  std::size_t file_size{0};
+
+  void init(const request_database& db, const std::string& download_seq) {
+    if (!res.good())
+      return;
+
+    Json::Value image(Json::objectValue);
+    try {
+      db->find_download_image_by_index(
+          download_seq, index, onis::database::lock_mode::NO_LOCK, image);
+    } catch (const onis::exception& e) {
+      res.set(OSRSP_FAILURE, e.get_code(), e.what(), false);
+    } catch (...) {
+      res.set(OSRSP_FAILURE, EOS_UNKNOWN, "Unknown error", false);
+    }
+    if (!res.good())
+      return;
+
+    path = image["path"].asString();
+
+    switch (image["type"].asInt()) {
+      case 1:
+        type = DlItemType::kDicomFile;
+        file_size = static_cast<std::size_t>(
+            onis::util::filesystem::get_file_size(path));
+        if (file_size <= 0) {
+          res.set(OSRSP_FAILURE, EOS_FILE_OPEN, "Failed to open DICOM file",
+                  false);
+        }
+        break;
+      case 2:
+        type = DlItemType::kJ2kStreamFile;
+        break;
+      default:
+        res.set(OSRSP_FAILURE, EOS_FILE_FORMAT, "Unknown file type", false);
+    }
+  }
+};
+
+#ifdef _BEFORE_FILE_STREAMING_SUPPORT_
 
 struct DlItem {
   // constructor:
@@ -31,11 +84,11 @@ struct DlItem {
   }
 
   onis::result res;
-  std::string srdlid;         // download id that needs to be returned
-  std::int32_t index;         // load index of the image
-  std::int32_t frame_index;   // frame index of the image.
-  std::int32_t cur_res;       // current resolution of the image
-  std::int32_t new_res;       // the resolution we should send
+  std::string srdlid;        // download id that needs to be returned
+  std::int32_t index;        // load index of the image
+  std::int32_t frame_index;  // frame index of the image.
+  std::int32_t cur_res;      // current resolution of the image
+  std::int32_t new_res;      // the resolution we should send
   std::int64_t dicom_byte_offset =
       0;  // next byte to read for type==0 (full DICOM file transfer)
   std::int64_t dicom_byte_end =
@@ -79,8 +132,11 @@ struct DlItem {
     path = image["path"].asString();
     type = image["type"].asInt();
     if (type == 1) {
+      // dicom file
+      type = 0;
+
       // raw format!
-      site_api_ptr api = site_api::get_instance();
+      /*site_api_ptr api = site_api::get_instance();
       onis::dicom_manager_ptr manager = api->get_dicom_manager();
       if (manager == NULL) {
         res.set(OSRSP_FAILURE, EOS_INTERNAL, "Missing Dicom manager", false);
@@ -118,7 +174,7 @@ struct DlItem {
 
       std::size_t count;
       if (frame->get_intermediate_pixel_data(&count) == nullptr)
-        res.set(OSRSP_FAILURE, EOS_FAILED_TO_EXTRACT_IMAGE, "", false);
+        res.set(OSRSP_FAILURE, EOS_FAILED_TO_EXTRACT_IMAGE, "", false);*/
 
     } else if (type == 2) {
       // j2k stream format!
@@ -237,3 +293,5 @@ struct DlItem {
     return 0;
   }
 };
+
+#endif

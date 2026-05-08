@@ -25,14 +25,18 @@ std::mutex g_backend_mutex;
 OnisBackendHandle* g_shared_backend = nullptr;
 std::once_flag g_dcmtk_init_once;
 
-void set_last_error(const char* message) { g_last_error = message; }
+void set_last_error(const char* message) {
+  g_last_error = message;
+}
 
 void ensure_dcmtk_initialized() {
   std::call_once(g_dcmtk_init_once, [] { dcmtk_init(); });
 }
 }  // namespace
 
-int32_t onis_backend_version(void) { return 2; }
+int32_t onis_backend_version(void) {
+  return 2;
+}
 
 OnisBackendHandle* onis_backend_create(void) {
   std::lock_guard<std::mutex> lock(g_backend_mutex);
@@ -91,14 +95,15 @@ int32_t onis_backend_instance_id(OnisBackendHandle* handle) {
   return handle->generation;
 }
 
-const char* onis_backend_get_last_error(void) { return g_last_error.c_str(); }
+const char* onis_backend_get_last_error(void) {
+  return g_last_error.c_str();
+}
 
 OnisBackendStatus onis_backend_dicom_load_file(OnisBackendHandle* handle,
                                                const char* utf8_path,
                                                int32_t* out_id) {
   if (handle == nullptr || utf8_path == nullptr || out_id == nullptr) {
-    set_last_error(
-        "Invalid argument: handle, utf8_path, or out_id is null.");
+    set_last_error("Invalid argument: handle, utf8_path, or out_id is null.");
     return ONIS_BACKEND_INVALID_ARGUMENT;
   }
 
