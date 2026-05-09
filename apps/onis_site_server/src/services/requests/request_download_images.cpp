@@ -1,5 +1,6 @@
 #include <png.h>
 #include <algorithm>
+#include <array>
 #include <cstdlib>
 #include <cstring>
 #include <fstream>
@@ -11,6 +12,7 @@
 
 #include "../../../include/database/items/db_download_image.hpp"
 #include "../../../include/database/items/db_download_series.hpp"
+#include "../../../include/database/items/db_item.hpp"
 #include "../../../include/services/requests/request_data.hpp"
 #include "../../../include/services/requests/request_service.hpp"
 #include "./download/download_item.hpp"
@@ -28,8 +30,7 @@ void request_service::process_download_images_request(
   onis::database::item::verify_array_value(req->input_json, "images", false);
 
   // prepare the download items array:
-  // std::unordered_map<std::string, Json::Value> dlmap;
-  std::vector<std::unique_ptr<DlItem>> dlitems;
+  download_stream_ptr dstream = std::make_shared<download_stream>();
   std::size_t dlitems_index = 0;
   std::size_t max_bytes = req->input_json["max_bytes"].asInt();
   std::size_t total_bytes = 0;
@@ -39,37 +40,224 @@ void request_service::process_download_images_request(
     request_database db(this);
     for (const auto& image : req->input_json["images"]) {
       std::string download_seq = image["dl"].asString();
-      // get the series download information:
-      /*if (dlmap.find(dlseq) == dlmap.end()) {
-        dlmap[dlseq] = Json::Value(Json::objectValue);
-        try {
-          db->find_download_series_by_seq(
-              dlseq, onis::database::lock_mode::NO_LOCK, dlmap[dlseq]);
-        } catch (const onis::exception& e) {
-          dlitem->res.set(OSRSP_FAILURE, e.get_code(), e.what(), false);
-          dlmap.erase(dlseq);
-          continue;
-        } catch (...) {
-          dlitem->res.set(OSRSP_FAILURE, EOS_UNKNOWN, "Unknown error", false);
-          dlmap.erase(dlseq);
-          continue;
-        }
-      }*/
 
       // prepare a download item for the image:
       std::unique_ptr<DlItem> dlitem = std::make_unique<DlItem>();
       dlitem->index = image["index"].asInt();
       dlitem->init(db, download_seq);
+
+      // get the series download information:
+      if (dstream->dlmap.find(download_seq) == dstream->dlmap.end()) {
+        dstream->dlmap[download_seq] = Json::Value(Json::objectValue);
+        try {
+          db->find_download_series_by_seq(download_seq,
+                                          onis::database::lock_mode::NO_LOCK,
+                                          dstream->dlmap[download_seq]);
+          dstream->dl_order.push_back(download_seq);
+        } catch (const onis::exception& e) {
+          dlitem->res.set(OSRSP_FAILURE, e.get_code(), e.what(), false);
+          dstream->dlmap.erase(download_seq);
+          continue;
+        } catch (...) {
+          dlitem->res.set(OSRSP_FAILURE, EOS_UNKNOWN, "Unknown error", false);
+          dstream->dlmap.erase(download_seq);
+          continue;
+        }
+      }
       if (!dlitem->res.good()) {
         continue;
       }
-      dlitems.emplace_back(std::move(dlitem));
+      dstream->items.emplace_back(std::move(dlitem));
       if (total_bytes > max_bytes)
         break;
     }
   }
-}
 
+  auto to_le_u32 = [](std::uint32_t value) -> std::array<char, 4> {
+    return std::array<char, 4>{
+        static_cast<char>(value & 0xFF),
+        static_cast<char>((value >> 8) & 0xFF),
+        static_cast<char>((value >> 16) & 0xFF),
+        static_cast<char>((value >> 24) & 0xFF),
+    };
+  };
+  auto to_le_u64 = [](std::uint64_t value) -> std::array<char, 8> {
+    return std::array<char, 8>{
+        static_cast<char>(value & 0xFF),
+        static_cast<char>((value >> 8) & 0xFF),
+        static_cast<char>((value >> 16) & 0xFF),
+        static_cast<char>((value >> 24) & 0xFF),
+        static_cast<char>((value >> 32) & 0xFF),
+        static_cast<char>((value >> 40) & 0xFF),
+        static_cast<char>((value >> 48) & 0xFF),
+        static_cast<char>((value >> 56) & 0xFF),
+    };
+  };
+
+  auto stream_callback = [dstream, to_le_u32, to_le_u64](
+                             char* out, std::size_t max_len) -> std::size_t {
+    if (max_len == 0) {
+      return 0;
+    }
+
+    std::size_t written = 0;
+    while (written < max_len &&
+           dstream->current_phase != download_stream::phase::kDone) {
+      auto write_from = [&](const char* src, std::size_t len) -> std::size_t {
+        const std::size_t remaining = len - dstream->phase_offset;
+        const std::size_t can_copy = std::min(max_len - written, remaining);
+        std::memcpy(out + written, src + dstream->phase_offset, can_copy);
+        written += can_copy;
+        dstream->phase_offset += can_copy;
+        return can_copy;
+      };
+
+      switch (dstream->current_phase) {
+        case download_stream::phase::kMagic:
+          write_from(dstream->magic.data(), dstream->magic.size());
+          dstream->on_data_written();
+          break;
+        case download_stream::phase::kSeriesCount: {
+          std::uint32_t series_count =
+              static_cast<std::uint32_t>(dstream->dl_order.size());
+          auto series_count_le = to_le_u32(series_count);
+          write_from(series_count_le.data(), series_count_le.size());
+          dstream->on_data_written();
+          break;
+        }
+        case download_stream::phase::kSeriesSeqLen: {
+          const std::string& series_seq =
+              dstream->dl_order[dstream->series_index];
+          auto series_seq_len =
+              to_le_u32(static_cast<std::uint32_t>(series_seq.size()));
+          write_from(series_seq_len.data(), series_seq_len.size());
+          dstream->on_data_written();
+          break;
+        }
+        case download_stream::phase::kSeriesSeq: {
+          const std::string& series_seq =
+              dstream->dl_order[dstream->series_index];
+          write_from(series_seq.data(), series_seq.size());
+          dstream->on_data_written();
+          break;
+        }
+        case download_stream::phase::kSeriesCompleted: {
+          const std::string& series_seq =
+              dstream->dl_order[dstream->series_index];
+          const std::int32_t completed =
+              dstream->dlmap[series_seq][DS_COMPLETED_KEY].asInt();
+          auto series_completed_le =
+              to_le_u32(static_cast<std::uint32_t>(completed));
+          write_from(series_completed_le.data(), series_completed_le.size());
+          dstream->on_data_written();
+          break;
+        }
+        case download_stream::phase::kSeriesExpected: {
+          const std::string& series_seq =
+              dstream->dl_order[dstream->series_index];
+          const std::int32_t expected =
+              dstream->dlmap[series_seq][DS_EXPECTED_KEY].asInt();
+          auto series_expected_le =
+              to_le_u32(static_cast<std::uint32_t>(expected));
+          write_from(series_expected_le.data(), series_expected_le.size());
+          dstream->on_data_written();
+          break;
+        }
+        case download_stream::phase::kItemCount: {
+          const std::int32_t item_count =
+              static_cast<std::int32_t>(dstream->items.size());
+          auto item_count_le =
+              to_le_u32(static_cast<std::uint32_t>(item_count));
+          write_from(item_count_le.data(), item_count_le.size());
+          dstream->on_data_written();
+          break;
+        }
+        case download_stream::phase::kItemDownloadSeqLen: {
+          const std::string& download_seq =
+              dstream->items[dstream->item_index]->download_seq;
+          auto download_seq_len =
+              to_le_u32(static_cast<std::uint32_t>(download_seq.size()));
+          write_from(download_seq_len.data(), download_seq_len.size());
+          dstream->on_data_written();
+          break;
+        }
+        case download_stream::phase::kItemDownloadSeq: {
+          const std::string& download_seq =
+              dstream->items[dstream->item_index]->download_seq;
+          write_from(download_seq.data(), download_seq.size());
+          dstream->on_data_written();
+          break;
+        }
+        case download_stream::phase::kItemIndex: {
+          const std::int32_t index = dstream->items[dstream->item_index]->index;
+          auto index_le = to_le_u32(static_cast<std::uint32_t>(index));
+          write_from(index_le.data(), index_le.size());
+          dstream->on_data_written();
+          break;
+        }
+        case download_stream::phase::kItemType: {
+          const DlItemType type = dstream->items[dstream->item_index]->type;
+          auto type_le = to_le_u32(static_cast<std::uint32_t>(type));
+          write_from(type_le.data(), type_le.size());
+          dstream->on_data_written();
+          break;
+        }
+        case download_stream::phase::kItemResult: {
+          const auto& code = dstream->items[dstream->item_index]->res.reason;
+          auto code_le = to_le_u32(code);
+          write_from(code_le.data(), code_le.size());
+          dstream->on_data_written();
+          break;
+        }
+        case download_stream::phase::kItemFileSize: {
+          const std::size_t file_size =
+              dstream->items[dstream->item_index]->file_size;
+          auto file_size_le = to_le_u64(static_cast<std::uint64_t>(file_size));
+          write_from(file_size_le.data(), file_size_le.size());
+          dstream->on_data_written();
+          break;
+        }
+        case download_stream::phase::kItemFilePayload: {
+          auto& item = dstream->items[dstream->item_index];
+          const std::size_t file_remaining =
+              item->file_size - dstream->phase_offset;
+          if (file_remaining == 0) {
+            dstream->current_file.close();
+            dstream->on_data_written();
+            break;
+          }
+          const std::size_t to_read =
+              std::min(max_len - written, file_remaining);
+          dstream->current_file.read(out + written,
+                                     static_cast<std::streamsize>(to_read));
+          const std::size_t read_count =
+              static_cast<std::size_t>(dstream->current_file.gcount());
+          written += read_count;
+          dstream->phase_offset += read_count;
+          if (read_count == 0 || dstream->phase_offset >= item->file_size ||
+              dstream->current_file.eof()) {
+            dstream->current_file.close();
+            dstream->phase_offset = item->file_size;
+            dstream->on_data_written();
+          }
+          break;
+        }
+        case download_stream::phase::kDone:
+          break;
+      }
+    }
+    return written;
+  };
+
+  const bool stream =
+      req->input_json.isMember("stream") && req->input_json["stream"].asBool();
+  if (stream) {
+    req->write_output(
+        [&stream_callback](request_data::stream_reader_fn& output_stream) {
+          output_stream = stream_callback;
+        });
+  }
+}
 #ifdef _BEFORE_FILE_STREAMING_SUPPORT_
 namespace {
 void my_png_write_data(png_structp png_ptr, png_bytep data, png_size_t length) {
@@ -112,9 +300,8 @@ void my_png_flush(png_structp png_ptr) {}
     for (std::size_t i = 0; i + 1 < len; i += 2) {
       // Read as signed short (little-endian byte order).
       const std::uint16_t raw = static_cast<std::uint16_t>(data[i]) |
-                                (static_cast<std::uint16_t>(data[i + 1]) << 8);
-      const std::int16_t v = static_cast<std::int16_t>(raw);
-      if (v < min_s16)
+                                (static_cast<std::uint16_t>(data[i + 1]) <<
+8); const std::int16_t v = static_cast<std::int16_t>(raw); if (v < min_s16)
         min_s16 = v;
       if (v > max_s16)
         max_s16 = v;
@@ -156,16 +343,14 @@ void png_read_from_mem(png_structp png_ptr, png_bytep outBytes,
 
 void dump_png_decoded_as_hex(
     const std::uint8_t* data, std::size_t len, const std::string& label,
-    const std::uint8_t* original_data = nullptr, std::size_t original_len = 0) {
-  if (data == nullptr || len == 0)
-    return;
+    const std::uint8_t* original_data = nullptr, std::size_t original_len =
+0) { if (data == nullptr || len == 0) return;
 
   png_mem_reader reader{data, len, 0};
 
   png_structp png_ptr =
-      png_create_read_struct(PNG_LIBPNG_VER_STRING, nullptr, nullptr, nullptr);
-  if (!png_ptr)
-    return;
+      png_create_read_struct(PNG_LIBPNG_VER_STRING, nullptr, nullptr,
+nullptr); if (!png_ptr) return;
 
   png_infop info_ptr = png_create_info_struct(png_ptr);
   if (!info_ptr) {
@@ -204,9 +389,8 @@ void dump_png_decoded_as_hex(
     row_pointers[y] = buffer.data() + y * rowbytes;
   }
 
-  // Keep decoded 16-bit samples in host endianness (little-endian on macOS).
-  if (bit_depth == 16) {
-    png_set_swap(png_ptr);
+  // Keep decoded 16-bit samples in host endianness (little-endian on
+macOS). if (bit_depth == 16) { png_set_swap(png_ptr);
   }
 
   png_read_image(png_ptr, row_pointers.data());
@@ -215,10 +399,9 @@ void dump_png_decoded_as_hex(
 
   const char* home = std::getenv("HOME");
   std::string path =
-      home ? std::string(home) + "/Documents/pngDecoded.txt" : "pngDecoded.txt";
-  std::ofstream out(path, std::ios::out | std::ios::app);
-  if (!out.is_open())
-    return;
+      home ? std::string(home) + "/Documents/pngDecoded.txt" :
+"pngDecoded.txt"; std::ofstream out(path, std::ios::out | std::ios::app); if
+(!out.is_open()) return;
 
   out << "==== " << label << " decoded GRAY "
       << "w=" << width << " h=" << height << " bit_depth=" << bit_depth
@@ -258,8 +441,8 @@ first_original_value = 0; bool found_first = false;
         const std::uint16_t original_raw =
             static_cast<std::uint16_t>(original_data[ob]) |
             (static_cast<std::uint16_t>(original_data[ob + 1]) << 8);
-        const std::int16_t decoded_s16 = static_cast<std::int16_t>(decoded_raw);
-        const std::int16_t original_s16 =
+        const std::int16_t decoded_s16 =
+static_cast<std::int16_t>(decoded_raw); const std::int16_t original_s16 =
 static_cast<std::int16_t>(original_raw); if (decoded_s16 != original_s16) {
           ++mismatch_count;
           if (!found_first) {
@@ -651,7 +834,8 @@ void request_service::process_download_images_request(
           }
 
           if (data_offset == 0) {
-            // first packet for this image: announce file format and full size.
+            // first packet for this image: announce file format and full
+            // size.
             total_length += sizeof(std::int32_t);  // image format = 0
             total_length += sizeof(std::int32_t);  // total file size
           }
@@ -815,7 +999,8 @@ void request_service::process_download_images_request(
                     /*dump_bytes_as_hex((*it)->data, (*it)->data_len,
                                       "monochrome image data (PNG or raw)");
                     dump_png_decoded_as_hex((*it)->data, (*it)->data_len,
-                                            "monochrome image data decoded");*/
+                                            "monochrome image data
+                    decoded");*/
                     memcpy(&binary_output[current_offset], (*it)->data,
                            (*it)->data_len);
                   }

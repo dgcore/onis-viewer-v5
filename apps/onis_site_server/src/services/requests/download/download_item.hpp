@@ -1,5 +1,12 @@
 #pragma once
 
+#include <json/json.h>
+#include <array>
+#include <fstream>
+#include <unordered_map>
+#include <utility>
+#include <vector>
+
 #include "../../../../include/services/requests/request_database.hpp"
 #include "../../../../include/services/requests/request_service.hpp"
 #include "../../../../include/site_api.hpp"
@@ -15,6 +22,7 @@ enum class DlItemType {
 };
 
 struct DlItem {
+  std::string download_seq;
   onis::result res;
   std::int32_t index{-1};
   DlItemType type{DlItemType::kUnknown};
@@ -22,8 +30,10 @@ struct DlItem {
   std::size_t file_size{0};
 
   void init(const request_database& db, const std::string& download_seq) {
-    if (!res.good())
+    if (!res.good() || !this->download_seq.empty())
       return;
+
+    this->download_seq = download_seq;
 
     Json::Value image(Json::objectValue);
     try {
@@ -57,6 +67,182 @@ struct DlItem {
     }
   }
 };
+
+struct download_stream {
+  enum class phase {
+    kMagic,
+    kSeriesCount,
+    kSeriesSeqLen,
+    kSeriesSeq,
+    kSeriesCompleted,
+    kSeriesExpected,
+    kItemCount,
+    kItemDownloadSeqLen,
+    kItemDownloadSeq,
+    kItemIndex,
+    kItemType,
+    kItemResult,
+    kItemFileSize,
+    kItemFilePayload,
+    kDone,
+  };
+  std::unordered_map<std::string, Json::Value> dlmap;
+  std::vector<std::string> dl_order;
+  std::vector<std::unique_ptr<DlItem>> items;
+  phase current_phase{phase::kMagic};
+  std::size_t series_index{0};
+  std::size_t item_index{0};
+  std::size_t phase_offset{0};
+  std::ifstream current_file;
+  std::array<char, 8> magic{{'O', 'N', 'I', 'S', 'D', 'L', '0', '1'}};
+
+  void on_data_written() {
+    switch (current_phase) {
+      case download_stream::phase::kMagic:
+        if (phase_offset == magic.size()) {
+          current_phase = phase::kSeriesCount;
+          phase_offset = 0;
+        }
+        break;
+      case download_stream::phase::kSeriesCount:
+        if (phase_offset == sizeof(std::uint32_t)) {
+          phase_offset = 0;
+          if (!dlmap.empty()) {
+            series_index = 0;
+            current_phase = phase::kSeriesSeqLen;
+          } else {
+            current_phase = phase::kItemCount;
+          }
+        }
+        break;
+      case download_stream::phase::kSeriesSeqLen:
+        if (phase_offset == sizeof(std::uint32_t)) {
+          phase_offset = 0;
+          current_phase = phase::kSeriesSeq;
+        }
+        break;
+      case download_stream::phase::kSeriesSeq:
+        if (phase_offset == dl_order[series_index].size()) {
+          phase_offset = 0;
+          current_phase = phase::kSeriesCompleted;
+        }
+        break;
+      case download_stream::phase::kSeriesCompleted:
+        if (phase_offset == sizeof(std::uint32_t)) {
+          phase_offset = 0;
+          current_phase = phase::kSeriesExpected;
+        }
+        break;
+      case download_stream::phase::kSeriesExpected:
+        if (phase_offset == sizeof(std::uint32_t)) {
+          phase_offset = 0;
+          series_index++;
+          if (series_index < dl_order.size()) {
+            current_phase = phase::kSeriesSeqLen;
+          } else {
+            current_phase = phase::kItemCount;
+            item_index = 0;
+          }
+        }
+        break;
+      case download_stream::phase::kItemCount:
+        if (phase_offset == sizeof(std::uint32_t)) {
+          phase_offset = 0;
+          if (!items.empty()) {
+            item_index = 0;
+            current_phase = phase::kItemDownloadSeqLen;
+          } else {
+            current_phase = phase::kDone;
+          }
+        }
+        break;
+      case download_stream::phase::kItemDownloadSeqLen:
+        if (phase_offset == sizeof(std::uint32_t)) {
+          phase_offset = 0;
+          current_phase = phase::kItemDownloadSeq;
+        }
+        break;
+      case download_stream::phase::kItemDownloadSeq:
+        if (phase_offset == items[item_index]->download_seq.size()) {
+          phase_offset = 0;
+          current_phase = phase::kItemIndex;
+        }
+        break;
+      case download_stream::phase::kItemIndex:
+        if (phase_offset == sizeof(std::uint32_t)) {
+          // open the file now:
+          current_file.close();
+          current_file.clear();
+          current_file.open(items[item_index]->path, std::ios::binary);
+          if (!current_file.is_open()) {
+            items[item_index]->res.set(OSRSP_FAILURE, EOS_FILE_OPEN,
+                                       "Failed to open file", false);
+          } else {
+            try {
+              current_file.seekg(0, std::ios::end);
+              std::streampos file_size = current_file.tellg();
+              items[item_index]->file_size =
+                  static_cast<std::size_t>(file_size);
+              current_file.seekg(0, std::ios::beg);
+            } catch (...) {
+              items[item_index]->res.set(OSRSP_FAILURE, EOS_FILE_OPEN,
+                                         "Failed to open file", false);
+            }
+          }
+          phase_offset = 0;
+          current_phase = phase::kItemResult;
+        }
+        break;
+      case download_stream::phase::kItemResult:
+        if (phase_offset == sizeof(std::uint32_t)) {
+          phase_offset = 0;
+          if (items[item_index]->res.good()) {
+            current_phase = phase::kItemType;
+          } else {
+            on_item_done();
+          }
+        }
+        break;
+      case download_stream::phase::kItemType:
+        if (phase_offset == sizeof(std::uint32_t)) {
+          phase_offset = 0;
+          current_phase = phase::kItemFileSize;
+        }
+        break;
+
+      case download_stream::phase::kItemFileSize:
+        if (phase_offset == sizeof(std::uint64_t)) {
+          phase_offset = 0;
+          if (items[item_index]->file_size == 0) {
+            on_item_done();
+          } else {
+            current_phase = phase::kItemFilePayload;
+          }
+        }
+        break;
+      case download_stream::phase::kItemFilePayload:
+        if (phase_offset == items[item_index]->file_size) {
+          phase_offset = 0;
+          on_item_done();
+        }
+        break;
+      default:
+        break;
+    }
+  }
+
+private:
+  void on_item_done() {
+    item_index++;
+    if (item_index < items.size()) {
+      current_phase = phase::kItemDownloadSeqLen;
+    } else {
+      current_phase = phase::kDone;
+    }
+  }
+};
+
+typedef std::shared_ptr<download_stream> download_stream_ptr;
 
 #ifdef _BEFORE_FILE_STREAMING_SUPPORT_
 

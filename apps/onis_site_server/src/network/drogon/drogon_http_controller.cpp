@@ -180,11 +180,14 @@ void http_drogon_controller::treat_post_request(
     // Direct assignment - both use JsonCPP (Json::Value)
     data->input_json = *json_obj;
     rqsrv_->process_request(data);
-    // INSERT_YOUR_CODE
     data->read_output([&](const Json::Value& output,
-                          const std::vector<std::uint8_t>& binary_output) {
-      // resp = drogon::HttpResponse::newHttpJsonResponse(output);
-      if (!binary_output.empty()) {
+                          const std::vector<std::uint8_t>& binary_output,
+                          const request_data::stream_reader_fn& stream_reader) {
+      if (stream_reader) {
+        resp = drogon::HttpResponse::newStreamResponse(stream_reader);
+        resp->setStatusCode(drogon::HttpStatusCode::k200OK);
+        resp->setContentTypeCode(drogon::CT_APPLICATION_OCTET_STREAM);
+      } else if (!binary_output.empty()) {
         resp = drogon::HttpResponse::newHttpResponse();
         resp->setStatusCode(drogon::HttpStatusCode::k200OK);
         // Send raw bytes
@@ -193,13 +196,6 @@ void http_drogon_controller::treat_post_request(
                         binary_output.size()));
         // Choose proper MIME type for your payload
         resp->setContentTypeCode(drogon::CT_APPLICATION_OCTET_STREAM);
-        // Optional metadata from JSON
-        /*if (output.isMember("mime")) {
-          resp->addHeader("X-Content-Mime", output["mime"].asString());
-        }
-        if (output.isMember("name")) {
-          resp->addHeader("X-File-Name", output["name"].asString());
-        }*/
       } else {
         resp = drogon::HttpResponse::newHttpJsonResponse(output);
         resp->setStatusCode(drogon::HttpStatusCode::k200OK);
