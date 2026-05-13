@@ -2,7 +2,7 @@ import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
-import 'package:onis_viewer/core/dicom/dicom_frame.dart';
+import 'package:onis_viewer/core/dicom/dicom_bridge_frame.dart';
 import 'package:onis_viewer/core/graphics/drivers/driver.dart';
 import 'package:onis_viewer/core/graphics/renderer/renderer.dart';
 import 'package:onis_viewer/core/math/matrix.dart';
@@ -475,7 +475,7 @@ class OsDartDriverImage extends OsDriverImage {
   int _filterType = 0;
 
   @override
-  bool initWithFrame(DicomFrame frame) {
+  bool initWithFrame(DicomBridgeFrame frame) {
     final dims = frame.getDimensions();
     if (dims == null) return false;
     final width = dims.$1;

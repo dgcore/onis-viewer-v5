@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
@@ -254,6 +255,74 @@ class SiteAsyncRequest implements AsyncRequest {
       }
 
       debugPrint('SiteAsyncRequest.send() - finally block completed');
+    }
+  }
+
+  @override
+  Future<void> sendStreaming(void Function(Uint8List chunk) onChunk) async {
+    debugPrint(
+        'SiteAsyncRequest.sendStreaming() started for request type: $requestType');
+
+    await cancel();
+
+    _sendCompleter = Completer<void>();
+    _isCancelled = false;
+
+    try {
+      if (files != null && files!.isNotEmpty) {
+        throw UnsupportedError(
+          'SiteAsyncRequest.sendStreaming does not support multipart uploads',
+        );
+      }
+
+      final url = _buildUrl(requestType);
+      _currentRequest = http.Request('POST', Uri.parse(url));
+      _currentRequest!.headers['Content-Type'] = 'application/json';
+      if (data != null) {
+        _currentRequest!.body = jsonEncode(data);
+      }
+
+      final response = await _client.send(_currentRequest!);
+
+      if (_isCancelled) {
+        debugPrint(
+            'SiteAsyncRequest.sendStreaming() - cancelled after HTTP send');
+        return;
+      }
+
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        final body = await response.stream.toBytes();
+        String message;
+        try {
+          message = utf8.decode(body);
+        } catch (_) {
+          message =
+              'HTTP ${response.statusCode} (binary body, ${body.length} bytes)';
+        }
+        throw HttpRequestException(message, response.statusCode);
+      }
+
+      await for (final slice in response.stream) {
+        if (_isCancelled) break;
+        if (slice.isEmpty) continue;
+        final chunk =
+            slice is Uint8List ? slice : Uint8List.fromList(slice);
+        onChunk(chunk);
+      }
+    } catch (e) {
+      debugPrint('SiteAsyncRequest.sendStreaming() - caught exception: $e');
+      if (e is HttpRequestException) {
+        rethrow;
+      }
+      throw HttpRequestException('HTTP streaming failed: $e', 0);
+    } finally {
+      debugPrint('SiteAsyncRequest.sendStreaming() - finally block executing');
+      _currentRequest = null;
+      _currentMultipartRequest = null;
+      if (_sendCompleter != null && !_sendCompleter!.isCompleted) {
+        _sendCompleter!.complete();
+      }
+      debugPrint('SiteAsyncRequest.sendStreaming() - finally block completed');
     }
   }
 

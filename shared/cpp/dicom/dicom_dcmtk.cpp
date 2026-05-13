@@ -2305,7 +2305,7 @@ onis::dicom_frame_ptr dicom_dcmtk_file::extract_frame(std::int32_t index) {
         if (tmp != nullptr) {
           unsigned long opt_compatibilityMode =
               CIF_MayDetachPixelData;  // | CIF_TakeOverExternalDataset;
-          long fCount;
+          long fCount = 1;
           _file->getDataset()->findAndGetLongInt(DCM_NumberOfFrames, fCount);
           int framecnt = (int)fCount;
           if (framecnt > 1) {

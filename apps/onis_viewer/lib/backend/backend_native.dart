@@ -1,7 +1,10 @@
+import 'dart:convert';
 import 'dart:ffi' as ffi;
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:ffi/ffi.dart';
+import 'package:onis_viewer/core/dicom/image_region.dart';
 import 'package:path/path.dart' as p;
 
 import 'ffi_bindings.dart';
@@ -56,8 +59,7 @@ class OnisBackendNative {
     final pathPtr = utf8Path.toNativeUtf8();
     final outId = calloc<ffi.Int32>();
     try {
-      final status =
-          _bindings.dicomLoadFile(_handle, pathPtr, outId);
+      final status = _bindings.dicomLoadFile(_handle, pathPtr, outId);
       if (status != OnisBackendStatus.ok) {
         throw StateError(
           'Backend dicomLoadFile failed: ${_readLastError()}',
@@ -77,6 +79,269 @@ class OnisBackendNative {
       throw StateError(
         'Backend dicomRelease failed: ${_readLastError()}',
       );
+    }
+  }
+
+  /// [tagKey] is `(group << 16) | element`, same encoding as internal DCMTK tag int.
+  /// [vr] is the DICOM value representation ASCII (e.g. `UI`, `CS`).
+  String dicomGetStringElement(int dicomId, int tagKey, String vr) {
+    _ensureOpen();
+    final vrPtr = vr.toNativeUtf8();
+    const maxLen = 65536;
+    final out = calloc<ffi.Uint8>(maxLen);
+    final written = calloc<ffi.Uint32>();
+    try {
+      final status = _bindings.dicomGetStringElement(
+        _handle,
+        dicomId,
+        tagKey,
+        vrPtr,
+        out,
+        maxLen,
+        written,
+      );
+      if (status != OnisBackendStatus.ok) {
+        throw StateError(
+          'Backend dicomGetStringElement failed: ${_readLastError()}',
+        );
+      }
+      final n = written.value;
+      if (n == 0) {
+        return '';
+      }
+      return utf8.decode(out.asTypedList(n));
+    } finally {
+      calloc.free(vrPtr);
+      calloc.free(out);
+      calloc.free(written);
+    }
+  }
+
+  /// Fills [ImageRegion] from native `dicom_dcmtk_base::get_regions`.
+  List<ImageRegion> dicomGetRegions(int dicomId) {
+    _ensureOpen();
+    final countPtr = calloc<ffi.Int32>();
+    const cap = 64;
+    var buf = calloc<OnisBackendDicomRegion>(cap);
+    try {
+      var status = _bindings.dicomGetRegions(
+        _handle,
+        dicomId,
+        buf,
+        cap,
+        countPtr,
+      );
+      if (status != OnisBackendStatus.ok) {
+        throw StateError(
+          'Backend dicomGetRegions failed: ${_readLastError()}',
+        );
+      }
+      var total = countPtr.value;
+      if (total > cap) {
+        calloc.free(buf);
+        buf = calloc<OnisBackendDicomRegion>(total);
+        status = _bindings.dicomGetRegions(
+          _handle,
+          dicomId,
+          buf,
+          total,
+          countPtr,
+        );
+        if (status != OnisBackendStatus.ok) {
+          throw StateError(
+            'Backend dicomGetRegions failed: ${_readLastError()}',
+          );
+        }
+        total = countPtr.value;
+      }
+
+      final out = <ImageRegion>[];
+      for (var i = 0; i < total; i++) {
+        final native = buf.elementAt(i).ref;
+        final r = ImageRegion();
+        r.spatialFormat = native.spatial_format;
+        r.dataType = native.data_type;
+        r.originalSpacing[0] = native.original_spacing_x;
+        r.originalSpacing[1] = native.original_spacing_y;
+        r.originalUnit[0] = native.original_unit_x;
+        r.originalUnit[1] = native.original_unit_y;
+        r.calibratedSpacing[0] = native.calibrated_spacing_x;
+        r.calibratedSpacing[1] = native.calibrated_spacing_y;
+        r.calibratedUnit[0] = native.calibrated_unit_x;
+        r.calibratedUnit[1] = native.calibrated_unit_y;
+        r.x0 = native.x0;
+        r.x1 = native.x1;
+        r.y0 = native.y0;
+        r.y1 = native.y1;
+        out.add(r);
+      }
+      return out;
+    } finally {
+      calloc.free(buf);
+      calloc.free(countPtr);
+    }
+  }
+
+  /// Creates a native [onis::dicom_frame] for [dicomId] / [frameIndex]. Returns
+  /// an opaque frame id; call [dicomReleaseFrame] when done.
+  int dicomCreateFrame(int dicomId, int frameIndex) {
+    _ensureOpen();
+    final outId = calloc<ffi.Int32>();
+    try {
+      final status = _bindings.dicomFrameCreate(
+        _handle,
+        dicomId,
+        frameIndex,
+        outId,
+      );
+      if (status != OnisBackendStatus.ok) {
+        throw StateError(
+          'Backend dicomFrameCreate failed: ${_readLastError()}',
+        );
+      }
+      return outId.value;
+    } finally {
+      calloc.free(outId);
+    }
+  }
+
+  void dicomReleaseFrame(int frameId) {
+    _ensureOpen();
+    final status = _bindings.dicomFrameRelease(_handle, frameId);
+    if (status != OnisBackendStatus.ok) {
+      throw StateError(
+        'Backend dicomFrameRelease failed: ${_readLastError()}',
+      );
+    }
+  }
+
+  (int width, int height) dicomFrameGetDimensions(int frameId) {
+    _ensureOpen();
+    final outW = calloc<ffi.Int32>();
+    final outH = calloc<ffi.Int32>();
+    try {
+      final status = _bindings.dicomFrameGetDimensions(
+        _handle,
+        frameId,
+        outW,
+        outH,
+      );
+      if (status != OnisBackendStatus.ok) {
+        throw StateError(
+          'Backend dicomFrameGetDimensions failed: ${_readLastError()}',
+        );
+      }
+      return (outW.value, outH.value);
+    } finally {
+      calloc.free(outW);
+      calloc.free(outH);
+    }
+  }
+
+  bool dicomFrameIsMonochrome(int frameId) {
+    _ensureOpen();
+    final out = calloc<ffi.Int32>();
+    try {
+      final status = _bindings.dicomFrameIsMonochrome(
+        _handle,
+        frameId,
+        out,
+      );
+      if (status != OnisBackendStatus.ok) {
+        throw StateError(
+          'Backend dicomFrameIsMonochrome failed: ${_readLastError()}',
+        );
+      }
+      return out.value != 0;
+    } finally {
+      calloc.free(out);
+    }
+  }
+
+  int dicomFrameGetBitsPerPixel(int frameId) {
+    _ensureOpen();
+    final out = calloc<ffi.Int32>();
+    try {
+      final status = _bindings.dicomFrameGetBitsPerPixel(
+        _handle,
+        frameId,
+        out,
+      );
+      if (status != OnisBackendStatus.ok) {
+        throw StateError(
+          'Backend dicomFrameGetBitsPerPixel failed: ${_readLastError()}',
+        );
+      }
+      return out.value;
+    } finally {
+      calloc.free(out);
+    }
+  }
+
+  /// Full copy of native intermediate pixels (`get_intermediate_pixel_data`).
+  Uint8List dicomFrameCopyIntermediatePixelData(int frameId) {
+    _ensureOpen();
+    final sizeOut = calloc<ffi.Uint32>();
+    try {
+      var status = _bindings.dicomFrameGetIntermediatePixelData(
+        _handle,
+        frameId,
+        ffi.nullptr,
+        0,
+        sizeOut,
+      );
+      if (status != OnisBackendStatus.ok) {
+        throw StateError(
+          'Backend dicomFrameGetIntermediatePixelData (size) failed: ${_readLastError()}',
+        );
+      }
+      final n = sizeOut.value;
+      if (n == 0) {
+        return Uint8List(0);
+      }
+      final buf = calloc<ffi.Uint8>(n);
+      try {
+        status = _bindings.dicomFrameGetIntermediatePixelData(
+          _handle,
+          frameId,
+          buf,
+          n,
+          sizeOut,
+        );
+        if (status != OnisBackendStatus.ok) {
+          throw StateError(
+            'Backend dicomFrameGetIntermediatePixelData (copy) failed: ${_readLastError()}',
+          );
+        }
+        return Uint8List.fromList(buf.asTypedList(n));
+      } finally {
+        calloc.free(buf);
+      }
+    } finally {
+      calloc.free(sizeOut);
+    }
+  }
+
+  ({int bits, bool isSigned}) dicomFrameGetRepresentation(int frameId) {
+    _ensureOpen();
+    final outBits = calloc<ffi.Int32>();
+    final outSigned = calloc<ffi.Int32>();
+    try {
+      final status = _bindings.dicomFrameGetRepresentation(
+        _handle,
+        frameId,
+        outBits,
+        outSigned,
+      );
+      if (status != OnisBackendStatus.ok) {
+        throw StateError(
+          'Backend dicomFrameGetRepresentation failed: ${_readLastError()}',
+        );
+      }
+      return (bits: outBits.value, isSigned: outSigned.value != 0);
+    } finally {
+      calloc.free(outBits);
+      calloc.free(outSigned);
     }
   }
 

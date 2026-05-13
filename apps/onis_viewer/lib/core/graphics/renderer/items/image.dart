@@ -1,5 +1,4 @@
-import 'package:onis_viewer/core/dicom/dicom_frame.dart';
-import 'package:onis_viewer/core/dicom/image_region.dart';
+import 'package:onis_viewer/core/dicom/dicom_bridge_frame.dart';
 import 'package:onis_viewer/core/error_codes.dart';
 import 'package:onis_viewer/core/graphics/drivers/driver.dart';
 import 'package:onis_viewer/core/graphics/renderer/items/item.dart';
@@ -25,13 +24,13 @@ class OsGraphicImage extends OsGraphicResponder {
   WeakReference<entities.Series>? _wseries;
   WeakReference<entities.Image>? _wimage;
 
-  List<DicomFrame?> _frames = [];
+  List<DicomBridgeFrame?> _frames = [];
   int _currentFrame = 0;
 
   OsDriverImage? _texture;
   int _filterType = 0;
-  bool _showAllOverlays = false;
-  OsResult _drawStatus = OsResult();
+  final bool _showAllOverlays = false;
+  final OsResult _drawStatus = OsResult();
   //final List<OsGraphicAnnotation> _annotations = [];
 
   OsGraphicImage([String name = ''])
@@ -49,7 +48,7 @@ class OsGraphicImage extends OsGraphicResponder {
 
   @override
   bool copyProperties(OsGraphicItem from) {
-    final ret = super.copyProperties(from);
+    /*final ret = super.copyProperties(from);
 
     final img = from as OsGraphicImage;
 
@@ -79,7 +78,8 @@ class OsGraphicImage extends OsGraphicResponder {
     _drawStatus = img._drawStatus;
     _showAllOverlays = img._showAllOverlays;
 
-    return ret;
+    return ret;*/
+    return false;
   }
 
   void setImage(entities.Image img) {
@@ -123,14 +123,14 @@ class OsGraphicImage extends OsGraphicResponder {
 
   int getFrameCount() => _frames.length;
 
-  DicomFrame? getFrame(int index) {
+  DicomBridgeFrame? getFrame(int index) {
     if (index >= 0 && index < _frames.length) {
       return _frames[index];
     }
     return null;
   }
 
-  void setFrame(int index, DicomFrame? frame) {
+  void setFrame(int index, DicomBridgeFrame? frame) {
     if (index >= 0 && index < _frames.length) {
       if (_frames[index] != null) {
         if (identical(_frames[index], frame)) {
@@ -173,7 +173,7 @@ class OsGraphicImage extends OsGraphicResponder {
       final image = getImage();
 
       if (image != null) {
-        DicomFrame? frame = getFrame(_currentFrame);
+        DicomBridgeFrame? frame = getFrame(_currentFrame);
 
         /*if (frame != null) {
           final dcm1 = image.getDicomFile();
@@ -239,7 +239,7 @@ class OsGraphicImage extends OsGraphicResponder {
         }
 
         if (frame != null) {
-          final dims = frame.getDimensions();
+          /*final dims = frame.getDimensions();
           if (dims != null) {
             imageSize[0] = dims.$1.toDouble();
             imageSize[1] = dims.$2.toDouble();
@@ -272,7 +272,7 @@ class OsGraphicImage extends OsGraphicResponder {
           } else {
             sca[0] = imageSize[0];
             sca[1] = imageSize[1];
-          }
+          }*/
         }
 
         validateMatrix();
@@ -412,11 +412,11 @@ class OsGraphicImage extends OsGraphicResponder {
     if (_windowCenter == double.infinity || _windowWidth == double.infinity) {
       final image = getImage();
       if (image != null) {
-        DicomFrame? frame = getFrame(_currentFrame);
-        if (frame != null) {
+        DicomBridgeFrame? frame = getFrame(_currentFrame);
+        /*if (frame != null) {
           return frame.getOriginalWindowLevel();
         } else {
-          final file = image.dicomFile;
+          /*final file = image.dicomFile;
           if (file != null) {
             ({double center, double width})? windowLevel = file.windowLevel;
             if (windowLevel != null) {
@@ -429,8 +429,8 @@ class OsGraphicImage extends OsGraphicResponder {
             } else {
               return windowLevel;
             }
-          }
-        }
+          }*/
+        }*/
       }
       return null;
     } else {
@@ -559,7 +559,7 @@ class OsGraphicImage extends OsGraphicResponder {
       return;
     }
     if (frameCount > 0) {
-      _frames = List<DicomFrame?>.filled(frameCount, null);
+      _frames = List<DicomBridgeFrame?>.filled(frameCount, null);
     }
   }
 

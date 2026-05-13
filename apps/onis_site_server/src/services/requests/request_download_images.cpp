@@ -249,14 +249,10 @@ void request_service::process_download_images_request(
     return written;
   };
 
-  const bool stream =
-      req->input_json.isMember("stream") && req->input_json["stream"].asBool();
-  if (stream) {
-    req->write_output(
-        [&stream_callback](request_data::stream_reader_fn& output_stream) {
-          output_stream = stream_callback;
-        });
-  }
+  req->write_output(
+      [&stream_callback](request_data::stream_reader_fn& output_stream) {
+        output_stream = stream_callback;
+      });
 }
 #ifdef _BEFORE_FILE_STREAMING_SUPPORT_
 namespace {

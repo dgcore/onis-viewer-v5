@@ -1,4 +1,4 @@
-import 'package:onis_viewer/core/dicom/dicom_frame.dart';
+/*import 'package:onis_viewer/core/dicom/dicom_frame.dart';
 import 'package:onis_viewer/core/dicom/dicom_tags.dart';
 import 'package:onis_viewer/core/dicom/image_region.dart';
 import 'package:onis_viewer/core/dicom/intermediate_pixel_data.dart';
@@ -328,3 +328,4 @@ class DicomFile {
     return frame;
   }
 }
+*/
