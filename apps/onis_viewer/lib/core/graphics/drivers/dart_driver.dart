@@ -473,43 +473,51 @@ class OsDartDriverImage extends OsDriverImage {
   int _width = 0;
   int _height = 0;
   int _filterType = 0;
+  int _decodeGen = 0;
 
   @override
-  bool initWithFrame(DicomBridgeFrame frame) {
-    final dims = frame.getDimensions();
-    if (dims == null) return false;
-    final width = dims.$1;
-    final height = dims.$2;
-    if (width <= 0 || height <= 0) return false;
-    final pixels = Uint8List(width * height * 4);
-    if (!frame.createBitmap(
-      bits: 32,
-      inverseColor: false,
-      pixels: pixels,
-      width: width,
-      height: height,
-    )) {
+  bool initWithFrame(OsDriverContext? context, DicomBridgeFrame frame) {
+    DicomFrameResolution? resolution = frame.getResolution();
+    if (resolution == null) return false;
+    if (resolution.width <= 0 || resolution.height <= 0) return false;
+    final pixels = Uint8List(resolution.width * resolution.height * 4);
+    if (!frame.createBitmap(bits: 32, inverseColor: false, pixels: pixels)) {
       return false;
     }
-    return initWithPixels(width: width, height: height, pixels: pixels);
+    return initWithPixels(
+      repaintContext: context,
+      width: resolution.width,
+      height: resolution.height,
+      pixels: pixels,
+    );
   }
 
   bool initWithPixels({
+    OsDriverContext? repaintContext,
     required int width,
     required int height,
     required Uint8List pixels,
   }) {
     if (width <= 0 || height <= 0) return false;
     if (pixels.length < width * height * 4) return false;
+    _bmp?.dispose();
+    _bmp = null;
     _width = width;
     _height = height;
+    final gen = ++_decodeGen;
+    final hook = repaintContext;
     ui.decodeImageFromPixels(
       pixels,
       width,
       height,
       ui.PixelFormat.rgba8888,
       (ui.Image image) {
+        if (gen != _decodeGen) {
+          image.dispose();
+          return;
+        }
         _bmp = image;
+        hook?.onPixelsDecoded?.call();
       },
     );
     return true;
@@ -525,13 +533,14 @@ class OsDartDriverImage extends OsDriverImage {
   // Draw:
   @override
   bool willDraw(OsDriverContext ctx) {
-    //return _bmp == null;
     return false;
   }
 
   @override
   void draw(OsDriver driver, OsRenderInfo info, bool useAlpha) {
-    if (_bmp == null || _width <= 0 || _height <= 0) return;
+    if (_bmp == null || _width <= 0 || _height <= 0) {
+      return;
+    }
     final context = driver.currentContext;
     if (context is! OsDartDriverContext || context.canvas == null) return;
 

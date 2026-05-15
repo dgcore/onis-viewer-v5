@@ -161,8 +161,7 @@ class _DisplayWindowPageState extends State<DisplayWindowPage>
     final left = (monitorArgs['left'] as num?)?.toDouble() ?? 100;
     final top = (monitorArgs['top'] as num?)?.toDouble() ?? 100;
     final labelIndex = monitorArgs['labelIndex'];
-    final title =
-        '${OnisViewerConstants.appName} — Monitor $labelIndex';
+    final title = '${OnisViewerConstants.appName} — Monitor $labelIndex';
 
     final options = WindowOptions(
       size: Size(width, height),

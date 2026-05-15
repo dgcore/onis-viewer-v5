@@ -1,4 +1,5 @@
 import 'package:onis_viewer/core/dicom/dicom_bridge_frame.dart';
+import 'package:onis_viewer/core/dicom/image_region.dart';
 import 'package:onis_viewer/core/error_codes.dart';
 import 'package:onis_viewer/core/graphics/drivers/driver.dart';
 import 'package:onis_viewer/core/graphics/renderer/items/item.dart';
@@ -15,7 +16,7 @@ class OsGraphicImage extends OsGraphicResponder {
   ColorLut? _colorLut;
   OpacityTable? _opacityTable;
   ConvolutionFilter? _convolutionFilter;
-  WindowLevel? _windowLevelPreset;
+  WindowLevelPreset? _windowLevelPreset;
 
   bool _isDirty = true;
   double _windowWidth = double.infinity;
@@ -228,21 +229,23 @@ class OsGraphicImage extends OsGraphicResponder {
               _windowCenter == double.infinity) {
             //final centerWidth = <double>[0, 0];
             final wl = frame.getOriginalWindowLevel();
-            frame.setWindowLevel(wl);
-            _windowWidth = wl.width;
-            _windowCenter = wl.center;
+            if (wl != null) {
+              frame.setWindowLevel(wl);
+              _windowWidth = wl.width;
+              _windowCenter = wl.center;
+            }
           } else {
-            frame.setWindowLevel((center: _windowCenter, width: _windowWidth));
+            frame.setWindowLevel(
+                WindowLevel(center: _windowCenter, width: _windowWidth));
           }
-
-          _texture!.initWithFrame(frame);
+          _texture!.initWithFrame(info.context, frame);
         }
 
         if (frame != null) {
-          /*final dims = frame.getDimensions();
+          final dims = frame.getResolution();
           if (dims != null) {
-            imageSize[0] = dims.$1.toDouble();
-            imageSize[1] = dims.$2.toDouble();
+            imageSize[0] = dims.width.toDouble();
+            imageSize[1] = dims.height.toDouble();
           }
 
           ImageRegion? region;
@@ -272,7 +275,7 @@ class OsGraphicImage extends OsGraphicResponder {
           } else {
             sca[0] = imageSize[0];
             sca[1] = imageSize[1];
-          }*/
+          }
         }
 
         validateMatrix();
@@ -383,7 +386,7 @@ class OsGraphicImage extends OsGraphicResponder {
 
   ConvolutionFilter? getConvolutionFilter() => _convolutionFilter;
 
-  void setWindowLevel(WindowLevel? preset, bool resetOriginal) {
+  void setWindowLevel(WindowLevelPreset? preset, bool resetOriginal) {
     _windowLevelPreset = preset;
     _isDirty = true;
 
@@ -394,12 +397,12 @@ class OsGraphicImage extends OsGraphicResponder {
         _isDirty = true;
       }
     } else {
-      _windowWidth = preset.width;
-      _windowCenter = preset.center;
+      _windowWidth = preset.windowLevel.width;
+      _windowCenter = preset.windowLevel.center;
     }
   }
 
-  WindowLevel? getWindowLevel() => _windowLevelPreset;
+  WindowLevelPreset? getWindowLevel() => _windowLevelPreset;
 
   void setWindowLevelValues(double center, double width) {
     _windowLevelPreset = null;

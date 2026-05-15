@@ -64,6 +64,8 @@ class OsMonitorConfig {
     List<Display> displays = [];
     try {
       displays = await screenRetriever.getAllDisplays();
+
+      displays = [displays[0]];
     } catch (e, st) {
       debugPrint('detectMonitors: getAllDisplays failed: $e\n$st');
     }
@@ -75,7 +77,7 @@ class OsMonitorConfig {
       List<double> displayArea = [0, 0, displaySize.width, displaySize.height];
       final displayLabelIndex = displays.indexOf(display);
       final displayMonitor = OsMonitor('mon${displayLabelIndex + 1}');
-      //displayMonitor.setActive(false);
+      displayMonitor.setActive(false);
       displayMonitor.setActive(true); // should be false for real monitors
       displayMonitor.setArea(displayArea);
       displayMonitor.setLabelIndex(displayLabelIndex);

@@ -1,6 +1,5 @@
 import 'package:onis_viewer/core/dicom/dicom_bridge_file.dart';
 import 'package:onis_viewer/core/dicom/dicom_bridge_frame.dart';
-import 'package:onis_viewer/core/dicom/dicom_frame.dart';
 import 'package:onis_viewer/core/dicom/dicom_tags.dart';
 import 'package:onis_viewer/core/dicom/image_region.dart';
 import 'package:onis_viewer/core/error_codes.dart';
@@ -81,6 +80,7 @@ class ImageDicomInfo {
 
 /// Opened patient entity with studies
 class Patient {
+  String guid = UUIDv4().toString();
   database.Patient? _patient;
   final List<Study> _studies = [];
 
@@ -387,6 +387,7 @@ class Series {
 ///////////////////////////////////////////////////////////////////////
 
 class Image {
+  String guid = UUIDv4().toString();
   database.Image? _image;
   WeakReference<Series>? _wSeries;
   final bool _highestQuality = false;
@@ -527,24 +528,24 @@ class Image {
     return ret;
   }
 
-  bool getRegionsForFrame(DicomFrame frame, List<ImageRegion> list) {
+  bool getRegionsForFrame(DicomBridgeFrame frame, List<ImageRegion> list) {
     ImageRegionInfo? info = getRegionInfo();
     if (info != null) {
-      (int width, int height)? widthHeight = frame.getDimensions();
-      if (widthHeight != null) {
-        if (info.dimensions[0] == widthHeight.$1 &&
-            info.dimensions[1] == widthHeight.$2) {
+      DicomFrameResolution? resolution = frame.getResolution();
+      if (resolution != null) {
+        if (info.dimensions[0] == resolution.width &&
+            info.dimensions[1] == resolution.height) {
           for (int i = 0; i < info.regions.length; i++) {
             list.add(info.regions[i]);
           }
           return false;
         } else {
-          if (widthHeight.$1 > 0 &&
-              widthHeight.$2 > 0 &&
+          if (resolution.width > 0 &&
+              resolution.height > 0 &&
               info.dimensions[0] > 0 &&
               info.dimensions[1] > 0) {
-            double factorx = widthHeight.$1 / info.dimensions[0];
-            double factory = widthHeight.$2 / info.dimensions[1];
+            double factorx = resolution.width / info.dimensions[0];
+            double factory = resolution.height / info.dimensions[1];
             for (int i = 0; i < info.regions.length; i++) {
               ImageRegion region = info.regions[i].clone();
               region.originalSpacing[0] /= factorx;
@@ -559,10 +560,10 @@ class Image {
               int fx1 = x1.floor();
               int fy0 = y0.floor();
               int fy1 = y1.floor();
-              if (fx0 > widthHeight.$1 - 1) fx0 = widthHeight.$1 - 1;
-              if (fx1 > widthHeight.$1 - 1) fx1 = widthHeight.$1 - 1;
-              if (fy0 > widthHeight.$2 - 1) fy0 = widthHeight.$2 - 1;
-              if (fy1 > widthHeight.$2 - 1) fy1 = widthHeight.$2 - 1;
+              if (fx0 > resolution.width - 1) fx0 = resolution.width - 1;
+              if (fx1 > resolution.width - 1) fx1 = resolution.width - 1;
+              if (fy0 > resolution.height - 1) fy0 = resolution.height - 1;
+              if (fy1 > resolution.height - 1) fy1 = resolution.height - 1;
               region.x0 = fx0;
               region.x1 = fx1;
               region.y0 = fy0;

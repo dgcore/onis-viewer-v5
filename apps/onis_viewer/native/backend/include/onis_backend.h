@@ -85,24 +85,21 @@ onis_backend_dicom_get_regions(OnisBackendHandle* handle, int32_t dicom_id,
 /// The returned [out_frame_id] must be released with
 /// [onis_backend_dicom_frame_release]. Releasing the parent [dicom_id] also
 /// drops all frames created from that dataset.
-ONIS_BACKEND_EXPORT OnisBackendStatus onis_backend_dicom_frame_create(
-    OnisBackendHandle* handle, int32_t dicom_id, int32_t frame_index,
-    int32_t* out_frame_id);
+ONIS_BACKEND_EXPORT OnisBackendStatus
+onis_backend_dicom_frame_create(OnisBackendHandle* handle, int32_t dicom_id,
+                                int32_t frame_index, int32_t* out_frame_id);
 
 ONIS_BACKEND_EXPORT OnisBackendStatus
 onis_backend_dicom_frame_release(OnisBackendHandle* handle, int32_t frame_id);
 
 /// Retrieves the pixel dimensions of a frame.
-ONIS_BACKEND_EXPORT OnisBackendStatus
-onis_backend_dicom_frame_get_dimensions(OnisBackendHandle* handle,
-                                        int32_t frame_id, int32_t* out_width,
-                                        int32_t* out_height);
+ONIS_BACKEND_EXPORT OnisBackendStatus onis_backend_dicom_frame_get_dimensions(
+    OnisBackendHandle* handle, int32_t frame_id, int32_t* out_width,
+    int32_t* out_height);
 
 /// [out_is_monochrome]: 0 = false, 1 = true (`dicom_frame::is_monochrome`).
-ONIS_BACKEND_EXPORT OnisBackendStatus
-onis_backend_dicom_frame_is_monochrome(OnisBackendHandle* handle,
-                                       int32_t frame_id,
-                                       int32_t* out_is_monochrome);
+ONIS_BACKEND_EXPORT OnisBackendStatus onis_backend_dicom_frame_is_monochrome(
+    OnisBackendHandle* handle, int32_t frame_id, int32_t* out_is_monochrome);
 
 /// Bits per pixel from `dicom_frame::get_bits_per_pixel` (planes * depth).
 ONIS_BACKEND_EXPORT OnisBackendStatus
@@ -112,18 +109,44 @@ onis_backend_dicom_frame_get_bits_per_pixel(OnisBackendHandle* handle,
 
 /// Query or copy `dicom_frame::get_intermediate_pixel_data`.
 /// If [out_buf] is NULL, writes the required byte count to [out_written] only.
-/// If [out_buf] is non-NULL, [out_buf_size] must be >= that count; copies all bytes.
+/// If [out_buf] is non-NULL, [out_buf_size] must be >= that count; copies all
+/// bytes.
 ONIS_BACKEND_EXPORT OnisBackendStatus
-onis_backend_dicom_frame_get_intermediate_pixel_data(
-    OnisBackendHandle* handle, int32_t frame_id, uint8_t* out_buf,
-    uint32_t out_buf_size, uint32_t* out_written);
+onis_backend_dicom_frame_get_intermediate_pixel_data(OnisBackendHandle* handle,
+                                                     int32_t frame_id,
+                                                     uint8_t* out_buf,
+                                                     uint32_t out_buf_size,
+                                                     uint32_t* out_written);
 
-/// `dicom_frame::get_representation` — [out_bits] is 8 / 16 / 32, or 0 if unknown.
-/// [out_is_signed]: 0 = unsigned, 1 = signed.
+/// `dicom_frame::get_representation` — [out_bits] is 8 / 16 / 32, or 0 if
+/// unknown. [out_is_signed]: 0 = unsigned, 1 = signed.
 ONIS_BACKEND_EXPORT OnisBackendStatus
 onis_backend_dicom_frame_get_representation(OnisBackendHandle* handle,
                                             int32_t frame_id, int32_t* out_bits,
                                             int32_t* out_is_signed);
+
+/// [intermediate]: 0 = display-scaled min/max, 1 = stored intermediate min/max
+/// (`dicom_frame::get_min_max_values`).
+ONIS_BACKEND_EXPORT OnisBackendStatus onis_backend_dicom_frame_get_min_max_values(
+    OnisBackendHandle* handle, int32_t frame_id, int32_t intermediate,
+    double* out_min, double* out_max);
+
+/// `dicom_frame::get_rescale_and_intercept`.
+ONIS_BACKEND_EXPORT OnisBackendStatus
+onis_backend_dicom_frame_get_rescale_intercept(OnisBackendHandle* handle,
+                                               int32_t frame_id,
+                                               double* out_rescale,
+                                               double* out_intercept);
+
+/// Copies one channel (0=R, 1=G, 2=B) from [dicom_frame::get_palette] into [out_buf].
+/// If [out_buf] is NULL, writes the required byte count to [out_written] only.
+/// If the channel has no palette data, sets [out_count]=0, [out_bits]=0, [out_written]=0.
+/// When [out_first_mapped] is non-NULL, writes the first mapped value from the dataset
+/// descriptor (0028,1101–1103) or 0.
+ONIS_BACKEND_EXPORT OnisBackendStatus onis_backend_dicom_frame_copy_palette(
+    OnisBackendHandle* handle, int32_t frame_id, int32_t channel,
+    int32_t* out_count, int32_t* out_bits, int32_t* out_first_mapped,
+    uint8_t* out_buf, uint32_t out_buf_size, uint32_t* out_written);
 
 #ifdef __cplusplus
 }

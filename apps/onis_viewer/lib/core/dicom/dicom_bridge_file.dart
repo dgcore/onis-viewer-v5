@@ -13,7 +13,8 @@ import 'package:onis_viewer/core/dicom/image_region.dart';
 ///
 /// Frame extraction: [DicomBridgeFileFrameFactory.extractFrame] in
 /// `dicom_bridge_frame.dart` (extension, avoids an import cycle with
-/// [DicomBridgeFrame]).
+/// [DicomBridgeFrame]). Extract hydrates native frame metadata (resolution, bits,
+/// photometric, palettes, min/max) before pixels are read.
 class DicomBridgeFile {
   DicomBridgeFile._(this._backendId, {String? unlinkPathAfterRelease})
       : _unlinkPathAfterRelease = unlinkPathAfterRelease;

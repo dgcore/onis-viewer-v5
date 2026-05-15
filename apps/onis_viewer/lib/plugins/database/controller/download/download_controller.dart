@@ -389,9 +389,17 @@ class DownloadController extends IDownloadController {
       }
 
       processLoadingQueue();
-      OVApi()
-          .messages
-          .sendMessage(OSMSG.seriesImagesDownloadCompleted, completedImages);
+      List<Map<String, dynamic>> completedImagesMaps = [];
+      for (final image in completedImages) {
+        completedImagesMaps.add({
+          'image': image.guid,
+          'series': image.series?.guid,
+          'study': image.series?.study?.guid,
+          'patient': image.series?.study?.patient?.guid
+        });
+      }
+      OVApi().messages.sendMessage(
+          OSMSG.seriesImagesDownloadCompleted, completedImagesMaps);
     }
   }
 
@@ -478,10 +486,14 @@ class DownloadController extends IDownloadController {
         OnisErrorCodes.none,
         'loaded',
       );
-      OVApi().messages.sendMessage(
-        OSMSG.seriesImagesReceived,
-        <entities.Image>[image],
-      );
+      OVApi().messages.sendMessage(OSMSG.seriesImagesReceived, [
+        {
+          'image': image.guid,
+          'series': image.series?.guid,
+          'study': image.series?.study?.guid,
+          'patient': image.series?.study?.patient?.guid
+        }
+      ]);
     } catch (e, st) {
       debugPrint(
         'DownloadController: stream item DICOM load failed: $e\n$st',
@@ -933,8 +945,12 @@ class DownloadController extends IDownloadController {
             }
         }*/
 
-        OVApi().messages.sendMessage(OSMSG.seriesDownloadReceivedInfo,
-            {"series": series, "properties": null});
+        OVApi().messages.sendMessage(OSMSG.seriesDownloadReceivedInfo, {
+          "patient": series?.study?.patient?.guid ?? '',
+          "study": series?.study?.guid ?? '',
+          "series": series?.guid ?? '',
+          "properties": null
+        });
       } catch (e) {
         series?.loadStatus.setStatus(
             ResultStatus.failure, OnisErrorCodes.invalidResponse, "");

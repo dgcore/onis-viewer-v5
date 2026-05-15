@@ -49,5 +49,16 @@ class OnisBackendService {
   ({int bits, bool isSigned}) dicomFrameGetRepresentation(int frameId) =>
       _native.dicomFrameGetRepresentation(frameId);
 
+  (double rescale, double intercept) dicomFrameGetRescaleIntercept(int frameId) =>
+      _native.dicomFrameGetRescaleIntercept(frameId);
+
+  (double min, double max) dicomFrameGetMinMaxValues(
+          int frameId, bool intermediate) =>
+      _native.dicomFrameGetMinMaxValues(frameId, intermediate);
+
+  ({int count, int bits, int value, Uint8List data})? dicomFrameCopyPalette(
+          int frameId, int channel) =>
+      _native.dicomFrameCopyPalette(frameId, channel);
+
   void dispose() => _native.close();
 }

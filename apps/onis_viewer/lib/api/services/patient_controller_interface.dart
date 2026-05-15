@@ -10,5 +10,9 @@ abstract class IPatientController extends ChangeNotifier {
   void registerPatient(entities.Patient patient, bool notify);
   Future<void> openPatients(List<database.Patient> patients,
       FindPatientStudyItem? primary, BuildContext context);
+  entities.Image? findImageByGuids(String patientGuid, String studyGuid,
+      String seriesGuid, String imageGuid);
+  entities.Series? findSeriesByGuids(
+      String patientGuid, String studyGuid, String seriesGuid);
   void forceNotification();
 }

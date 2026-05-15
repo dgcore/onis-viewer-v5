@@ -3,23 +3,36 @@ import 'dart:convert';
 import 'package:onis_viewer/core/models/database/item.dart';
 import 'package:onis_viewer/core/models/database/preference_item.dart';
 
-class WindowLevel extends PreferenceItem {
+class WindowLevel {
   double center = 128;
   double width = 256;
 
-  WindowLevel? createFromData(dynamic data) {
-    WindowLevel item = WindowLevel();
+  WindowLevel({this.center = 128, this.width = 256});
+
+  WindowLevel clone() {
+    return WindowLevel(
+      center: center,
+      width: width,
+    );
+  }
+}
+
+class WindowLevelPreset extends PreferenceItem {
+  WindowLevel windowLevel = WindowLevel();
+
+  WindowLevelPreset? createFromData(dynamic data) {
+    WindowLevelPreset item = WindowLevelPreset();
     if (!item.decodeData(data)) {
       return null;
     }
     return item;
   }
 
-  WindowLevel() : super('WL', '1.0.0.0');
+  WindowLevelPreset() : super('WL', '1.0.0.0');
 
   @override
   Item? clone(bool children) {
-    WindowLevel copy = WindowLevel();
+    WindowLevelPreset copy = WindowLevelPreset();
     copy.id = id;
     copy.flags = flags;
     copy.version = version;
@@ -31,9 +44,9 @@ class WindowLevel extends PreferenceItem {
   bool copyTo(Item target, int mode) {
     if (!super.copyTo(target, mode)) return false;
     if (hasFlag(PreferenceItem.infoPrefItemData)) {
-      WindowLevel to = target as WindowLevel;
-      to.center = center;
-      to.width = width;
+      WindowLevelPreset to = target as WindowLevelPreset;
+      to.windowLevel.center = windowLevel.center;
+      to.windowLevel.width = windowLevel.width;
     }
     return true;
   }
@@ -41,10 +54,11 @@ class WindowLevel extends PreferenceItem {
   @override
   int compare(Item item) {
     int flags = super.compare(item);
-    WindowLevel other = item as WindowLevel;
+    WindowLevelPreset other = item as WindowLevelPreset;
     if (hasFlag(PreferenceItem.infoPrefItemData) &&
         other.hasFlag(PreferenceItem.infoPrefItemData)) {
-      if (center != other.center || width != other.width) {
+      if (windowLevel.center != other.windowLevel.center ||
+          windowLevel.width != other.windowLevel.width) {
         flags |= PreferenceItem.infoPrefItemData;
       }
     }
@@ -53,15 +67,18 @@ class WindowLevel extends PreferenceItem {
 
   @override
   String encodeData() {
-    Map<String, dynamic> data = {'c': center, 'w': width};
+    Map<String, dynamic> data = {
+      'c': windowLevel.center,
+      'w': windowLevel.width
+    };
     return jsonEncode(data);
   }
 
   @override
   bool decodeData(dynamic data) {
     try {
-      center = data.c;
-      width = data.w;
+      windowLevel.center = data.c;
+      windowLevel.width = data.w;
       return true;
     } catch (e) {
       return false;

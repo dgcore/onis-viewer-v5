@@ -44,8 +44,10 @@ void ensure_dcmtk_initialized() {
   std::call_once(g_dcmtk_init_once, [] { dcmtk_init(); });
 }
 
-void erase_dicom_frames_for_dataset(OnisBackendHandle* handle, int32_t dicom_id) {
-  for (auto it = handle->dicom_frames.begin(); it != handle->dicom_frames.end();) {
+void erase_dicom_frames_for_dataset(OnisBackendHandle* handle,
+                                    int32_t dicom_id) {
+  for (auto it = handle->dicom_frames.begin();
+       it != handle->dicom_frames.end();) {
     if (it->second.dicom_id == dicom_id) {
       it = handle->dicom_frames.erase(it);
     } else {
@@ -53,10 +55,30 @@ void erase_dicom_frames_for_dataset(OnisBackendHandle* handle, int32_t dicom_id)
     }
   }
 }
+
+std::int32_t parse_palette_descriptor_first_mapped(const std::string& descriptor) {
+  const auto p0 = descriptor.find('\\');
+  if (p0 == std::string::npos) {
+    return 0;
+  }
+  const auto p1 = descriptor.find('\\', p0 + 1);
+  const std::string token =
+      p1 == std::string::npos ? descriptor.substr(p0 + 1)
+                              : descriptor.substr(p0 + 1, p1 - p0 - 1);
+  try {
+    return static_cast<std::int32_t>(std::stol(token));
+  } catch (...) {
+    return 0;
+  }
+}
+
+static std::int32_t palette_descriptor_tag(std::int32_t channel) {
+  return static_cast<std::int32_t>(0x00281101 + channel);
+}
 }  // namespace
 
 int32_t onis_backend_version(void) {
-  return 7;
+  return 10;
 }
 
 OnisBackendHandle* onis_backend_create(void) {
@@ -485,7 +507,8 @@ OnisBackendStatus onis_backend_dicom_frame_get_representation(
     OnisBackendHandle* handle, int32_t frame_id, int32_t* out_bits,
     int32_t* out_is_signed) {
   if (handle == nullptr || out_bits == nullptr || out_is_signed == nullptr) {
-    set_last_error("Invalid argument: handle, out_bits, or out_is_signed is null.");
+    set_last_error(
+        "Invalid argument: handle, out_bits, or out_is_signed is null.");
     return ONIS_BACKEND_INVALID_ARGUMENT;
   }
 
@@ -505,5 +528,146 @@ OnisBackendStatus onis_backend_dicom_frame_get_representation(
   const std::int32_t bits = it->second.frame->get_representation(&signed_data);
   *out_bits = bits;
   *out_is_signed = signed_data ? 1 : 0;
+  return ONIS_BACKEND_OK;
+}
+
+OnisBackendStatus onis_backend_dicom_frame_get_min_max_values(
+    OnisBackendHandle* handle, int32_t frame_id, int32_t intermediate,
+    double* out_min, double* out_max) {
+  if (handle == nullptr || out_min == nullptr || out_max == nullptr) {
+    set_last_error("Invalid argument: handle, out_min, or out_max is null.");
+    return ONIS_BACKEND_INVALID_ARGUMENT;
+  }
+
+  std::lock_guard<std::mutex> lock(g_backend_mutex);
+  if (g_shared_backend == nullptr || handle != g_shared_backend) {
+    set_last_error("Invalid argument: backend handle is not active.");
+    return ONIS_BACKEND_INVALID_ARGUMENT;
+  }
+
+  const auto it = g_shared_backend->dicom_frames.find(frame_id);
+  if (it == g_shared_backend->dicom_frames.end()) {
+    set_last_error("Unknown frame id.");
+    return ONIS_BACKEND_INVALID_ARGUMENT;
+  }
+
+  double min_v = 0.0;
+  double max_v = 0.0;
+  if (!it->second.frame->get_min_max_values(&min_v, &max_v,
+                                            intermediate != 0)) {
+    set_last_error("get_min_max_values unavailable for this frame.");
+    return ONIS_BACKEND_ERROR;
+  }
+  *out_min = min_v;
+  *out_max = max_v;
+  return ONIS_BACKEND_OK;
+}
+
+OnisBackendStatus onis_backend_dicom_frame_get_rescale_intercept(
+    OnisBackendHandle* handle, int32_t frame_id, double* out_rescale,
+    double* out_intercept) {
+  if (handle == nullptr || out_rescale == nullptr ||
+      out_intercept == nullptr) {
+    set_last_error(
+        "Invalid argument: handle, out_rescale, or out_intercept is null.");
+    return ONIS_BACKEND_INVALID_ARGUMENT;
+  }
+
+  std::lock_guard<std::mutex> lock(g_backend_mutex);
+  if (g_shared_backend == nullptr || handle != g_shared_backend) {
+    set_last_error("Invalid argument: backend handle is not active.");
+    return ONIS_BACKEND_INVALID_ARGUMENT;
+  }
+
+  const auto it = g_shared_backend->dicom_frames.find(frame_id);
+  if (it == g_shared_backend->dicom_frames.end()) {
+    set_last_error("Unknown frame id.");
+    return ONIS_BACKEND_INVALID_ARGUMENT;
+  }
+
+  double rescale = 1.0;
+  double intercept = 0.0;
+  if (!it->second.frame->get_rescale_and_intercept(&rescale, &intercept)) {
+    set_last_error("get_rescale_and_intercept failed.");
+    return ONIS_BACKEND_ERROR;
+  }
+  *out_rescale = rescale;
+  *out_intercept = intercept;
+  return ONIS_BACKEND_OK;
+}
+
+OnisBackendStatus onis_backend_dicom_frame_copy_palette(
+    OnisBackendHandle* handle, int32_t frame_id, int32_t channel,
+    int32_t* out_count, int32_t* out_bits, int32_t* out_first_mapped,
+    uint8_t* out_buf, uint32_t out_buf_size, uint32_t* out_written) {
+  if (handle == nullptr || out_count == nullptr || out_bits == nullptr ||
+      out_written == nullptr) {
+    set_last_error(
+        "Invalid argument: handle, out_count, out_bits, or out_written is null.");
+    return ONIS_BACKEND_INVALID_ARGUMENT;
+  }
+  if (channel < 0 || channel > 2) {
+    set_last_error("Invalid argument: palette channel must be 0, 1, or 2.");
+    return ONIS_BACKEND_INVALID_ARGUMENT;
+  }
+
+  std::lock_guard<std::mutex> lock(g_backend_mutex);
+  if (g_shared_backend == nullptr || handle != g_shared_backend) {
+    set_last_error("Invalid argument: backend handle is not active.");
+    return ONIS_BACKEND_INVALID_ARGUMENT;
+  }
+
+  const auto it = g_shared_backend->dicom_frames.find(frame_id);
+  if (it == g_shared_backend->dicom_frames.end()) {
+    set_last_error("Unknown frame id.");
+    return ONIS_BACKEND_INVALID_ARGUMENT;
+  }
+
+  const OnisBackendDicomFrameSlot& slot = it->second;
+  onis::dicom_palette* pal = slot.frame->get_palette(channel);
+
+  if (out_first_mapped != nullptr) {
+    *out_first_mapped = 0;
+    const auto di = g_shared_backend->dicoms.find(slot.dicom_id);
+    if (di != g_shared_backend->dicoms.end() && di->second) {
+      std::string desc;
+      if (di->second->get_string_element(desc, palette_descriptor_tag(channel),
+                                         "US")) {
+        *out_first_mapped = parse_palette_descriptor_first_mapped(desc);
+      }
+    }
+  }
+
+  const std::size_t nbytes =
+      (pal == nullptr || pal->data == nullptr || pal->count <= 0)
+          ? 0
+          : (pal->bits == 16 ? static_cast<std::size_t>(pal->count) * 2u
+                             : static_cast<std::size_t>(pal->count));
+  if (nbytes == 0) {
+    *out_count = 0;
+    *out_bits = 0;
+    *out_written = 0;
+    return ONIS_BACKEND_OK;
+  }
+  if (nbytes > static_cast<std::size_t>(UINT32_MAX)) {
+    set_last_error("Palette data too large.");
+    return ONIS_BACKEND_ERROR;
+  }
+
+  *out_count = pal->count;
+  *out_bits = pal->bits;
+  const uint32_t ucnt = static_cast<uint32_t>(nbytes);
+
+  if (out_buf == nullptr) {
+    *out_written = ucnt;
+    return ONIS_BACKEND_OK;
+  }
+
+  if (out_buf_size < ucnt) {
+    set_last_error("Output buffer too small for palette data.");
+    return ONIS_BACKEND_INVALID_ARGUMENT;
+  }
+  std::memcpy(out_buf, pal->data, nbytes);
+  *out_written = ucnt;
   return ONIS_BACKEND_OK;
 }

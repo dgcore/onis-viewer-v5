@@ -50,6 +50,10 @@ abstract class OsDriverContext {
 
   OsDriver? get driver => _wDriver.target;
 
+  /// When set (e.g. by [OsContainerWnd]), [OsDartDriverImage] invokes this after
+  /// [dart:ui.decodeImageFromPixels] completes so the canvas repaints (decode is async).
+  void Function()? onPixelsDecoded;
+
   //operations:
   //void resize(double width, double height);
   //void setTargetBuffer(int target);
@@ -155,7 +159,8 @@ abstract class OsDriver {
 ///////////////////////////////////////////////////////////////////////
 
 abstract class OsDriverImage {
-  bool initWithFrame(DicomBridgeFrame frame);
+  /// [context] is used after async pixel decode (Dart) to schedule a repaint.
+  bool initWithFrame(OsDriverContext? context, DicomBridgeFrame frame);
 
   //public initWithFrame(frame =OsDicomFrame):void;
   //public initWithPixels(width =number, height =number, pixelFormat =number, pixels =Uint8ClampedArray):boolean { return false; }

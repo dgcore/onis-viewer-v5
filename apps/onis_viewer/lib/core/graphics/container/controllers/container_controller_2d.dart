@@ -96,17 +96,14 @@ class OsContainerController2D extends OsContainerController {
     //#endif
         
         //unselect all the images (to fire annotation selection event):
-        if (container) container.unselectAll(true, false, null, null, null);
+        if (container) container.unselectAll(true, false, null, null, null);*/
 
-        //we destroy all the render elements:
-        for (let i=0; i<this._listRenderElements.length; i++) this._listRenderElements[i].release();
-        this._listRenderElements.splice(0, this._listRenderElements.length);
-        
-        //we release all the series info:
-        for (let i=0; i<_listOfSeriesInfo.length; i++) _listOfSeriesInfo[i].destroy();
-        _listOfSeriesInfo.splice(0, _listOfSeriesInfo.length);
-        
-        let localModifiedContainers:Array<OsContainerWnd> = [];
+    //we destroy all the render elements:
+    _listRenderElements.clear();
+    //we release all the series info:
+    _listOfSeriesInfo.clear();
+
+    /*let localModifiedContainers:Array<OsContainerWnd> = [];
         let targetModifiedContainers:Array<OsContainerWnd> = modifiedContainers;
         if (!targetModifiedContainers) targetModifiedContainers = localModifiedContainers;
         if (container) {
@@ -177,59 +174,67 @@ class OsContainerController2D extends OsContainerController {
       _listRenderElements.add(render);
     } else {
       if (container != null) {
-        /*let matrix:[number, number] = [0, 0]; //rows, cols
-                container.getImageMatrix(matrix);
-                let imageBoxCount:number = matrix[0] * matrix[1];
-                let refresh:boolean = false;
-                let pageToRefresh:number = -1;
-                let propagate:IContainerPropagateItem|null = container.getPropagationItem();
-                for (let i=0; i<imageCount; i++) {
-                    let render:OsRenderer2D = <OsRenderer2D>createRenderer();
-                    seriesInfo.rendererCount++;
-                    let grp:OsGraphicGroup|null = render.getImageGroupItem(false);
-                    if (grp) {
-                        let item:OsGraphicImage = OsGraphicImage("");
-                        if (!series.images[i]) {
+        final matrix = container.getImageMatrix();
+        int imageBoxCount = matrix[0] * matrix[1];
+        bool refresh = false;
+        int pageToRefresh = -1;
+        final propagate = container.propagationItem;
+        for (int i = 0; i < imageCount; i++) {
+          final render = createRenderer() as OsRenderer2D?;
+          if (render != null) {
+            seriesInfo.rendererCount++;
+            final grp = render.getImageGroupItem();
+            if (grp != null) {
+              final item = OsGraphicImage("");
+              /*if (series.images[i] == null) {
                             item.setNullImage(series);
                             item.setLoadImageIndex(i);
                         }
-                        else {
-                            item.setImage(series.images[i]);
-                            item.setLoadImageIndex(series.images[i].loadIndex);
-                        }
-                        item.setParent(grp);
-                        if (!render.getActiveImageItem(false)) render.setActiveImageItem(item);
-                        if (!render.getPrimaryImageItem(false)) render.setPrimaryImageItem(item);
-                        item.release();
-                    }
-                    _listRenderElements.push(render);
-                    pageToRefresh = applyIncomingImageProperties(render, false);
-                    if (pageToRefresh != container.getCurrentPage()) refresh = true;
-                    else {
-                        //refresh only if renderer is visible:
-                        for (let j=0; j<imageBoxCount; j++) {
-                            if (container.getImageBoxRenderer(j) == render) {
-                                refresh = true;
-                                break;
-                            }
-                        }
-                    }
-                    //restore the states:
-                    let img1:OsGraphicImage|null = render.getPrimaryImageItem(false);
-                    let image1:OsOpenedImage|null = img1?img1.getImage():null;
-                    if (image1 && seriesInfo.dupInfo) this._applyImageStates(i, render, series, image1, seriesInfo.dupInfo, series.findState(_stateId, 0), fromHangingProtocol);
-                    
-                    //propagate:
-                    if (propagate) propagate.onReceivedImage(container, render);
-                }
-           
+                        else {*/
+              item.setImage(series.images[i]);
+              item.setLoadImageIndex(series.images[i].loadIndex);
+              //}
+              item.setParent(grp);
+              if (render.getActiveImageItem() == null) {
+                render.setActiveImageItem(item);
+              }
+              if (render.getPrimaryImageItem() == null) {
+                render.setPrimaryImageItem(item);
+              }
+            }
+            _listRenderElements.add(render);
+            pageToRefresh = applyIncomingImageProperties(render, false);
 
-                
-                
-                if (refresh) 
-                    if (pageToRefresh != -1) container.setCurrentPage(pageToRefresh, OsContDraw.OS_FORCE_REDRAW);
-                    else container.setCurrentPage(container.getCurrentPage(), OsContDraw.OS_FORCE_REDRAW);
-                    */
+            if (pageToRefresh != container.currentPage) {
+              refresh = true;
+            } else {
+              //refresh only if renderer is visible:
+              for (int j = 0; j < imageBoxCount; j++) {
+                if (container.getImageBoxRenderer(j) == render) {
+                  refresh = true;
+                  break;
+                }
+              }
+            }
+            //restore the states:
+            /*let img1:OsGraphicImage|null = render.getPrimaryImageItem(false);
+                    let image1:OsOpenedImage|null = img1?img1.getImage():null;
+                    if (image1 && seriesInfo.dupInfo) this._applyImageStates(i, render, series, image1, seriesInfo.dupInfo, series.findState(_stateId, 0), fromHangingProtocol);*/
+
+            //propagate:
+            if (propagate != null) propagate.onReceivedImage(container, render);
+          }
+        }
+
+        if (refresh) {
+          if (pageToRefresh != -1) {
+            container.setCurrentPage(
+                index: pageToRefresh, mode: OsContDraw.osForceRedraw);
+          } else {
+            container.setCurrentPage(
+                index: container.currentPage, mode: OsContDraw.osForceRedraw);
+          }
+        }
       }
     }
 
@@ -298,14 +303,22 @@ class OsContainerController2D extends OsContainerController {
   void onReceivedMessage(int id, dynamic message) {
     final payload = _extractMessagePayload(message);
     if (id == OSMSG.seriesDownloadReceivedInfo) {
-      if (payload is Map && payload['series'] is entities.Series) {
-        _onReceivedSeriesInfo(payload['series'] as entities.Series);
+      entities.Series? series = OVApi().openedPatients.findSeriesByGuids(
+          payload['patient'], payload['study'], payload['series']);
+      if (series != null) {
+        _onReceivedSeriesInfo(series);
       }
     } else if (id == OSMSG.seriesImagesReceived) {
-      if (payload is List<entities.Image>) {
-        _onReceivedImages(payload, false);
-      } else if (payload is List) {
-        _onReceivedImages(payload.whereType<entities.Image>().toList(), false);
+      List<entities.Image> images = [];
+      for (var item in payload) {
+        entities.Image? image = OVApi().openedPatients.findImageByGuids(
+            item['patient'], item['study'], item['series'], item['image']);
+        if (image != null) {
+          images.add(image);
+        }
+      }
+      if (images.isNotEmpty) {
+        _onReceivedImages(images, false);
       }
     }
   }
@@ -353,9 +366,8 @@ class OsContainerController2D extends OsContainerController {
           }
           OsContainerWnd? container = getContainer();
           if (container != null) {
-            OVApi()
-                .messages
-                .sendMessage(OSMSG.imageContainerModified, container);
+            OVApi().messages.sendMessage(
+                OSMSG.imageContainerModified, {'container': container.guid});
           }
           break;
         }
@@ -546,7 +558,7 @@ class OsContainerController2D extends OsContainerController {
     if (container == null) return -1;
 
     render.setInitialized();
-    WindowLevel? preset = _incomingImageProperties.windowLevelPreset;
+    WindowLevelPreset? preset = _incomingImageProperties.windowLevelPreset;
     if (preset != null) render.setWindowLevel(preset, false);
     ColorLut? colorLutPreset = _incomingImageProperties.colorLutPreset;
     if (colorLutPreset != null) {

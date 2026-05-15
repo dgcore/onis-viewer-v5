@@ -345,6 +345,117 @@ class OnisBackendNative {
     }
   }
 
+  (double rescale, double intercept) dicomFrameGetRescaleIntercept(int frameId) {
+    _ensureOpen();
+    final outPair = calloc<ffi.Double>(2);
+    try {
+      final status = _bindings.dicomFrameGetRescaleIntercept(
+        _handle,
+        frameId,
+        outPair,
+        outPair.elementAt(1),
+      );
+      if (status != OnisBackendStatus.ok) {
+        throw StateError(
+          'Backend dicomFrameGetRescaleIntercept failed: ${_readLastError()}',
+        );
+      }
+      return (outPair[0], outPair[1]);
+    } finally {
+      calloc.free(outPair);
+    }
+  }
+
+  (double min, double max) dicomFrameGetMinMaxValues(
+      int frameId, bool intermediate) {
+    _ensureOpen();
+    final outPair = calloc<ffi.Double>(2);
+    try {
+      final status = _bindings.dicomFrameGetMinMaxValues(
+        _handle,
+        frameId,
+        intermediate ? 1 : 0,
+        outPair,
+        outPair.elementAt(1),
+      );
+      if (status != OnisBackendStatus.ok) {
+        throw StateError(
+          'Backend dicomFrameGetMinMaxValues failed: ${_readLastError()}',
+        );
+      }
+      return (outPair[0], outPair[1]);
+    } finally {
+      calloc.free(outPair);
+    }
+  }
+
+  /// One channel (0=R, 1=G, 2=B): bytes from [dicom_frame::get_palette], [value] = first mapped from dataset descriptor.
+  ({int count, int bits, int value, Uint8List data})? dicomFrameCopyPalette(
+      int frameId, int channel) {
+    if (channel < 0 || channel > 2) {
+      throw ArgumentError.value(channel, 'channel', 'expected 0..2');
+    }
+    _ensureOpen();
+    final outCount = calloc<ffi.Int32>();
+    final outBits = calloc<ffi.Int32>();
+    final outFirst = calloc<ffi.Int32>();
+    final sizeOut = calloc<ffi.Uint32>();
+    try {
+      var status = _bindings.dicomFrameCopyPalette(
+        _handle,
+        frameId,
+        channel,
+        outCount,
+        outBits,
+        outFirst,
+        ffi.nullptr,
+        0,
+        sizeOut,
+      );
+      if (status != OnisBackendStatus.ok) {
+        throw StateError(
+          'Backend dicomFrameCopyPalette (size) failed: ${_readLastError()}',
+        );
+      }
+      final n = sizeOut.value;
+      if (n == 0 || outCount.value <= 0) {
+        return null;
+      }
+      final buf = calloc<ffi.Uint8>(n);
+      try {
+        status = _bindings.dicomFrameCopyPalette(
+          _handle,
+          frameId,
+          channel,
+          outCount,
+          outBits,
+          outFirst,
+          buf,
+          n,
+          sizeOut,
+        );
+        if (status != OnisBackendStatus.ok) {
+          throw StateError(
+            'Backend dicomFrameCopyPalette (copy) failed: ${_readLastError()}',
+          );
+        }
+        return (
+          count: outCount.value,
+          bits: outBits.value,
+          value: outFirst.value,
+          data: Uint8List.fromList(buf.asTypedList(n)),
+        );
+      } finally {
+        calloc.free(buf);
+      }
+    } finally {
+      calloc.free(outCount);
+      calloc.free(outBits);
+      calloc.free(outFirst);
+      calloc.free(sizeOut);
+    }
+  }
+
   void close() {
     if (isClosed) {
       return;

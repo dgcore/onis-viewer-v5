@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:onis_viewer/api/core/ov_api_core.dart';
 import 'package:onis_viewer/api/services/message_codes.dart';
+import 'package:onis_viewer/api/services/patient_controller_interface.dart';
 import 'package:onis_viewer/core/models/database/patient.dart' as db_patient;
 import 'package:onis_viewer/core/models/entities/patient.dart' as entities;
 import 'package:onis_viewer/core/responses/find_study_response.dart';
-import 'package:onis_viewer/api/services/patient_controller_interface.dart';
 import 'package:onis_viewer/plugins/database/ui/retrieve_series.dart';
 
 class OpenedPatientsService extends IPatientController {
@@ -50,6 +50,38 @@ class OpenedPatientsService extends IPatientController {
     if (notify) {
       forceNotification();
     }
+  }
+
+  @override
+  entities.Series? findSeriesByGuids(
+      String patientGuid, String studyGuid, String seriesGuid) {
+    final patient = patients
+        .where((patient) => patient.guid == patientGuid)
+        .cast<entities.Patient?>()
+        .firstWhere((p) => p != null, orElse: () => null);
+    if (patient == null) return null;
+    final study = patient.studies
+        .where((study) => study.guid == studyGuid)
+        .cast<entities.Study?>()
+        .firstWhere((s) => s != null, orElse: () => null);
+    if (study == null) return null;
+    final series = study.series
+        .where((series) => series.guid == seriesGuid)
+        .cast<entities.Series?>()
+        .firstWhere((s) => s != null, orElse: () => null);
+    return series;
+  }
+
+  @override
+  entities.Image? findImageByGuids(String patientGuid, String studyGuid,
+      String seriesGuid, String imageGuid) {
+    final series = findSeriesByGuids(patientGuid, studyGuid, seriesGuid);
+    if (series == null) return null;
+    final image = series.images
+        .where((image) => image.guid == imageGuid)
+        .cast<entities.Image?>()
+        .firstWhere((i) => i != null, orElse: () => null);
+    return image;
   }
 
   @override
@@ -106,8 +138,7 @@ class OpenedPatientsService extends IPatientController {
     final payload = <String, dynamic>{
       'originEngineId': OVApi().flutterEngineInstanceId,
       'version': _version,
-      'patients':
-          _patients.map((p) => p.toJson()).toList(growable: false),
+      'patients': _patients.map((p) => p.toJson()).toList(growable: false),
     };
     OVApi().messages.sendMessage(OSMSG.openedPatientsSnapshot, payload);
   }
@@ -142,8 +173,8 @@ class OpenedPatientsService extends IPatientController {
     final rebuilt = <entities.Patient>[];
     for (final rawPatient in rawPatients) {
       if (rawPatient is! Map) continue;
-      rebuilt.add(entities.Patient.fromJson(
-          Map<String, dynamic>.from(rawPatient)));
+      rebuilt.add(
+          entities.Patient.fromJson(Map<String, dynamic>.from(rawPatient)));
     }
     _patients
       ..clear()

@@ -437,7 +437,7 @@ class OsRenderer2D extends OsRenderer {
   //window level
   //-----------------------------------------------------------------------
 
-  void setWindowLevel(WindowLevel? preset, bool resetOriginal) {
+  void setWindowLevel(WindowLevelPreset? preset, bool resetOriginal) {
     OsGraphicImage? item = getPrimaryImageItem();
     item?.setWindowLevel(preset, resetOriginal);
   }
@@ -447,7 +447,7 @@ class OsRenderer2D extends OsRenderer {
     item?.setWindowLevelValues(center, width);
   }
 
-  WindowLevel? getWindowLevel() {
+  WindowLevelPreset? getWindowLevel() {
     OsGraphicImage? item = getPrimaryImageItem();
     return item?.getWindowLevel();
   }

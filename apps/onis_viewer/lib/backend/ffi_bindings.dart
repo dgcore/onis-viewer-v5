@@ -221,6 +221,57 @@ typedef _DicomFrameGetRepresentationDart = int Function(
   ffi.Pointer<ffi.Int32>,
 );
 
+typedef _DicomFrameCopyPaletteNative = ffi.Int32 Function(
+  ffi.Pointer<OnisBackendHandle>,
+  ffi.Int32,
+  ffi.Int32,
+  ffi.Pointer<ffi.Int32>,
+  ffi.Pointer<ffi.Int32>,
+  ffi.Pointer<ffi.Int32>,
+  ffi.Pointer<ffi.Uint8>,
+  ffi.Uint32,
+  ffi.Pointer<ffi.Uint32>,
+);
+typedef _DicomFrameCopyPaletteDart = int Function(
+  ffi.Pointer<OnisBackendHandle>,
+  int,
+  int,
+  ffi.Pointer<ffi.Int32>,
+  ffi.Pointer<ffi.Int32>,
+  ffi.Pointer<ffi.Int32>,
+  ffi.Pointer<ffi.Uint8>,
+  int,
+  ffi.Pointer<ffi.Uint32>,
+);
+
+typedef _DicomFrameGetMinMaxValuesNative = ffi.Int32 Function(
+  ffi.Pointer<OnisBackendHandle>,
+  ffi.Int32,
+  ffi.Int32,
+  ffi.Pointer<ffi.Double>,
+  ffi.Pointer<ffi.Double>,
+);
+typedef _DicomFrameGetMinMaxValuesDart = int Function(
+  ffi.Pointer<OnisBackendHandle>,
+  int,
+  int,
+  ffi.Pointer<ffi.Double>,
+  ffi.Pointer<ffi.Double>,
+);
+
+typedef _DicomFrameGetRescaleInterceptNative = ffi.Int32 Function(
+  ffi.Pointer<OnisBackendHandle>,
+  ffi.Int32,
+  ffi.Pointer<ffi.Double>,
+  ffi.Pointer<ffi.Double>,
+);
+typedef _DicomFrameGetRescaleInterceptDart = int Function(
+  ffi.Pointer<OnisBackendHandle>,
+  int,
+  ffi.Pointer<ffi.Double>,
+  ffi.Pointer<ffi.Double>,
+);
+
 /// Returns true if [lib] exports the DCMTK DICOM entry points (not an older
 /// stub dylib). Tries both Apple symbol spellings.
 bool onisBackendLibraryHasDicomExports(ffi.DynamicLibrary lib) {
@@ -349,7 +400,43 @@ bool onisBackendLibraryHasDicomExports(ffi.DynamicLibrary lib) {
       '_onis_backend_dicom_frame_get_representation',
     ),
   );
-  return hasFrameRepr;
+  if (!hasFrameRepr) return false;
+
+  final hasFrameMinMax = tryLookup(
+    () => lib.lookupFunction<_DicomFrameGetMinMaxValuesNative,
+        _DicomFrameGetMinMaxValuesDart>(
+      'onis_backend_dicom_frame_get_min_max_values',
+    ),
+    () => lib.lookupFunction<_DicomFrameGetMinMaxValuesNative,
+        _DicomFrameGetMinMaxValuesDart>(
+      '_onis_backend_dicom_frame_get_min_max_values',
+    ),
+  );
+  if (!hasFrameMinMax) return false;
+
+  final hasFrameRescale = tryLookup(
+    () => lib.lookupFunction<_DicomFrameGetRescaleInterceptNative,
+        _DicomFrameGetRescaleInterceptDart>(
+      'onis_backend_dicom_frame_get_rescale_intercept',
+    ),
+    () => lib.lookupFunction<_DicomFrameGetRescaleInterceptNative,
+        _DicomFrameGetRescaleInterceptDart>(
+      '_onis_backend_dicom_frame_get_rescale_intercept',
+    ),
+  );
+  if (!hasFrameRescale) return false;
+
+  final hasFramePalette = tryLookup(
+    () => lib.lookupFunction<_DicomFrameCopyPaletteNative,
+        _DicomFrameCopyPaletteDart>(
+      'onis_backend_dicom_frame_copy_palette',
+    ),
+    () => lib.lookupFunction<_DicomFrameCopyPaletteNative,
+        _DicomFrameCopyPaletteDart>(
+      '_onis_backend_dicom_frame_copy_palette',
+    ),
+  );
+  return hasFramePalette;
 }
 
 _DicomGetStringElementDart _lookupDicomGetStringElement(
@@ -505,6 +592,59 @@ _DicomFrameGetRepresentationDart _lookupDicomFrameGetRepresentation(
   }
 }
 
+_DicomFrameCopyPaletteDart _lookupDicomFrameCopyPalette(ffi.DynamicLibrary lib) {
+  try {
+    return lib.lookupFunction<_DicomFrameCopyPaletteNative,
+        _DicomFrameCopyPaletteDart>(
+      'onis_backend_dicom_frame_copy_palette',
+    );
+  } catch (_) {
+    if (Platform.isMacOS || Platform.isIOS) {
+      return lib.lookupFunction<_DicomFrameCopyPaletteNative,
+          _DicomFrameCopyPaletteDart>(
+        '_onis_backend_dicom_frame_copy_palette',
+      );
+    }
+    rethrow;
+  }
+}
+
+_DicomFrameGetMinMaxValuesDart _lookupDicomFrameGetMinMaxValues(
+    ffi.DynamicLibrary lib) {
+  try {
+    return lib.lookupFunction<_DicomFrameGetMinMaxValuesNative,
+        _DicomFrameGetMinMaxValuesDart>(
+      'onis_backend_dicom_frame_get_min_max_values',
+    );
+  } catch (_) {
+    if (Platform.isMacOS || Platform.isIOS) {
+      return lib.lookupFunction<_DicomFrameGetMinMaxValuesNative,
+          _DicomFrameGetMinMaxValuesDart>(
+        '_onis_backend_dicom_frame_get_min_max_values',
+      );
+    }
+    rethrow;
+  }
+}
+
+_DicomFrameGetRescaleInterceptDart _lookupDicomFrameGetRescaleIntercept(
+    ffi.DynamicLibrary lib) {
+  try {
+    return lib.lookupFunction<_DicomFrameGetRescaleInterceptNative,
+        _DicomFrameGetRescaleInterceptDart>(
+      'onis_backend_dicom_frame_get_rescale_intercept',
+    );
+  } catch (_) {
+    if (Platform.isMacOS || Platform.isIOS) {
+      return lib.lookupFunction<_DicomFrameGetRescaleInterceptNative,
+          _DicomFrameGetRescaleInterceptDart>(
+        '_onis_backend_dicom_frame_get_rescale_intercept',
+      );
+    }
+    rethrow;
+  }
+}
+
 class _DicomExportNames {
   const _DicomExportNames(this.loadFile, this.release);
   final String loadFile;
@@ -591,7 +731,10 @@ class OnisBackendBindings {
         dicomFrameGetBitsPerPixel = _lookupDicomFrameGetBitsPerPixel(lib),
         dicomFrameGetIntermediatePixelData =
             _lookupDicomFrameGetIntermediatePixelData(lib),
-        dicomFrameGetRepresentation = _lookupDicomFrameGetRepresentation(lib);
+        dicomFrameGetRepresentation = _lookupDicomFrameGetRepresentation(lib),
+        dicomFrameGetMinMaxValues = _lookupDicomFrameGetMinMaxValues(lib),
+        dicomFrameGetRescaleIntercept = _lookupDicomFrameGetRescaleIntercept(lib),
+        dicomFrameCopyPalette = _lookupDicomFrameCopyPalette(lib);
 
   final _VersionDart version;
   final _CreateDart create;
@@ -610,4 +753,7 @@ class OnisBackendBindings {
   final _DicomFrameGetBitsPerPixelDart dicomFrameGetBitsPerPixel;
   final _DicomFrameGetIntermediatePixelDataDart dicomFrameGetIntermediatePixelData;
   final _DicomFrameGetRepresentationDart dicomFrameGetRepresentation;
+  final _DicomFrameGetMinMaxValuesDart dicomFrameGetMinMaxValues;
+  final _DicomFrameGetRescaleInterceptDart dicomFrameGetRescaleIntercept;
+  final _DicomFrameCopyPaletteDart dicomFrameCopyPalette;
 }
