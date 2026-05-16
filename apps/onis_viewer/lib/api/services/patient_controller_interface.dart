@@ -14,5 +14,14 @@ abstract class IPatientController extends ChangeNotifier {
       String seriesGuid, String imageGuid);
   entities.Series? findSeriesByGuids(
       String patientGuid, String studyGuid, String seriesGuid);
+  void notifySeriesStatusChanged(entities.Series series);
+  Future<void> notifyInitialSeriesDownloadInfo(
+      entities.Series series, int imageCount, String properties) async {}
+  Future<void> notifyImageDownloadUpdate(
+    entities.Image image,
+    int reason,
+    int dicomFileId, {
+    String? loadPath,
+  }) async {}
   void forceNotification();
 }

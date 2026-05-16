@@ -100,6 +100,9 @@ class _OnisViewerAppState extends State<OnisViewerApp> with WindowListener {
               final window = await DesktopMultiWindow.createWindow(
                 jsonEncode(payload),
               );
+              await window.setFrame(
+                Rect.fromLTWH(area[0], area[1], area[2], area[3]),
+              );
               await window.setTitle(
                   '${OnisViewerConstants.appName} — Monitor ${monitor.getLabelIndex()}');
               await window.show();
@@ -131,16 +134,10 @@ class _OnisViewerAppState extends State<OnisViewerApp> with WindowListener {
   Size _clampWindowSize(double width, double height) {
     var w = width;
     var h = height;
-    if (w.isNaN ||
-        w <= 0 ||
-        w.isInfinite ||
-        w > 16384) {
+    if (w.isNaN || w <= 0 || w.isInfinite || w > 16384) {
       w = OnisViewerConstants.defaultWindowWidth;
     }
-    if (h.isNaN ||
-        h <= 0 ||
-        h.isInfinite ||
-        h > 16384) {
+    if (h.isNaN || h <= 0 || h.isInfinite || h > 16384) {
       h = OnisViewerConstants.defaultWindowHeight;
     }
     return Size(w, h);

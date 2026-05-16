@@ -13,4 +13,10 @@ class OSMSG {
   static const int pageTypeUnregistered = 8;
   static const int openedPatientsSnapshot = 9;
   static const int openedPatientsSyncRequest = 10;
+
+  // commands:
+  static const int cmdDownloadSeries = 1000;
+
+  static const int syncInitSeriesDownloadInfo = 1001;
+  static const int syncImageDownloadUpdate = 1002;
 }

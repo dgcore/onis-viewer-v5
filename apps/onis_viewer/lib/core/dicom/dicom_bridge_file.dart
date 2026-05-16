@@ -1,5 +1,4 @@
-import 'dart:io';
-
+import 'package:flutter/foundation.dart';
 import 'package:onis_viewer/api/ov_api.dart';
 import 'package:onis_viewer/core/dicom/image_region.dart';
 
@@ -9,17 +8,24 @@ import 'package:onis_viewer/core/dicom/image_region.dart';
 /// pixels. Use [DicomBridgeFile] when the dataset lives only in the backend until FFI
 /// exposes tag/frame APIs.
 ///
-/// Loads and releases go through [OVApi.backend] (single process-wide backend).
+/// Loads and releases go through [OVApi.backend] (single process-wide C++
+/// backend shared by all Flutter engine isolates in the process).
 ///
 /// Frame extraction: [DicomBridgeFileFrameFactory.extractFrame] in
 /// `dicom_bridge_frame.dart` (extension, avoids an import cycle with
 /// [DicomBridgeFrame]). Extract hydrates native frame metadata (resolution, bits,
 /// photometric, palettes, min/max) before pixels are read.
 class DicomBridgeFile {
-  DicomBridgeFile._(this._backendId, {String? unlinkPathAfterRelease})
-      : _unlinkPathAfterRelease = unlinkPathAfterRelease;
+  DicomBridgeFile._(
+    this._backendId, {
+    String? unlinkPathAfterRelease,
+    bool releaseOnDispose = true,
+  })  : _unlinkPathAfterRelease = unlinkPathAfterRelease,
+        _releaseOnDispose = releaseOnDispose;
 
   final int _backendId;
+  final bool _releaseOnDispose;
+
   /// When set (e.g. stream download temp file), deleted in [dispose] after
   /// [releaseDicom] so native code keeps a valid on-disk file until the session ends.
   final String? _unlinkPathAfterRelease;
@@ -78,8 +84,19 @@ class DicomBridgeFile {
   /// [unlinkPathAfterRelease]: if the dataset was loaded from a scratch path
   /// (e.g. HTTP stream temp file), pass it here so it is removed only after
   /// [dispose] releases the native handle. Do not delete that file yourself.
-  factory DicomBridgeFile.adopt(int backendId, {String? unlinkPathAfterRelease}) =>
-      DicomBridgeFile._(backendId, unlinkPathAfterRelease: unlinkPathAfterRelease);
+  /// [releaseOnDispose]: when `false`, [dispose] does not call [releaseDicom].
+  /// Use on the download window when a display sub-window shares the same
+  /// process-wide backend id.
+  factory DicomBridgeFile.adopt(
+    int backendId, {
+    String? unlinkPathAfterRelease,
+    bool releaseOnDispose = true,
+  }) =>
+      DicomBridgeFile._(
+        backendId,
+        unlinkPathAfterRelease: unlinkPathAfterRelease,
+        releaseOnDispose: releaseOnDispose,
+      );
 
   /// Releases the native dataset. Safe to call more than once.
   void dispose() {
@@ -87,12 +104,21 @@ class DicomBridgeFile {
       return;
     }
     _released = true;
-    OVApi().backend.releaseDicom(_backendId);
-    final p = _unlinkPathAfterRelease;
+    if (!_releaseOnDispose) {
+      return;
+    }
+    try {
+      OVApi().backend.releaseDicom(_backendId);
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('DicomBridgeFile.dispose: release skipped: $e');
+      }
+    }
+    /*final p = _unlinkPathAfterRelease;
     if (p != null) {
       try {
         File(p).deleteSync();
       } catch (_) {}
-    }
+    }*/
   }
 }

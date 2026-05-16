@@ -1,11 +1,14 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:onis_viewer/api/core/ov_api_core.dart';
+import 'package:desktop_multi_window/desktop_multi_window.dart';
 import 'package:onis_viewer/api/services/message_codes.dart';
 import 'package:onis_viewer/api/services/patient_controller_interface.dart';
 import 'package:onis_viewer/core/models/database/patient.dart' as db_patient;
 import 'package:onis_viewer/core/models/entities/patient.dart' as entities;
 import 'package:onis_viewer/core/responses/find_study_response.dart';
 import 'package:onis_viewer/plugins/database/ui/retrieve_series.dart';
+import 'package:uuid_v4/uuid_v4.dart';
 
 class OpenedPatientsService extends IPatientController {
   final List<entities.Patient> _patients = [];
@@ -173,8 +176,8 @@ class OpenedPatientsService extends IPatientController {
     final rebuilt = <entities.Patient>[];
     for (final rawPatient in rawPatients) {
       if (rawPatient is! Map) continue;
-      rebuilt.add(
-          entities.Patient.fromJson(Map<String, dynamic>.from(rawPatient)));
+      rebuilt.add(entities.Patient.fromJson(
+          true, Map<String, dynamic>.from(rawPatient)));
     }
     _patients
       ..clear()
@@ -188,5 +191,48 @@ class OpenedPatientsService extends IPatientController {
       'originEngineId': OVApi().flutterEngineInstanceId,
     };
     OVApi().messages.sendMessage(OSMSG.openedPatientsSyncRequest, payload);
+  }
+
+  @override
+  void notifySeriesStatusChanged(entities.Series series) {}
+
+  @override
+  Future<void> notifyInitialSeriesDownloadInfo(
+      entities.Series series, int imageCount, String properties) async {
+    List<String> guids = [];
+    for (int i = 0; i < imageCount; i++) {
+      guids.add(UUIDv4().toString());
+    }
+    final payload = <String, dynamic>{
+      'patient': series.study?.patient?.guid ?? '',
+      'study': series.study?.guid ?? '',
+      'series': series.guid,
+      'images': guids,
+    };
+    await OVApi()
+        .messages
+        .sendMessage(OSMSG.syncInitSeriesDownloadInfo, payload);
+  }
+
+  @override
+  Future<void> notifyImageDownloadUpdate(
+    entities.Image image,
+    int reason,
+    int dicomFileId, {
+    String? loadPath,
+  }) async {
+    final displayOwnsRelease =
+        !kIsWeb && (await DesktopMultiWindow.getAllSubWindowIds()).isNotEmpty;
+    final payload = <String, dynamic>{
+      'patient': image.series?.study?.patient?.guid ?? '',
+      'study': image.series?.study?.guid ?? '',
+      'series': image.series?.guid ?? '',
+      'image': image.guid,
+      'reason': reason,
+      'dicomFileId': dicomFileId,
+      'displayOwnsRelease': displayOwnsRelease,
+      if (loadPath != null && loadPath.isNotEmpty) 'loadPath': loadPath,
+    };
+    await OVApi().messages.sendMessage(OSMSG.syncImageDownloadUpdate, payload);
   }
 }

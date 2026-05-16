@@ -558,15 +558,18 @@ class OsGraphicImage extends OsGraphicResponder {
   }
 
   void _allocateFrames(int frameCount) {
-    if (_frames.isNotEmpty) {
-      return;
-    }
     if (frameCount > 0) {
       _frames = List<DicomBridgeFrame?>.filled(frameCount, null);
+    } else {
+      _frames = [];
     }
   }
 
   void _releaseFrames() {
-    _frames.clear();
+    for (final frame in _frames) {
+      frame?.dispose();
+    }
+    _frames = [];
+    _currentFrame = 0;
   }
 }

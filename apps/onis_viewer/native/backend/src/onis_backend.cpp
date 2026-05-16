@@ -56,15 +56,16 @@ void erase_dicom_frames_for_dataset(OnisBackendHandle* handle,
   }
 }
 
-std::int32_t parse_palette_descriptor_first_mapped(const std::string& descriptor) {
+std::int32_t parse_palette_descriptor_first_mapped(
+    const std::string& descriptor) {
   const auto p0 = descriptor.find('\\');
   if (p0 == std::string::npos) {
     return 0;
   }
   const auto p1 = descriptor.find('\\', p0 + 1);
-  const std::string token =
-      p1 == std::string::npos ? descriptor.substr(p0 + 1)
-                              : descriptor.substr(p0 + 1, p1 - p0 - 1);
+  const std::string token = p1 == std::string::npos
+                                ? descriptor.substr(p0 + 1)
+                                : descriptor.substr(p0 + 1, p1 - p0 - 1);
   try {
     return static_cast<std::int32_t>(std::stol(token));
   } catch (...) {
@@ -566,8 +567,7 @@ OnisBackendStatus onis_backend_dicom_frame_get_min_max_values(
 OnisBackendStatus onis_backend_dicom_frame_get_rescale_intercept(
     OnisBackendHandle* handle, int32_t frame_id, double* out_rescale,
     double* out_intercept) {
-  if (handle == nullptr || out_rescale == nullptr ||
-      out_intercept == nullptr) {
+  if (handle == nullptr || out_rescale == nullptr || out_intercept == nullptr) {
     set_last_error(
         "Invalid argument: handle, out_rescale, or out_intercept is null.");
     return ONIS_BACKEND_INVALID_ARGUMENT;
@@ -603,7 +603,8 @@ OnisBackendStatus onis_backend_dicom_frame_copy_palette(
   if (handle == nullptr || out_count == nullptr || out_bits == nullptr ||
       out_written == nullptr) {
     set_last_error(
-        "Invalid argument: handle, out_count, out_bits, or out_written is null.");
+        "Invalid argument: handle, out_count, out_bits, or out_written is "
+        "null.");
     return ONIS_BACKEND_INVALID_ARGUMENT;
   }
   if (channel < 0 || channel > 2) {

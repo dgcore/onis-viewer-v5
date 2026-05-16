@@ -196,23 +196,28 @@ class Patient {
 
   Map<String, dynamic> toJson() {
     return <String, dynamic>{
+      'guid': guid,
       'databaseInfo': _patient?.toJson(),
       'studies': _studies.map((s) => s.toJson()).toList(growable: false),
     };
   }
 
-  factory Patient.fromJson(Map<String, dynamic> map) {
+  factory Patient.fromJson(bool includeGuid, Map<String, dynamic> map) {
     final patient = Patient();
     final dbRaw = map['databaseInfo'];
     if (dbRaw is Map) {
       patient.databaseInfo =
           database.Patient.fromJson(Map<String, dynamic>.from(dbRaw));
     }
+    if (includeGuid) {
+      patient.guid = map['guid'];
+    }
     final studies = map['studies'];
     if (studies is List) {
       for (final rawStudy in studies) {
         if (rawStudy is! Map) continue;
-        patient.addStudy(Study.fromJson(Map<String, dynamic>.from(rawStudy)));
+        patient.addStudy(
+            Study.fromJson(includeGuid, Map<String, dynamic>.from(rawStudy)));
       }
     }
     return patient;
@@ -294,23 +299,28 @@ class Study {
 
   Map<String, dynamic> toJson() {
     return <String, dynamic>{
+      'guid': guid,
       'databaseInfo': _study?.toJson(),
       'series': _series.map((s) => s.toJson()).toList(growable: false),
     };
   }
 
-  factory Study.fromJson(Map<String, dynamic> map) {
+  factory Study.fromJson(bool includeGuid, Map<String, dynamic> map) {
     final study = Study();
     final dbRaw = map['databaseInfo'];
     if (dbRaw is Map) {
       study.databaseInfo =
           database.Study.fromJson(Map<String, dynamic>.from(dbRaw));
     }
+    if (includeGuid) {
+      study.guid = map['guid'];
+    }
     final seriesList = map['series'];
     if (seriesList is List) {
       for (final rawSeries in seriesList) {
         if (rawSeries is! Map) continue;
-        study.addSeries(Series.fromJson(Map<String, dynamic>.from(rawSeries)));
+        study.addSeries(
+            Series.fromJson(includeGuid, Map<String, dynamic>.from(rawSeries)));
       }
     }
     return study;
@@ -353,7 +363,7 @@ class Series {
   }
 
   // Operations:
-  void prepareForDownload(int imageCount) {
+  /*void prepareForDownload(int imageCount) {
     if (imageCount > images.length) {
       int count = imageCount - images.length;
       for (int i = 0; i < count; i++) {
@@ -363,20 +373,35 @@ class Series {
         addImage(image);
       }
     }
+  }*/
+  void prepareForDownload(List<String> imageGuids) {
+    if (imageGuids.length <= images.length) return;
+    int count = imageGuids.length - images.length;
+    for (int i = 0; i < count; i++) {
+      final image = Image();
+      image.guid = imageGuids[i];
+      image.loadStatus.status = ResultStatus.pending;
+      image.loadIndex = images.length;
+      addImage(image);
+    }
   }
 
   Map<String, dynamic> toJson() {
     return <String, dynamic>{
+      'guid': guid,
       'databaseInfo': _series?.toJson(),
     };
   }
 
-  factory Series.fromJson(Map<String, dynamic> map) {
+  factory Series.fromJson(bool includeGuid, Map<String, dynamic> map) {
     final series = Series();
     final dbRaw = map['databaseInfo'];
     if (dbRaw is Map) {
       series.databaseInfo =
           database.Series.fromJson(Map<String, dynamic>.from(dbRaw));
+    }
+    if (includeGuid) {
+      series.guid = map['guid'];
     }
     return series;
   }

@@ -127,9 +127,11 @@ onis_backend_dicom_frame_get_representation(OnisBackendHandle* handle,
 
 /// [intermediate]: 0 = display-scaled min/max, 1 = stored intermediate min/max
 /// (`dicom_frame::get_min_max_values`).
-ONIS_BACKEND_EXPORT OnisBackendStatus onis_backend_dicom_frame_get_min_max_values(
-    OnisBackendHandle* handle, int32_t frame_id, int32_t intermediate,
-    double* out_min, double* out_max);
+ONIS_BACKEND_EXPORT OnisBackendStatus
+onis_backend_dicom_frame_get_min_max_values(OnisBackendHandle* handle,
+                                            int32_t frame_id,
+                                            int32_t intermediate,
+                                            double* out_min, double* out_max);
 
 /// `dicom_frame::get_rescale_and_intercept`.
 ONIS_BACKEND_EXPORT OnisBackendStatus
@@ -138,11 +140,11 @@ onis_backend_dicom_frame_get_rescale_intercept(OnisBackendHandle* handle,
                                                double* out_rescale,
                                                double* out_intercept);
 
-/// Copies one channel (0=R, 1=G, 2=B) from [dicom_frame::get_palette] into [out_buf].
-/// If [out_buf] is NULL, writes the required byte count to [out_written] only.
-/// If the channel has no palette data, sets [out_count]=0, [out_bits]=0, [out_written]=0.
-/// When [out_first_mapped] is non-NULL, writes the first mapped value from the dataset
-/// descriptor (0028,1101–1103) or 0.
+/// Copies one channel (0=R, 1=G, 2=B) from [dicom_frame::get_palette] into
+/// [out_buf]. If [out_buf] is NULL, writes the required byte count to
+/// [out_written] only. If the channel has no palette data, sets [out_count]=0,
+/// [out_bits]=0, [out_written]=0. When [out_first_mapped] is non-NULL, writes
+/// the first mapped value from the dataset descriptor (0028,1101–1103) or 0.
 ONIS_BACKEND_EXPORT OnisBackendStatus onis_backend_dicom_frame_copy_palette(
     OnisBackendHandle* handle, int32_t frame_id, int32_t channel,
     int32_t* out_count, int32_t* out_bits, int32_t* out_first_mapped,

@@ -34,6 +34,7 @@ class DownloadController extends IDownloadController {
   //final List<DownloadPerformance> _performanceSources = [];
   //final Map<entities.Image, _DicomChunkState> _dicomChunks = {};
   int _containerIndex = -1;
+  int? _messageSubscription;
   //final List<OsJ2kDecodeItem> _j2kItems = [];
   //final List<OsJ2kDecoder> _j2kDecoders = [];
 
@@ -51,7 +52,111 @@ class DownloadController extends IDownloadController {
   //private _maxImageDecoders:number = 2;
 
   DownloadController() {
+    _messageSubscription = OVApi().messages.subscribe(onReceivedMessage);
     // for (let iinnumber = 0; i<this._maxImageDecoders; i++) _j2kDecoders.push(OsJ2kDecoder(this));
+  }
+
+  void onReceivedMessage(int id, dynamic data) {
+    final payload = _coerceMessageMap(data);
+    if (payload.isEmpty) {
+      return;
+    }
+
+    if (id == OSMSG.cmdDownloadSeries ||
+        id == OSMSG.syncInitSeriesDownloadInfo) {
+      final dbApi =
+          OVApi().plugins.getPublicApi<DatabaseApi>('onis_database_plugin');
+      final patientGuid = payload['patient']?.toString() ?? '';
+      final studyGuid = payload['study']?.toString() ?? '';
+      final seriesGuid = payload['series']?.toString() ?? '';
+      final series = dbApi?.patientController.findSeriesByGuids(
+        patientGuid,
+        studyGuid,
+        seriesGuid,
+      );
+      if (series == null) {
+        return;
+      }
+      if (id == OSMSG.cmdDownloadSeries) {
+        addSeriesToLoadingQueue(series, true);
+      } else if (id == OSMSG.syncInitSeriesDownloadInfo) {
+        try {
+          series.prepareForDownload(_coerceStringList(payload['images']));
+        } catch (e, st) {
+          debugPrint(
+            'DownloadController: _onInitSeriesDownloadInfo: error: $e\n$st',
+          );
+        }
+      }
+    } else if (id == OSMSG.syncImageDownloadUpdate) {
+      final dbApi =
+          OVApi().plugins.getPublicApi<DatabaseApi>('onis_database_plugin');
+      final patientGuid = payload['patient']?.toString() ?? '';
+      final studyGuid = payload['study']?.toString() ?? '';
+      final seriesGuid = payload['series']?.toString() ?? '';
+      final imageGuid = payload['image']?.toString() ?? '';
+      final image = dbApi?.patientController.findImageByGuids(
+        patientGuid,
+        studyGuid,
+        seriesGuid,
+        imageGuid,
+      );
+      if (image == null) {
+        return;
+      }
+
+      final rawId = payload['dicomFileId'];
+      final dicomFileId =
+          rawId is int ? rawId : (rawId is num ? rawId.toInt() : null);
+      if (dicomFileId == null || dicomFileId <= 0) {
+        return;
+      }
+
+      final existing = image.dicomBridgeFile;
+      if (existing != null &&
+          existing.backendId == dicomFileId &&
+          !existing.isReleased) {
+        return;
+      }
+
+      final displayOwnsRelease = payload['displayOwnsRelease'] == true;
+      final releaseOnDispose =
+          displayOwnsRelease ? OVApi().flutterEngineInstanceId > 0 : true;
+      final loadPath = payload['loadPath']?.toString();
+      image.dicomBridgeFile = DicomBridgeFile.adopt(
+        dicomFileId,
+        unlinkPathAfterRelease:
+            loadPath != null && loadPath.isNotEmpty ? loadPath : null,
+        releaseOnDispose: releaseOnDispose,
+      );
+
+      image.loadStatus.status = ResultStatus.success;
+      image.loadStatus.reason = OnisErrorCodes.none;
+    }
+  }
+
+  /// Cross-window [StandardMessageCodec] yields [Map] / [List<Object?>], not typed collections.
+  static Map<String, dynamic> _coerceMessageMap(dynamic data) {
+    if (data is Map<String, dynamic>) {
+      return data;
+    }
+    if (data is Map) {
+      return Map<String, dynamic>.from(data);
+    }
+    return const {};
+  }
+
+  static List<String> _coerceStringList(dynamic value) {
+    if (value is List<String>) {
+      return value;
+    }
+    if (value is List) {
+      return [
+        for (final element in value)
+          if (element != null) element.toString(),
+      ];
+    }
+    return const [];
   }
 
   /*public destroy() {
@@ -221,9 +326,13 @@ class DownloadController extends IDownloadController {
 
   bool _startDownload(DownloadSeries info) {
     entities.Series? series = info.getSeries();
-    series?.loadStatus.status = ResultStatus.waiting;
     final source = info.getSource();
+
+    String guid = OVApi().guid;
+    print('DownloadController: _startDownload: guid: $guid');
+
     if (source == null) return false;
+    series?.loadStatus.status = ResultStatus.waiting;
     Map<String, dynamic> data = {
       "series": [series]
     };
@@ -333,8 +442,8 @@ class DownloadController extends IDownloadController {
 
     final parser = OnisDownloadStreamParser(
       memoryThresholdBytes: _dicomImageMemoryThresholdBytes,
-      onItem: (item) {
-        _handleStreamDownloadItemSync(
+      onItem: (item) async {
+        await _handleStreamDownloadItemSync(
           info,
           imagesByLoadIndex,
           item,
@@ -403,19 +512,19 @@ class DownloadController extends IDownloadController {
     }
   }
 
-  void _handleStreamDownloadItemSync(
+  Future<void> _handleStreamDownloadItemSync(
     DownloadSeries info,
     Map<int, entities.Image> imagesByLoadIndex,
     OnisDlStreamItem item,
     List<entities.Image> completedImages,
     List<bool> delayNextDownload,
-  ) {
+  ) async {
     if (item.downloadSeq != info.downloadSeq) {
-      return;
+      return Future.value();
     }
     final image = imagesByLoadIndex[item.loadIndex];
     if (image == null) {
-      return;
+      return Future.value();
     }
 
     if (item.resultCode != OnisErrorCodes.none) {
@@ -443,7 +552,7 @@ class DownloadController extends IDownloadController {
         OnisErrorCodes.noSupport,
         '',
       );
-      return;
+      return Future.value();
     }
 
     final parserPath = item.tempFilePath;
@@ -468,14 +577,10 @@ class DownloadController extends IDownloadController {
           OnisErrorCodes.noFile,
           '',
         );
-        return;
+        return Future.value();
       }
 
       final id = OVApi().backend.loadDicomFile(loadPath);
-      image.dicomBridgeFile = DicomBridgeFile.adopt(
-        id,
-        unlinkPathAfterRelease: loadPath,
-      );
       tempPathHandedToBridge = true;
 
       _setImageLoadStatus(
@@ -486,14 +591,25 @@ class DownloadController extends IDownloadController {
         OnisErrorCodes.none,
         'loaded',
       );
-      OVApi().messages.sendMessage(OSMSG.seriesImagesReceived, [
-        {
-          'image': image.guid,
-          'series': image.series?.guid,
-          'study': image.series?.study?.guid,
-          'patient': image.series?.study?.patient?.guid
-        }
-      ]);
+
+      // Shared process-wide backend: peers adopt [id] via syncImageDownloadUpdate.
+      await OVApi().openedPatients.notifyImageDownloadUpdate(
+            image,
+            OnisErrorCodes.none,
+            id,
+            loadPath: loadPath,
+          );
+
+      unawaited(
+        OVApi().messages.sendMessage(OSMSG.seriesImagesReceived, [
+          {
+            'image': image.guid,
+            'series': image.series?.guid,
+            'study': image.series?.study?.guid,
+            'patient': image.series?.study?.patient?.guid,
+          },
+        ]),
+      );
     } catch (e, st) {
       debugPrint(
         'DownloadController: stream item DICOM load failed: $e\n$st',
@@ -908,25 +1024,33 @@ class DownloadController extends IDownloadController {
   //-----------------------------------------------------
 
   void _onInitSeriesDownloadResponse(
-      DownloadSeries info, AsyncResponse response) {
+      DownloadSeries info, AsyncResponse response) async {
     final series = info.getSeries();
     if (response.isSuccess && response.data != null) {
       try {
         String downloadSeq = response.data!["data"][0]['seq'] as String;
         int imageCount = response.data!["data"][0]['image_count'] as int;
         info.downloadSeq = downloadSeq;
-        if (imageCount == -1) {
+
+        await OVApi()
+            .openedPatients
+            .notifyInitialSeriesDownloadInfo(series!, imageCount, '');
+        info.pendingRanges = [
+          [0, 0xFFFFFF]
+        ];
+
+        /*if (imageCount == -1) {
           //don't know yet how many images there is in the series, we prepare just one:
-          series?.prepareForDownload(1);
+          series.prepareForDownload(1);
           info.pendingRanges = [
             [0, 0xFFFFFF]
           ];
         } else {
-          series?.prepareForDownload(imageCount);
+          series.prepareForDownload(imageCount);
           info.pendingRanges = [
             [0, 0xFFFFFF]
           ];
-        }
+        }*/
 
         /*let properties:{} = null;
         if ('properties' in data.data[0]) {
@@ -946,10 +1070,10 @@ class DownloadController extends IDownloadController {
         }*/
 
         OVApi().messages.sendMessage(OSMSG.seriesDownloadReceivedInfo, {
-          "patient": series?.study?.patient?.guid ?? '',
-          "study": series?.study?.guid ?? '',
-          "series": series?.guid ?? '',
-          "properties": null
+          "patient": series.study?.patient?.guid ?? '',
+          "study": series.study?.guid ?? '',
+          "series": series.guid,
+          "properties": null,
         });
       } catch (e) {
         series?.loadStatus.setStatus(
@@ -1438,7 +1562,7 @@ class DownloadController extends IDownloadController {
     }
   }
 
-  int _readSeriesInformation(DownloadSeries info, entities.Series series,
+  /*int _readSeriesInformation(DownloadSeries info, entities.Series series,
       Uint8List bytes, int offset) {
     bool valid = true;
     //read the series uid:
@@ -1494,7 +1618,7 @@ class DownloadController extends IDownloadController {
       // }
     }
     return valid ? offset : -1;
-  }
+  }*/
 
   /*List<dynamic> _readImageInformation(
       entities.Series series, Uint8List bytes, int offset) {

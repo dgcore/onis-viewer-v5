@@ -15,8 +15,6 @@ import 'package:onis_viewer/core/models/database/opacity_table.dart';
 import 'package:onis_viewer/core/models/database/window_level.dart';
 import 'package:onis_viewer/core/models/entities/patient.dart' as entities;
 import 'package:onis_viewer/core/onis_exception.dart';
-import 'package:onis_viewer/core/result/result.dart';
-import 'package:onis_viewer/plugins/database/public/database_api.dart';
 
 ///////////////////////////////////////////////////////////////////////
 // OsDisplayedSeriesInfo
@@ -238,13 +236,19 @@ class OsContainerController2D extends OsContainerController {
       }
     }
 
-    if (series.loadStatus.status == ResultStatus.pending) {
+    OVApi().messages.sendMessage(OSMSG.cmdDownloadSeries, {
+      'patient': series.study?.patient?.guid ?? '',
+      'study': series.study?.guid ?? '',
+      'series': series.guid,
+    });
+
+    /*if (series.loadStatus.status == ResultStatus.pending) {
       if (getContainer() != null) {
         final dbApi =
             OVApi().plugins.getPublicApi<DatabaseApi>('onis_database_plugin');
         dbApi?.downloadController.addSeriesToLoadingQueue(series, true);
       }
-    }
+    }*/
 
     /* let localModifiedContainers:Array<OsContainerWnd> = [];
         let targetModifiedContainers:Array<OsContainerWnd>|null = modifiedContainers;
