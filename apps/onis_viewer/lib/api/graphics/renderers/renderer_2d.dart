@@ -2,7 +2,6 @@ import 'dart:math' as math;
 
 import 'package:onis_viewer/api/core/ov_api_core.dart';
 import 'package:onis_viewer/api/graphics/managers/render_type_manager.dart';
-import 'package:onis_viewer/core/dicom/dicom_frame.dart';
 import 'package:onis_viewer/core/dicom/image_region.dart';
 import 'package:onis_viewer/core/graphics/container/container_wnd.dart';
 import 'package:onis_viewer/core/graphics/drivers/driver.dart';
@@ -438,7 +437,7 @@ class OsRenderer2D extends OsRenderer {
   //window level
   //-----------------------------------------------------------------------
 
-  void setWindowLevel(WindowLevel? preset, bool resetOriginal) {
+  void setWindowLevel(WindowLevelPreset? preset, bool resetOriginal) {
     OsGraphicImage? item = getPrimaryImageItem();
     item?.setWindowLevel(preset, resetOriginal);
   }
@@ -448,7 +447,7 @@ class OsRenderer2D extends OsRenderer {
     item?.setWindowLevelValues(center, width);
   }
 
-  WindowLevel? getWindowLevel() {
+  WindowLevelPreset? getWindowLevel() {
     OsGraphicImage? item = getPrimaryImageItem();
     return item?.getWindowLevel();
   }
@@ -476,6 +475,7 @@ class OsRenderer2D extends OsRenderer {
   //camera
   //-----------------------------------------------------------------------
 
+  @override
   OsGraphicCamera getCamera() {
     return _camera;
   }
@@ -521,9 +521,10 @@ class OsRenderer2D extends OsRenderer {
   }
 
   bool scaleCameraToOriginal(double cx, double cy) {
-    OsGraphicImage? item = getPrimaryImageItem();
+    return false;
+    /*OsGraphicImage? item = getPrimaryImageItem();
     entities.Image? image = item?.getImage();
-    DicomFrame? frame = item?.getFrame(item.getCurrentFrame());
+    DicomBridgeFrame? frame = item?.getFrame(item.getCurrentFrame());
     if (image == null) return false;
     bool cameraValid = false;
     double orthoWidth = 0;
@@ -596,7 +597,7 @@ class OsRenderer2D extends OsRenderer {
     _camera.rot[1] = 0.0;
     _camera.setOrthoWidth(orthoWidth);
     _camera.validateMatrix();
-    return true;
+    return true;*/
   }
 
   void scaleCameraToRealSize(double cm, double cx, double cy, bool reset) {

@@ -79,6 +79,10 @@ if(EXISTS "${CMAKE_SOURCE_DIR}/apps/onis_site_server")
     add_subdirectory(apps/onis_site_server)
 endif()
 
+if(EXISTS "${CMAKE_SOURCE_DIR}/apps/onis_viewer/native/backend/CMakeLists.txt")
+    add_subdirectory(apps/onis_viewer/native/backend)
+endif()
+
 # External libraries setup
 if(BUILD_DCMTK)
     # DCMTK configuration will be added here

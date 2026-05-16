@@ -553,7 +553,9 @@ bool dicom_dcmtk_base::get_binary_value(
 
         // DcmElement *new_elt = newDicomElement(dcmtk_tag, total-header_size);
 #//if defined(WIN32) || defined(_ONIS_FOR_LINUX_)
-        DcmElement* new_elt = newDicomElement(dcmtk_tag, total - header_size);
+        DcmTag dcmtk_dcm_tag(dcmtk_tag);
+        DcmElement* new_elt =
+            newDicomElement(dcmtk_dcm_tag, total - header_size);
         // #else
         //       DcmElement* new_elt =
         //         DcmDataset::newDicomElement(dcmtk_tag, total - header_size);
@@ -1162,7 +1164,8 @@ bool dicom_dcmtk_base::set_binary_value(std::int32_t tag,
   // create the new element:
   bool ok = true;
   // #if defined(WIN32) || defined(_ONIS_FOR_LINUX_)
-  DcmElement* elt = newDicomElement(dcmtk_tag);
+  DcmTag dcmtk_dcm_tag(dcmtk_tag);
+  DcmElement* elt = newDicomElement(dcmtk_dcm_tag);
   // #else
   // DcmElement* elt = DcmDataset::newDicomElement(dcmtk_tag);
   // #endif
@@ -2302,7 +2305,7 @@ onis::dicom_frame_ptr dicom_dcmtk_file::extract_frame(std::int32_t index) {
         if (tmp != nullptr) {
           unsigned long opt_compatibilityMode =
               CIF_MayDetachPixelData;  // | CIF_TakeOverExternalDataset;
-          long fCount;
+          long fCount = 1;
           _file->getDataset()->findAndGetLongInt(DCM_NumberOfFrames, fCount);
           int framecnt = (int)fCount;
           if (framecnt > 1) {

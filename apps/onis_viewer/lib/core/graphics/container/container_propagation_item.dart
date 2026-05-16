@@ -1,4 +1,3 @@
-import 'package:onis_viewer/core/dicom/dicom_tags.dart';
 import 'package:onis_viewer/core/graphics/container/container_wnd.dart';
 import 'package:onis_viewer/core/graphics/container/controllers/container_controller.dart';
 import 'package:onis_viewer/core/graphics/renderer/items/image.dart';
@@ -495,7 +494,7 @@ class OsContainerPropagateItem {
             study1 = series1?.study;
             patient1 = study1?.patient;
             if (image1 != null) {
-              if (image1.dicomFile != null) {
+              /*if (image1.dicomFile != null) {
                 if (identical(series, series1)) {
                   winnerRenderer = render1;
                 } else if ((currentMode & OsPropagateFlags.study) != 0) {
@@ -509,17 +508,10 @@ class OsContainerPropagateItem {
                   winnerContainer = containers[it3];
                   break;
                 }
-              }
+              }*/
             }
           }
         }
-      }
-
-      if (winnerRenderer != null) {
-        List<OsRenderer> renderers = [];
-        renderers.add(render);
-        propagate3(
-            winnerContainer, winnerRenderer, container, renderers, currentType);
       }
     }
   }
@@ -741,7 +733,7 @@ class OsContainerPropagateItem {
     }
 
     if (types.contains("WL")) {
-      final centerWidth = img.getWindowLevelValues();
+      /*final centerWidth = img.getWindowLevelValues();
 
       if (centerWidth != null) {
         final preset = img.getWindowLevel();
@@ -812,7 +804,7 @@ class OsContainerPropagateItem {
         }
 
         redraw = true;
-      }
+      }*/
     }
 
     bool doPosition = types.contains("POS");

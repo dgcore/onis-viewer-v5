@@ -257,4 +257,13 @@ bool has_tmp_extension(const std::string& file_path) {
   }
 }
 
+std::int64_t get_file_size(const std::string& file_path) {
+  try {
+    std::filesystem::path path(file_path);
+    return std::filesystem::file_size(path);
+  } catch (...) {
+    return -1;
+  }
+}
+
 }  // namespace onis::util::filesystem

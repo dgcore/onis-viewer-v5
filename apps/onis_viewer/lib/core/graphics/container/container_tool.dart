@@ -39,7 +39,8 @@ class OsContainerTool {
   void setVisibility({required bool value, required bool sendMessage}) {
     _visible = visible;
     if (sendMessage) {
-      OVApi().messages.sendMessage(OSMSG.imageContainerToolVisibility, this);
+      OVApi().messages.sendMessage(
+          OSMSG.imageContainerToolVisibility, {'tool': id, 'visible': value});
     }
   }
 

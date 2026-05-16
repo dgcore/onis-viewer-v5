@@ -22,4 +22,5 @@ bool exist_file(const std::string& file_path);
 bool move_file(const std::string& file_path, const std::string& new_file_path);
 bool copy_file(const std::string& file_path, const std::string& new_file_path);
 bool has_tmp_extension(const std::string& file_path);
+std::int64_t get_file_size(const std::string& file_path);
 }  // namespace onis::util::filesystem

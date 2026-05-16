@@ -1,7 +1,9 @@
 import 'dart:convert';
 import "dart:io";
 
+import 'package:desktop_multi_window/desktop_multi_window.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:onis_viewer/api/core/ov_api_core.dart';
 import 'package:onis_viewer/app/onis_viewer_app.dart';
 import 'package:onis_viewer/core/constants.dart';
@@ -11,13 +13,11 @@ import 'package:onis_viewer/core/theme/app_theme.dart';
 import 'package:window_manager/window_manager.dart';
 
 void main(List<String> args) async {
-  // Set up SSL certificate validation override for desktop platforms
   if (Platform.isWindows || Platform.isMacOS || Platform.isLinux) {
     HttpOverrides.global = _MyHttpOverrides();
   }
 
   WidgetsFlutterBinding.ensureInitialized();
-  await windowManager.ensureInitialized();
   debugPrint('main args: $args');
 
   // desktop_multi_window launches sub-window isolates with:
@@ -25,6 +25,7 @@ void main(List<String> args) async {
   final isSubWindowLaunch = args.length >= 3 && args[0] == 'multi_window';
   if (isSubWindowLaunch) {
     final engineId = int.tryParse(args[1]) ?? 1;
+    OVApi.registerSubWindowEngineId(engineId);
     runApp(DisplayWindowApp(
       windowArgs: args[2],
       flutterEngineInstanceId: engineId,
@@ -32,6 +33,8 @@ void main(List<String> args) async {
     return;
   }
 
+  // window_manager must only run in the main isolate.
+  await windowManager.ensureInitialized();
   runApp(const OnisViewerApp());
 }
 
@@ -103,97 +106,83 @@ class DisplayWindowPage extends StatefulWidget {
   State<DisplayWindowPage> createState() => _DisplayWindowPageState();
 }
 
-class _DisplayWindowPageState extends State<DisplayWindowPage>
-    with WindowListener {
-  //late final Map<String, dynamic> args;
+class _DisplayWindowPageState extends State<DisplayWindowPage> {
   final OVApi _api = OVApi();
-  final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
   OsMonitor? _monitor;
+
+  /// macOS secondary Flutter engines get [AppLifecycleState.hidden] when the
+  /// app loses focus, which disables the frame pipeline and freezes the UI.
+  /// https://github.com/flutter/flutter/issues/133533
+  AppLifecycleListener? _macSubWindowLifecycleWorkaround;
 
   @override
   void initState() {
     super.initState();
+    if (Platform.isMacOS && widget.flutterEngineInstanceId > 0) {
+      _macSubWindowLifecycleWorkaround = AppLifecycleListener(
+        onStateChange: (state) {
+          if (state == AppLifecycleState.hidden) {
+            // ignore: invalid_use_of_protected_member
+            SchedulerBinding.instance.handleAppLifecycleStateChanged(
+              AppLifecycleState.inactive,
+            );
+          }
+        },
+      );
+    }
     _initializeDisplayWindow();
   }
 
   Future<void> _initializeDisplayWindow() async {
     try {
+      await _applySubWindowChrome(
+        jsonDecode(widget.windowArgs) as Map<String, dynamic>,
+      );
+
       await _api.initialize(
         flutterEngineInstanceId: widget.flutterEngineInstanceId,
       );
-      final monitorArgs = jsonDecode(widget.windowArgs);
-      final labelIndex = monitorArgs['labelIndex'];
+
+      final monitorArgs = jsonDecode(widget.windowArgs) as Map<String, dynamic>;
+      final labelIndex = (monitorArgs['labelIndex'] as num?)?.toInt();
       final monitors = _api.monitorConfiguration?.getActiveMonitors() ?? [];
-      if (monitors.isNotEmpty) {
-        _monitor = monitors
-            .firstWhere((monitor) => monitor.getLabelIndex() == labelIndex);
-        if (_monitor != null) {
-          _monitor?.createWindow();
+      if (labelIndex != null) {
+        for (final m in monitors) {
+          if (m.getLabelIndex() == labelIndex) {
+            _monitor = m;
+            break;
+          }
         }
+        _monitor?.createWindow();
         if (mounted) {
           setState(() {});
         }
       }
-      /*_api.attachMultiWindowMessageHandler((call, fromWindowId) async {
-        if (call.method == 'onis/backend_identity') {
-          return <String, dynamic>{
-            'windowType': 'display',
-            'backendVersion': _api.backend.backendVersion,
-            'backendInstanceId': _api.backend.backendInstanceId,
-            'fromWindowId': fromWindowId,
-          };
-        }
-        return null;
-      });*/
-      await _configureWindow();
     } catch (e, st) {
       debugPrint('DisplayWindow initialization failed: $e\n$st');
-      rethrow;
     }
   }
 
-  Future<void> _configureWindow() async {
-    windowManager.addListener(this);
-
-    final monitorArgs = jsonDecode(widget.windowArgs);
-    final width = (monitorArgs['width'] as num).toDouble();
-    final height = (monitorArgs['height'] as num).toDouble();
+  /// Secondary engines use [WindowController] only (not [window_manager]).
+  Future<void> _applySubWindowChrome(Map<String, dynamic> monitorArgs) async {
+    final labelIndex = monitorArgs['labelIndex'];
+    final title = '${OnisViewerConstants.appName} — Monitor $labelIndex';
     final left = (monitorArgs['left'] as num?)?.toDouble() ?? 100;
     final top = (monitorArgs['top'] as num?)?.toDouble() ?? 100;
-    final labelIndex = monitorArgs['labelIndex'];
-    final title =
-        '${OnisViewerConstants.appName} — Monitor $labelIndex';
+    final width = (monitorArgs['width'] as num?)?.toDouble() ?? 800;
+    final height = (monitorArgs['height'] as num?)?.toDouble() ?? 600;
 
-    final options = WindowOptions(
-      size: Size(width, height),
-      center: false,
-      title: title,
-      backgroundColor: Colors.black,
-      skipTaskbar: false,
-      titleBarStyle: TitleBarStyle.normal,
-    );
-
-    await windowManager.waitUntilReadyToShow(options, () async {
-      await windowManager.setBounds(Rect.fromLTWH(left, top, width, height));
-      await windowManager.setMinimumSize(
-        const Size(
-          OnisViewerConstants.minWindowWidth,
-          OnisViewerConstants.minWindowHeight,
-        ),
-      );
-      await windowManager.setResizable(true);
-      await windowManager.setMaximizable(true);
-      await windowManager.setMinimizable(true);
-      await windowManager.setClosable(true);
-      await windowManager.show();
-      await windowManager.focus();
-    });
+    final window =
+        WindowController.fromWindowId(widget.flutterEngineInstanceId);
+    await window.setFrame(Rect.fromLTWH(left, top, width, height));
+    await window.setTitle(title);
+    await window.show();
   }
 
   @override
   void dispose() {
+    _macSubWindowLifecycleWorkaround?.dispose();
     _api.dispose();
-    windowManager.removeListener(this);
     super.dispose();
   }
 

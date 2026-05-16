@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 /// Enumeration of request types supported by the async request system
 enum RequestType {
   /// Find studies in the database
@@ -76,6 +78,15 @@ abstract class AsyncRequest {
   ///
   /// Returns a Future that completes with the response when the request is finished
   Future<AsyncResponse> send();
+
+  /// Receive a binary response body as a sequence of chunks (HTTP streaming).
+  ///
+  /// Default: not supported. Site server downloads override this for `stream: true`.
+  Future<void> sendStreaming(void Function(Uint8List chunk) onChunk) async {
+    throw UnsupportedError(
+      'sendStreaming is not supported for this request implementation',
+    );
+  }
 
   /// Cancel the current request if it's in progress
   ///

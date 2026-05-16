@@ -1,4 +1,4 @@
-import 'package:onis_viewer/core/dicom/dicom_frame.dart';
+import 'package:onis_viewer/core/dicom/dicom_bridge_frame.dart';
 import 'package:onis_viewer/core/dicom/image_region.dart';
 import 'package:onis_viewer/core/error_codes.dart';
 import 'package:onis_viewer/core/graphics/drivers/driver.dart';
@@ -16,7 +16,7 @@ class OsGraphicImage extends OsGraphicResponder {
   ColorLut? _colorLut;
   OpacityTable? _opacityTable;
   ConvolutionFilter? _convolutionFilter;
-  WindowLevel? _windowLevelPreset;
+  WindowLevelPreset? _windowLevelPreset;
 
   bool _isDirty = true;
   double _windowWidth = double.infinity;
@@ -25,13 +25,13 @@ class OsGraphicImage extends OsGraphicResponder {
   WeakReference<entities.Series>? _wseries;
   WeakReference<entities.Image>? _wimage;
 
-  List<DicomFrame?> _frames = [];
+  List<DicomBridgeFrame?> _frames = [];
   int _currentFrame = 0;
 
   OsDriverImage? _texture;
   int _filterType = 0;
-  bool _showAllOverlays = false;
-  OsResult _drawStatus = OsResult();
+  final bool _showAllOverlays = false;
+  final OsResult _drawStatus = OsResult();
   //final List<OsGraphicAnnotation> _annotations = [];
 
   OsGraphicImage([String name = ''])
@@ -49,7 +49,7 @@ class OsGraphicImage extends OsGraphicResponder {
 
   @override
   bool copyProperties(OsGraphicItem from) {
-    final ret = super.copyProperties(from);
+    /*final ret = super.copyProperties(from);
 
     final img = from as OsGraphicImage;
 
@@ -79,7 +79,8 @@ class OsGraphicImage extends OsGraphicResponder {
     _drawStatus = img._drawStatus;
     _showAllOverlays = img._showAllOverlays;
 
-    return ret;
+    return ret;*/
+    return false;
   }
 
   void setImage(entities.Image img) {
@@ -123,14 +124,14 @@ class OsGraphicImage extends OsGraphicResponder {
 
   int getFrameCount() => _frames.length;
 
-  DicomFrame? getFrame(int index) {
+  DicomBridgeFrame? getFrame(int index) {
     if (index >= 0 && index < _frames.length) {
       return _frames[index];
     }
     return null;
   }
 
-  void setFrame(int index, DicomFrame? frame) {
+  void setFrame(int index, DicomBridgeFrame? frame) {
     if (index >= 0 && index < _frames.length) {
       if (_frames[index] != null) {
         if (identical(_frames[index], frame)) {
@@ -173,7 +174,7 @@ class OsGraphicImage extends OsGraphicResponder {
       final image = getImage();
 
       if (image != null) {
-        DicomFrame? frame = getFrame(_currentFrame);
+        DicomBridgeFrame? frame = getFrame(_currentFrame);
 
         /*if (frame != null) {
           final dcm1 = image.getDicomFile();
@@ -228,21 +229,23 @@ class OsGraphicImage extends OsGraphicResponder {
               _windowCenter == double.infinity) {
             //final centerWidth = <double>[0, 0];
             final wl = frame.getOriginalWindowLevel();
-            frame.setWindowLevel(wl);
-            _windowWidth = wl.width;
-            _windowCenter = wl.center;
+            if (wl != null) {
+              frame.setWindowLevel(wl);
+              _windowWidth = wl.width;
+              _windowCenter = wl.center;
+            }
           } else {
-            frame.setWindowLevel((center: _windowCenter, width: _windowWidth));
+            frame.setWindowLevel(
+                WindowLevel(center: _windowCenter, width: _windowWidth));
           }
-
-          _texture!.initWithFrame(frame);
+          _texture!.initWithFrame(info.context, frame);
         }
 
         if (frame != null) {
-          final dims = frame.getDimensions();
+          final dims = frame.getResolution();
           if (dims != null) {
-            imageSize[0] = dims.$1.toDouble();
-            imageSize[1] = dims.$2.toDouble();
+            imageSize[0] = dims.width.toDouble();
+            imageSize[1] = dims.height.toDouble();
           }
 
           ImageRegion? region;
@@ -383,7 +386,7 @@ class OsGraphicImage extends OsGraphicResponder {
 
   ConvolutionFilter? getConvolutionFilter() => _convolutionFilter;
 
-  void setWindowLevel(WindowLevel? preset, bool resetOriginal) {
+  void setWindowLevel(WindowLevelPreset? preset, bool resetOriginal) {
     _windowLevelPreset = preset;
     _isDirty = true;
 
@@ -394,12 +397,12 @@ class OsGraphicImage extends OsGraphicResponder {
         _isDirty = true;
       }
     } else {
-      _windowWidth = preset.width;
-      _windowCenter = preset.center;
+      _windowWidth = preset.windowLevel.width;
+      _windowCenter = preset.windowLevel.center;
     }
   }
 
-  WindowLevel? getWindowLevel() => _windowLevelPreset;
+  WindowLevelPreset? getWindowLevel() => _windowLevelPreset;
 
   void setWindowLevelValues(double center, double width) {
     _windowLevelPreset = null;
@@ -412,11 +415,11 @@ class OsGraphicImage extends OsGraphicResponder {
     if (_windowCenter == double.infinity || _windowWidth == double.infinity) {
       final image = getImage();
       if (image != null) {
-        DicomFrame? frame = getFrame(_currentFrame);
-        if (frame != null) {
+        DicomBridgeFrame? frame = getFrame(_currentFrame);
+        /*if (frame != null) {
           return frame.getOriginalWindowLevel();
         } else {
-          final file = image.dicomFile;
+          /*final file = image.dicomFile;
           if (file != null) {
             ({double center, double width})? windowLevel = file.windowLevel;
             if (windowLevel != null) {
@@ -429,8 +432,8 @@ class OsGraphicImage extends OsGraphicResponder {
             } else {
               return windowLevel;
             }
-          }
-        }
+          }*/
+        }*/
       }
       return null;
     } else {
@@ -555,15 +558,18 @@ class OsGraphicImage extends OsGraphicResponder {
   }
 
   void _allocateFrames(int frameCount) {
-    if (_frames.isNotEmpty) {
-      return;
-    }
     if (frameCount > 0) {
-      _frames = List<DicomFrame?>.filled(frameCount, null);
+      _frames = List<DicomBridgeFrame?>.filled(frameCount, null);
+    } else {
+      _frames = [];
     }
   }
 
   void _releaseFrames() {
-    _frames.clear();
+    for (final frame in _frames) {
+      frame?.dispose();
+    }
+    _frames = [];
+    _currentFrame = 0;
   }
 }

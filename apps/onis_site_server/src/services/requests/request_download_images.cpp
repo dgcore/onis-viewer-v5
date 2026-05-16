@@ -1,15 +1,18 @@
 #include <png.h>
 #include <algorithm>
+#include <array>
 #include <cstdlib>
 #include <cstring>
 #include <fstream>
 #include <iomanip>
+#include <iostream>
 #include <limits>
 #include <sstream>
 #include <vector>
 
 #include "../../../include/database/items/db_download_image.hpp"
 #include "../../../include/database/items/db_download_series.hpp"
+#include "../../../include/database/items/db_item.hpp"
 #include "../../../include/services/requests/request_data.hpp"
 #include "../../../include/services/requests/request_service.hpp"
 #include "./download/download_item.hpp"
@@ -19,6 +22,239 @@
 #include "onis_kit/include/utilities/string.hpp"
 #include "onis_kit/include/utilities/uuid.hpp"
 
+void request_service::process_download_images_request(
+    const request_data_ptr& req) {
+  // verify the input:
+  onis::database::item::verify_integer_value(req->input_json, "max_bytes",
+                                             false);
+  onis::database::item::verify_array_value(req->input_json, "images", false);
+
+  // prepare the download items array:
+  download_stream_ptr dstream = std::make_shared<download_stream>();
+  std::size_t dlitems_index = 0;
+  std::size_t max_bytes = req->input_json["max_bytes"].asInt();
+  std::size_t total_bytes = 0;
+
+  // Fill the download items array:
+  {
+    request_database db(this);
+    for (const auto& image : req->input_json["images"]) {
+      std::string download_seq = image["dl"].asString();
+
+      // prepare a download item for the image:
+      std::unique_ptr<DlItem> dlitem = std::make_unique<DlItem>();
+      dlitem->index = image["index"].asInt();
+      dlitem->init(db, download_seq);
+
+      // get the series download information:
+      if (dstream->dlmap.find(download_seq) == dstream->dlmap.end()) {
+        dstream->dlmap[download_seq] = Json::Value(Json::objectValue);
+        try {
+          db->find_download_series_by_seq(download_seq,
+                                          onis::database::lock_mode::NO_LOCK,
+                                          dstream->dlmap[download_seq]);
+          dstream->dl_order.push_back(download_seq);
+        } catch (const onis::exception& e) {
+          dlitem->res.set(OSRSP_FAILURE, e.get_code(), e.what(), false);
+          dstream->dlmap.erase(download_seq);
+          continue;
+        } catch (...) {
+          dlitem->res.set(OSRSP_FAILURE, EOS_UNKNOWN, "Unknown error", false);
+          dstream->dlmap.erase(download_seq);
+          continue;
+        }
+      }
+      if (!dlitem->res.good()) {
+        continue;
+      }
+      dstream->items.emplace_back(std::move(dlitem));
+      if (total_bytes > max_bytes)
+        break;
+    }
+  }
+
+  auto to_le_u32 = [](std::uint32_t value) -> std::array<char, 4> {
+    return std::array<char, 4>{
+        static_cast<char>(value & 0xFF),
+        static_cast<char>((value >> 8) & 0xFF),
+        static_cast<char>((value >> 16) & 0xFF),
+        static_cast<char>((value >> 24) & 0xFF),
+    };
+  };
+  auto to_le_u64 = [](std::uint64_t value) -> std::array<char, 8> {
+    return std::array<char, 8>{
+        static_cast<char>(value & 0xFF),
+        static_cast<char>((value >> 8) & 0xFF),
+        static_cast<char>((value >> 16) & 0xFF),
+        static_cast<char>((value >> 24) & 0xFF),
+        static_cast<char>((value >> 32) & 0xFF),
+        static_cast<char>((value >> 40) & 0xFF),
+        static_cast<char>((value >> 48) & 0xFF),
+        static_cast<char>((value >> 56) & 0xFF),
+    };
+  };
+
+  auto stream_callback = [dstream, to_le_u32, to_le_u64](
+                             char* out, std::size_t max_len) -> std::size_t {
+    if (max_len == 0) {
+      return 0;
+    }
+
+    std::size_t written = 0;
+    while (written < max_len &&
+           dstream->current_phase != download_stream::phase::kDone) {
+      auto write_from = [&](const char* src, std::size_t len) -> std::size_t {
+        const std::size_t remaining = len - dstream->phase_offset;
+        const std::size_t can_copy = std::min(max_len - written, remaining);
+        std::memcpy(out + written, src + dstream->phase_offset, can_copy);
+        written += can_copy;
+        dstream->phase_offset += can_copy;
+        return can_copy;
+      };
+
+      switch (dstream->current_phase) {
+        case download_stream::phase::kMagic:
+          write_from(dstream->magic.data(), dstream->magic.size());
+          dstream->on_data_written();
+          break;
+        case download_stream::phase::kSeriesCount: {
+          std::uint32_t series_count =
+              static_cast<std::uint32_t>(dstream->dl_order.size());
+          auto series_count_le = to_le_u32(series_count);
+          write_from(series_count_le.data(), series_count_le.size());
+          dstream->on_data_written();
+          break;
+        }
+        case download_stream::phase::kSeriesSeqLen: {
+          const std::string& series_seq =
+              dstream->dl_order[dstream->series_index];
+          auto series_seq_len =
+              to_le_u32(static_cast<std::uint32_t>(series_seq.size()));
+          write_from(series_seq_len.data(), series_seq_len.size());
+          dstream->on_data_written();
+          break;
+        }
+        case download_stream::phase::kSeriesSeq: {
+          const std::string& series_seq =
+              dstream->dl_order[dstream->series_index];
+          write_from(series_seq.data(), series_seq.size());
+          dstream->on_data_written();
+          break;
+        }
+        case download_stream::phase::kSeriesCompleted: {
+          const std::string& series_seq =
+              dstream->dl_order[dstream->series_index];
+          const std::int32_t completed =
+              dstream->dlmap[series_seq][DS_COMPLETED_KEY].asInt();
+          auto series_completed_le =
+              to_le_u32(static_cast<std::uint32_t>(completed));
+          write_from(series_completed_le.data(), series_completed_le.size());
+          dstream->on_data_written();
+          break;
+        }
+        case download_stream::phase::kSeriesExpected: {
+          const std::string& series_seq =
+              dstream->dl_order[dstream->series_index];
+          const std::int32_t expected =
+              dstream->dlmap[series_seq][DS_EXPECTED_KEY].asInt();
+          auto series_expected_le =
+              to_le_u32(static_cast<std::uint32_t>(expected));
+          write_from(series_expected_le.data(), series_expected_le.size());
+          dstream->on_data_written();
+          break;
+        }
+        case download_stream::phase::kItemCount: {
+          const std::int32_t item_count =
+              static_cast<std::int32_t>(dstream->items.size());
+          auto item_count_le =
+              to_le_u32(static_cast<std::uint32_t>(item_count));
+          write_from(item_count_le.data(), item_count_le.size());
+          dstream->on_data_written();
+          break;
+        }
+        case download_stream::phase::kItemDownloadSeqLen: {
+          const std::string& download_seq =
+              dstream->items[dstream->item_index]->download_seq;
+          auto download_seq_len =
+              to_le_u32(static_cast<std::uint32_t>(download_seq.size()));
+          write_from(download_seq_len.data(), download_seq_len.size());
+          dstream->on_data_written();
+          break;
+        }
+        case download_stream::phase::kItemDownloadSeq: {
+          const std::string& download_seq =
+              dstream->items[dstream->item_index]->download_seq;
+          write_from(download_seq.data(), download_seq.size());
+          dstream->on_data_written();
+          break;
+        }
+        case download_stream::phase::kItemIndex: {
+          const std::int32_t index = dstream->items[dstream->item_index]->index;
+          auto index_le = to_le_u32(static_cast<std::uint32_t>(index));
+          write_from(index_le.data(), index_le.size());
+          dstream->on_data_written();
+          break;
+        }
+        case download_stream::phase::kItemType: {
+          const DlItemType type = dstream->items[dstream->item_index]->type;
+          auto type_le = to_le_u32(static_cast<std::uint32_t>(type));
+          write_from(type_le.data(), type_le.size());
+          dstream->on_data_written();
+          break;
+        }
+        case download_stream::phase::kItemResult: {
+          const auto& code = dstream->items[dstream->item_index]->res.reason;
+          auto code_le = to_le_u32(code);
+          write_from(code_le.data(), code_le.size());
+          dstream->on_data_written();
+          break;
+        }
+        case download_stream::phase::kItemFileSize: {
+          const std::size_t file_size =
+              dstream->items[dstream->item_index]->file_size;
+          auto file_size_le = to_le_u64(static_cast<std::uint64_t>(file_size));
+          write_from(file_size_le.data(), file_size_le.size());
+          dstream->on_data_written();
+          break;
+        }
+        case download_stream::phase::kItemFilePayload: {
+          auto& item = dstream->items[dstream->item_index];
+          const std::size_t file_remaining =
+              item->file_size - dstream->phase_offset;
+          if (file_remaining == 0) {
+            dstream->current_file.close();
+            dstream->on_data_written();
+            break;
+          }
+          const std::size_t to_read =
+              std::min(max_len - written, file_remaining);
+          dstream->current_file.read(out + written,
+                                     static_cast<std::streamsize>(to_read));
+          const std::size_t read_count =
+              static_cast<std::size_t>(dstream->current_file.gcount());
+          written += read_count;
+          dstream->phase_offset += read_count;
+          if (read_count == 0 || dstream->phase_offset >= item->file_size ||
+              dstream->current_file.eof()) {
+            dstream->current_file.close();
+            dstream->phase_offset = item->file_size;
+            dstream->on_data_written();
+          }
+          break;
+        }
+        case download_stream::phase::kDone:
+          break;
+      }
+    }
+    return written;
+  };
+
+  req->write_output(
+      [&stream_callback](request_data::stream_reader_fn& output_stream) {
+        output_stream = stream_callback;
+      });
+}
+#ifdef _BEFORE_FILE_STREAMING_SUPPORT_
 namespace {
 void my_png_write_data(png_structp png_ptr, png_bytep data, png_size_t length) {
   /* with libpng15 next line causes pointer deference error; use libpng12 */
@@ -60,9 +296,8 @@ void my_png_flush(png_structp png_ptr) {}
     for (std::size_t i = 0; i + 1 < len; i += 2) {
       // Read as signed short (little-endian byte order).
       const std::uint16_t raw = static_cast<std::uint16_t>(data[i]) |
-                                (static_cast<std::uint16_t>(data[i + 1]) << 8);
-      const std::int16_t v = static_cast<std::int16_t>(raw);
-      if (v < min_s16)
+                                (static_cast<std::uint16_t>(data[i + 1]) <<
+8); const std::int16_t v = static_cast<std::int16_t>(raw); if (v < min_s16)
         min_s16 = v;
       if (v > max_s16)
         max_s16 = v;
@@ -104,16 +339,14 @@ void png_read_from_mem(png_structp png_ptr, png_bytep outBytes,
 
 void dump_png_decoded_as_hex(
     const std::uint8_t* data, std::size_t len, const std::string& label,
-    const std::uint8_t* original_data = nullptr, std::size_t original_len = 0) {
-  if (data == nullptr || len == 0)
-    return;
+    const std::uint8_t* original_data = nullptr, std::size_t original_len =
+0) { if (data == nullptr || len == 0) return;
 
   png_mem_reader reader{data, len, 0};
 
   png_structp png_ptr =
-      png_create_read_struct(PNG_LIBPNG_VER_STRING, nullptr, nullptr, nullptr);
-  if (!png_ptr)
-    return;
+      png_create_read_struct(PNG_LIBPNG_VER_STRING, nullptr, nullptr,
+nullptr); if (!png_ptr) return;
 
   png_infop info_ptr = png_create_info_struct(png_ptr);
   if (!info_ptr) {
@@ -152,9 +385,8 @@ void dump_png_decoded_as_hex(
     row_pointers[y] = buffer.data() + y * rowbytes;
   }
 
-  // Keep decoded 16-bit samples in host endianness (little-endian on macOS).
-  if (bit_depth == 16) {
-    png_set_swap(png_ptr);
+  // Keep decoded 16-bit samples in host endianness (little-endian on
+macOS). if (bit_depth == 16) { png_set_swap(png_ptr);
   }
 
   png_read_image(png_ptr, row_pointers.data());
@@ -163,10 +395,9 @@ void dump_png_decoded_as_hex(
 
   const char* home = std::getenv("HOME");
   std::string path =
-      home ? std::string(home) + "/Documents/pngDecoded.txt" : "pngDecoded.txt";
-  std::ofstream out(path, std::ios::out | std::ios::app);
-  if (!out.is_open())
-    return;
+      home ? std::string(home) + "/Documents/pngDecoded.txt" :
+"pngDecoded.txt"; std::ofstream out(path, std::ios::out | std::ios::app); if
+(!out.is_open()) return;
 
   out << "==== " << label << " decoded GRAY "
       << "w=" << width << " h=" << height << " bit_depth=" << bit_depth
@@ -206,8 +437,8 @@ first_original_value = 0; bool found_first = false;
         const std::uint16_t original_raw =
             static_cast<std::uint16_t>(original_data[ob]) |
             (static_cast<std::uint16_t>(original_data[ob + 1]) << 8);
-        const std::int16_t decoded_s16 = static_cast<std::int16_t>(decoded_raw);
-        const std::int16_t original_s16 =
+        const std::int16_t decoded_s16 =
+static_cast<std::int16_t>(decoded_raw); const std::int16_t original_s16 =
 static_cast<std::int16_t>(original_raw); if (decoded_s16 != original_s16) {
           ++mismatch_count;
           if (!found_first) {
@@ -253,6 +484,20 @@ static_cast<std::int16_t>(original_raw); if (decoded_s16 != original_s16) {
 
 void request_service::process_download_images_request(
     const request_data_ptr& req) {
+  const bool stream_response =
+      req->input_json.isMember("stream") && req->input_json["stream"].asBool();
+  auto get_file_size = [](const std::string& path) -> std::int64_t {
+    std::ifstream ifs(path, std::ios::binary | std::ios::ate);
+    if (!ifs.is_open()) {
+      return -1;
+    }
+    const auto pos = ifs.tellg();
+    if (pos < 0) {
+      return -1;
+    }
+    return static_cast<std::int64_t>(pos);
+  };
+
   // verify the input:
   onis::database::item::verify_integer_value(req->input_json, "max_bytes",
                                              false);
@@ -271,7 +516,6 @@ void request_service::process_download_images_request(
       std::string dlseq = image["dl"].asString();
       DlItem* dlitem = new DlItem(dlseq);
       dlitems.push_back(dlitem);
-      dlitem->cur_res = image["from"].asInt();
       dlitem->index = image["index"].asInt();
 
       // get the series download information:
@@ -298,7 +542,56 @@ void request_service::process_download_images_request(
 
       // init path and resolution offset:
       dlitem->cloud_decode_image_j2k_offsets(db, dlseq);
-      total_bytes += dlitem->cloud_increase_image_resolution();
+      if (dlitem->res.good() && dlitem->type != 0) {
+        dlitem->cur_res = image["from"].asInt();
+      }
+      if (dlitem->res.good() && dlitem->type == 0) {  // dicom file format
+        if (image.isMember("byte_offset")) {
+          dlitem->dicom_byte_offset = image["byte_offset"].asInt64();
+        } else {
+          dlitem->dicom_byte_offset = 0;
+        }
+        if (dlitem->dicom_byte_offset < 0) {
+          dlitem->dicom_byte_offset = 0;
+        }
+
+        const std::int64_t file_size = get_file_size(dlitem->path);
+        if (file_size <= 0) {
+          dlitem->res.set(OSRSP_FAILURE, EOS_FILE_OPEN,
+                          "Failed to open DICOM file", false);
+          continue;
+        }
+
+        std::int64_t from_offset = dlitem->dicom_byte_offset;
+        if (from_offset >= file_size) {
+          dlitem->dicom_byte_end = -1;
+          continue;
+        }
+
+        std::int64_t chunk_len = file_size - from_offset;
+        if (max_bytes > 0) {
+          if (total_bytes == 0) {
+            chunk_len = std::min<std::int64_t>(
+                chunk_len, static_cast<std::int64_t>(max_bytes));
+          } else {
+            std::int64_t remaining_budget =
+                static_cast<std::int64_t>(max_bytes - total_bytes);
+            if (remaining_budget <= 0) {
+              break;
+            }
+            chunk_len = std::min<std::int64_t>(chunk_len, remaining_budget);
+          }
+        }
+
+        if (chunk_len <= 0) {
+          break;
+        }
+
+        dlitem->dicom_byte_end = from_offset + chunk_len;
+        total_bytes += static_cast<std::int32_t>(chunk_len);
+      } else {
+        total_bytes += dlitem->cloud_increase_image_resolution();
+      }
       if (total_bytes > max_bytes)
         break;
     }
@@ -308,8 +601,17 @@ void request_service::process_download_images_request(
   std::int32_t total_length = 0;
   for (std::list<DlItem*>::iterator it = dlitems.begin(); it != dlitems.end();
        it++) {
-    if ((*it)->res.good() && (*it)->new_res == -1)
+    if ((*it)->res.good()) {
+      if ((*it)->type == 0) {
+        if ((*it)->dicom_byte_end <= (*it)->dicom_byte_offset) {
+          continue;
+        }
+      } else if ((*it)->new_res == -1) {
+        continue;
+      }
+    } else {
       continue;
+    }
 
     // we will write the series id:
     total_length += sizeof(std::uint8_t) + (*it)->srdlid.length();
@@ -321,6 +623,7 @@ void request_service::process_download_images_request(
     if ((*it)->res.good()) {
       if ((*it)->type == 1) {  // raw format
         (*it)->type = 3;       // png format
+        (*it)->type = 0;       // dicom format
       }
       if ((*it)->type == 1 || (*it)->type == 3) {  // raw or png format
         // raw format or png!
@@ -485,7 +788,6 @@ void request_service::process_download_images_request(
             }
           }
         }
-
       } else if ((*it)->type == 2) {  // stream format
 
         if ((*it)->cur_res == -1) {
@@ -514,6 +816,30 @@ void request_service::process_download_images_request(
                             (*it)->offsets[(*it)->new_res * 2 + 1] -
                             (*it)->offsets[((*it)->cur_res + 1) * 2];
           }
+        }
+      } else if ((*it)->type == 0) {  // dicom format
+        std::int64_t data_offset = (*it)->dicom_byte_offset;
+        std::int64_t data_end = (*it)->dicom_byte_end;
+        if (data_end > data_offset) {
+          std::int64_t data_length = data_end - data_offset;
+          std::int64_t file_size = get_file_size((*it)->path);
+          if (file_size <= 0) {
+            (*it)->res.set(OSRSP_FAILURE, EOS_FILE_OPEN,
+                           "Failed to open DICOM file", false);
+            continue;
+          }
+
+          if (data_offset == 0) {
+            // first packet for this image: announce file format and full
+            // size.
+            total_length += sizeof(std::int32_t);  // image format = 0
+            total_length += sizeof(std::int32_t);  // total file size
+          }
+
+          // write next offset and bytes for this packet.
+          total_length += sizeof(std::int32_t);  // next offset
+          total_length += sizeof(std::int32_t);  // data length
+          total_length += static_cast<std::int32_t>(data_length);  // data
         }
       }
     }
@@ -570,8 +896,17 @@ void request_service::process_download_images_request(
         // write each image data:
         for (std::list<DlItem*>::iterator it = dlitems.begin();
              it != dlitems.end(); it++) {
-          if ((*it)->res.good() && (*it)->new_res == -1)
+          if ((*it)->res.good()) {
+            if ((*it)->type == 0) {
+              if ((*it)->dicom_byte_end <= (*it)->dicom_byte_offset) {
+                continue;
+              }
+            } else if ((*it)->new_res == -1) {
+              continue;
+            }
+          } else {
             continue;
+          }
 
           // write the series id:
           *((std::uint8_t*)&binary_output[current_offset]) =
@@ -589,6 +924,8 @@ void request_service::process_download_images_request(
           // additional data only if the result was ok:
           if ((*it)->res.good()) {
             if ((*it)->type == 1 || (*it)->type == 3) {  // raw or png format
+
+              printf("bordel1¥n");
 
               std::size_t width, height;
               (*it)->frame->get_dimensions(&width, &height);
@@ -658,7 +995,8 @@ void request_service::process_download_images_request(
                     /*dump_bytes_as_hex((*it)->data, (*it)->data_len,
                                       "monochrome image data (PNG or raw)");
                     dump_png_decoded_as_hex((*it)->data, (*it)->data_len,
-                                            "monochrome image data decoded");*/
+                                            "monochrome image data
+                    decoded");*/
                     memcpy(&binary_output[current_offset], (*it)->data,
                            (*it)->data_len);
                   }
@@ -713,8 +1051,10 @@ void request_service::process_download_images_request(
               }
 
             } else if ((*it)->type == 3) {  // png format
+              printf("bordel2¥n");
 
             } else if ((*it)->type == 2) {  // stream data
+              printf("bordel3¥n");
 
               std::int32_t data_offset = 0;
               std::int32_t data_length = 0;
@@ -759,6 +1099,94 @@ void request_service::process_download_images_request(
                 *((std::int32_t*)&binary_output[current_offset]) = 0;
                 current_offset += sizeof(std::int32_t);
               }
+            } else if ((*it)->type == 0) {  // dicom file data
+              printf("bordel4¥n");
+              std::int64_t data_offset = (*it)->dicom_byte_offset;
+              std::int64_t data_end = (*it)->dicom_byte_end;
+              std::int64_t data_length = 0;
+              if (data_end > data_offset)
+                data_length = data_end - data_offset;
+
+              if (data_length > 0) {
+                onis::file_ptr fp = onis::file::open_file(
+                    (*it)->path, onis::fflags::read | onis::fflags::binary);
+                if (fp != NULL) {
+                  if (data_offset == 0) {
+                    const std::int64_t file_size_i64 =
+                        get_file_size((*it)->path);
+                    std::int32_t file_size =
+                        file_size_i64 > std::numeric_limits<std::int32_t>::max()
+                            ? std::numeric_limits<std::int32_t>::max()
+                            : static_cast<std::int32_t>(file_size_i64);
+                    // first packet: image format and full size
+                    *((std::int32_t*)&binary_output[current_offset]) = 0;
+                    current_offset += sizeof(std::int32_t);
+                    *((std::int32_t*)&binary_output[current_offset]) =
+                        file_size;
+                    current_offset += sizeof(std::int32_t);
+                    printf("coucou1¥n");
+                    std::cerr
+                        << "request_download_images: dicom first packet"
+                        << " dl=" << (*it)->srdlid << " index=" << (*it)->index
+                        << " path=" << (*it)->path << " file_size=" << file_size
+                        << " data_offset=" << data_offset
+                        << " data_end=" << data_end
+                        << " data_length=" << data_length << std::endl;
+                  }
+
+                  // next offset
+                  *((std::int32_t*)&binary_output[current_offset]) =
+                      data_end > std::numeric_limits<std::int32_t>::max()
+                          ? std::numeric_limits<std::int32_t>::max()
+                          : static_cast<std::int32_t>(data_end);
+                  current_offset += sizeof(std::int32_t);
+                  // data length
+                  *((std::int32_t*)&binary_output[current_offset]) =
+                      data_length > std::numeric_limits<std::int32_t>::max()
+                          ? std::numeric_limits<std::int32_t>::max()
+                          : static_cast<std::int32_t>(data_length);
+                  current_offset += sizeof(std::int32_t);
+
+                  fp->seek(data_offset, onis::fflags::begin);
+                  const std::int32_t read_len =
+                      data_length > std::numeric_limits<std::int32_t>::max()
+                          ? std::numeric_limits<std::int32_t>::max()
+                          : static_cast<std::int32_t>(data_length);
+                  std::int32_t read =
+                      fp->read(&binary_output[current_offset], read_len);
+                  fp->close();
+                  if (read == read_len) {
+                    current_offset += read_len;
+                  } else {
+                    // keep framing coherent: empty payload and rollback copy
+                    // size.
+                    *((std::int32_t*)&binary_output[current_offset -
+                                                    sizeof(std::int32_t)]) = 0;
+                  }
+                } else {
+                  printf("coucou2¥n");
+                  std::cerr
+                      << "request_download_images: failed to open dicom file"
+                      << " dl=" << (*it)->srdlid << " index=" << (*it)->index
+                      << " path=" << (*it)->path
+                      << " data_offset=" << data_offset
+                      << " data_end=" << data_end
+                      << " data_length=" << data_length << std::endl;
+                  if (data_offset == 0) {
+                    *((std::int32_t*)&binary_output[current_offset]) = 0;
+                    current_offset += sizeof(std::int32_t);
+                    *((std::int32_t*)&binary_output[current_offset]) = 0;
+                    current_offset += sizeof(std::int32_t);
+                  }
+                  *((std::int32_t*)&binary_output[current_offset]) =
+                      data_offset > std::numeric_limits<std::int32_t>::max()
+                          ? std::numeric_limits<std::int32_t>::max()
+                          : static_cast<std::int32_t>(data_offset);
+                  current_offset += sizeof(std::int32_t);
+                  *((std::int32_t*)&binary_output[current_offset]) = 0;
+                  current_offset += sizeof(std::int32_t);
+                }
+              }
             }
           }
         }
@@ -777,4 +1205,30 @@ void request_service::process_download_images_request(
           *((std::int32_t*)&binary_output[0]) = req->res.reason;
         }*/
       });
+
+  if (stream_response) {
+    auto stream_payload = std::make_shared<std::vector<std::uint8_t>>();
+    req->read_output([&](const json& output,
+                         const std::vector<std::uint8_t>& binary_output) {
+      stream_payload->assign(binary_output.begin(), binary_output.end());
+    });
+
+    req->write_stream_output(
+        [stream_payload](const request_data::stream_send_fn& send,
+                         const request_data::stream_close_fn& close) {
+          static constexpr std::size_t kChunkSize = 64 * 1024;
+          std::size_t offset = 0;
+          while (offset < stream_payload->size()) {
+            const std::size_t len =
+                std::min(kChunkSize, stream_payload->size() - offset);
+            send(std::string_view(
+                reinterpret_cast<const char*>(stream_payload->data() + offset),
+                len));
+            offset += len;
+          }
+          close();
+        });
+  }
 }
+
+#endif

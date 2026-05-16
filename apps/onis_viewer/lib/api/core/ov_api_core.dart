@@ -9,16 +9,19 @@ import 'package:onis_viewer/api/graphics/managers/support_set_manager.dart';
 import 'package:onis_viewer/api/managers/page_type_manager.dart';
 import 'package:onis_viewer/api/services/message_service.dart';
 import 'package:onis_viewer/api/services/opened_patients_service.dart';
+import 'package:onis_viewer/api/services/patient_controller_interface.dart';
 import 'package:onis_viewer/api/view_type/view_type_manager.dart';
 import 'package:onis_viewer/backend/backend_service.dart';
 import 'package:onis_viewer/core/monitor/monitor_config.dart';
-import 'package:onis_viewer/api/services/patient_controller_interface.dart';
+import 'package:uuid_v4/uuid_v4.dart';
 
 /// Core OVApi singleton that coordinates all API modules
 class OVApi {
   static final OVApi _instance = OVApi._internal();
   factory OVApi() => _instance;
   OVApi._internal();
+
+  final String guid = UUIDv4().toString();
 
   // API modules
   //late final PageManager _pageManager;
@@ -44,6 +47,14 @@ class OVApi {
   /// This Flutter engine's [WindowController.windowId] (`0` = main window).
   /// Set during [initialize]; reads as `0` before that.
   int _flutterEngineInstanceId = 0;
+
+  /// Set from [main] before [runApp] in a `multi_window` isolate.
+  static int? _registeredSubWindowEngineId;
+
+  static void registerSubWindowEngineId(int id) {
+    assert(id > 0, 'sub-window engine id must be > 0');
+    _registeredSubWindowEngineId = id;
+  }
 
   bool _isInitialized = false;
   int _initializeRefCount = 0;
@@ -71,10 +82,11 @@ class OVApi {
   /// secondary window. Omit or pass `null` for the main window.
   Future<void> initialize({int? flutterEngineInstanceId}) async {
     _initializeRefCount++;
+    _applyEngineInstanceId(flutterEngineInstanceId);
     if (_isInitialized) {
       return;
     }
-    _initializingFuture ??= _performInitialize(flutterEngineInstanceId);
+    _initializingFuture ??= _performInitialize();
     try {
       await _initializingFuture;
     } catch (e) {
@@ -86,9 +98,18 @@ class OVApi {
     }
   }
 
-  Future<void> _performInitialize(int? flutterEngineInstanceId) async {
+  void _applyEngineInstanceId(int? flutterEngineInstanceId) {
+    final resolved = flutterEngineInstanceId ??
+        _registeredSubWindowEngineId ??
+        _flutterEngineInstanceId;
+    if (resolved > 0 || _flutterEngineInstanceId == 0) {
+      _flutterEngineInstanceId = resolved;
+    }
+  }
+
+  Future<void> _performInitialize() async {
     try {
-      _flutterEngineInstanceId = flutterEngineInstanceId ?? 0;
+      _applyEngineInstanceId(null);
 
       // Initialize modules
       _viewTypeManager = ViewTypeManager();
@@ -97,7 +118,10 @@ class OVApi {
       _containerSupportSetManager = OsSContainerSupportSetManager();
 
       // Initialize services
-      _messageService = OsMessageService();
+      _messageService = OsMessageService(
+        ownWindowId: _flutterEngineInstanceId,
+        isSubWindowEngine: _registeredSubWindowEngineId != null,
+      );
       _backendService = OnisBackendService();
       _openedPatientsService = OpenedPatientsService();
 

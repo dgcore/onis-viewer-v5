@@ -410,7 +410,8 @@ class OsContainerSynchroItem {
     }
     if (notify) {
       for (final container in targetModified) {
-        OVApi().messages.sendMessage(OSMSG.imageContainerModified, container);
+        OVApi().messages.sendMessage(
+            OSMSG.imageContainerModified, {'container': container.guid});
       }
     }
   }
@@ -732,7 +733,8 @@ class OsContainerSynchroItem {
     }
     if (notify) {
       for (final container in targetModified) {
-        OVApi().messages.sendMessage(OSMSG.imageContainerModified, container);
+        OVApi().messages.sendMessage(
+            OSMSG.imageContainerModified, {'container': container.guid});
       }
     }
   }

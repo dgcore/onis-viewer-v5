@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:onis_viewer/api/core/ov_api_core.dart';
 import 'package:onis_viewer/api/services/message_codes.dart';
 import 'package:onis_viewer/core/graphics/canvas/canvas.dart';
+import 'package:onis_viewer/core/graphics/container/container_propagation_item.dart';
 import 'package:onis_viewer/core/graphics/container/container_syncho_item.dart';
 import 'package:onis_viewer/core/graphics/container/container_tool.dart';
 import 'package:onis_viewer/core/graphics/container/container_widget.dart';
@@ -16,6 +17,7 @@ import 'package:onis_viewer/core/models/database/hanging_protocol.dart';
 import 'package:onis_viewer/core/models/database/opacity_table.dart';
 import 'package:onis_viewer/core/models/database/window_level.dart';
 import 'package:onis_viewer/core/models/entities/patient.dart' as entities;
+import 'package:uuid_v4/uuid_v4.dart';
 
 enum OsContDraw {
   osDraw,
@@ -38,7 +40,7 @@ class OsIncomingImageProperties {
   bool flipVertically = false;
   double rotation = 0;
   double zoom = 0.0;
-  WindowLevel? windowLevelPreset;
+  WindowLevelPreset? windowLevelPreset;
   ColorLut? colorLutPreset;
   OpacityTable? opacityTablePreset;
   ConvolutionFilter? convolutionFilterPreset;
@@ -74,6 +76,7 @@ class OsContainerImageBoxInfo {
 }
 
 class OsContainerWnd extends ChangeNotifier {
+  String guid = UUIDv4().toString();
   //private _image:OsDriverImage|null = null;
   //private _component:any = null;
 
@@ -122,8 +125,8 @@ class OsContainerWnd extends ChangeNotifier {
   //private _annotationAction:OsAnnotationAction|null; /*annotation_action_wptr _wannotation_action;*/
   //private _wrunningItem:OsWeakObject|null;
 
-  //private _synchroItem:IContainerSynchroItem|null;
-  //private _propagationItem:IContainerPropagateItem|null;
+  OsContainerSynchroItem? _synchroItem;
+  OsContainerPropagateItem? _propagationItem;
   //private _wscoutItem:OsWeakObject|null;
 
   int _currentPage = 0;
@@ -193,6 +196,9 @@ class OsContainerWnd extends ChangeNotifier {
         _context = driver.createContext(),
         _controller = controller,
         _wView = WeakReference<ViewWnd>(view) {
+    _context.onPixelsDecoded = () {
+      _redrawNotifier.value++;
+    };
     _controller.container = this;
     setImageMatrix(2, 2);
   }
@@ -956,19 +962,16 @@ class OsContainerWnd extends ChangeNotifier {
   //-----------------------------------------------------------------------
   //propagation
   //-----------------------------------------------------------------------
-  /*public setPropagationItem(item =IContainerPropagateItem|null) {
-        let current:IContainerPropagateItem|null = this._propagationItem;
-        if (current) current.registerContainer(this, false);
-        this._propagationItem = null;
-        if (item) {
-            this._propagationItem = item;
-            item.registerContainer(this, true);
-        }
-    }
 
-    public getPropagationItem():IContainerPropagateItem|null {
-        return this._propagationItem;
-    }
+  OsContainerPropagateItem? get propagationItem => _propagationItem;
+
+  set propagationItem(OsContainerPropagateItem? item) {
+    _propagationItem?.registerContainer(this, false);
+    _propagationItem = item;
+    _propagationItem?.registerContainer(this, true);
+  }
+
+  /*
         
     //-----------------------------------------------------------------------
     //rendering drivers
@@ -1216,27 +1219,29 @@ class OsContainerWnd extends ChangeNotifier {
     return ret;
   }
 
-  /*public nextPage() {
-        let pageCount:number = this.getPageCount();
-        let newPage:number = this._currentPage+1;
-        if (newPage < 0) newPage = 0;
-        else if (newPage >= pageCount) newPage = pageCount-1;
-        this.setCurrentPage(newPage, OsContDraw.OS_DRAW);
-        this.processSynchro();
+  void nextPage() {
+    int newPage = _currentPage + 1;
+    if (newPage < 0) {
+      newPage = 0;
+    } else if (newPage >= pageCount) {
+      newPage = pageCount - 1;
     }
-    
-    public previousPage() {
-        let pageCount:number = this.getPageCount();
-        let newPage:number = this._currentPage-1;
-        if (newPage < 0) newPage = 0;
-        else if (newPage >= pageCount) newPage = pageCount-1;
-        this.setCurrentPage(newPage, OsContDraw.OS_DRAW);
-        this.processSynchro();
-    }
+    setCurrentPage(index: newPage, mode: OsContDraw.osDraw);
+    //this.processSynchro();
+  }
 
-    
-    
-    public redrawImageBox(index:number):void {
+  void previousPage() {
+    int newPage = _currentPage - 1;
+    if (newPage < 0) {
+      newPage = 0;
+    } else if (newPage >= pageCount) {
+      newPage = pageCount - 1;
+    }
+    setCurrentPage(index: newPage, mode: OsContDraw.osDraw);
+    //this.processSynchro();
+  }
+
+  /*public redrawImageBox(index:number):void {
         let list:Array<number> = new Array<number>();
         list.push(index);
         this.redrawImageBoxes(list);
@@ -1879,7 +1884,9 @@ class OsContainerWnd extends ChangeNotifier {
       {required bool inactive, required bool sendModifiedMessage}) {
     _inactive = inactive;
     if (sendModifiedMessage) {
-      OVApi().messages.sendMessage(OSMSG.imageContainerModified, this);
+      OVApi()
+          .messages
+          .sendMessage(OSMSG.imageContainerModified, {'container': guid});
     }
   }
 
@@ -2009,10 +2016,14 @@ class OsContainerWnd extends ChangeNotifier {
     _wtool = tool != null ? WeakReference(tool) : null;
     _wtoolData = data != null ? WeakReference(data) : null;
     if (doCallback) {
-      OVApi().messages.sendMessage(OSMSG.imageContainerToolSet, this);
+      OVApi()
+          .messages
+          .sendMessage(OSMSG.imageContainerToolSet, {'container': guid});
     }
     if (sendModifiedMessage) {
-      OVApi().messages.sendMessage(OSMSG.imageContainerModified, this);
+      OVApi()
+          .messages
+          .sendMessage(OSMSG.imageContainerModified, {'container': guid});
     }
   }
 
@@ -2927,6 +2938,11 @@ class OsContainerWnd extends ChangeNotifier {
   }
 
   void onMouseWheel(RawPointerInfo pointer) {
+    if (pointer.localDelta.dy > 0)
+      nextPage();
+    else
+      previousPage();
+
     /*ContainerTool? tool = runningTool;
     if (tool == null) {
       if (currentTool != null &&

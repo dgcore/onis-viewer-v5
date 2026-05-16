@@ -1,5 +1,5 @@
-import 'package:onis_viewer/core/dicom/dicom_file.dart';
-import 'package:onis_viewer/core/dicom/dicom_frame.dart';
+import 'package:onis_viewer/core/dicom/dicom_bridge_file.dart';
+import 'package:onis_viewer/core/dicom/dicom_bridge_frame.dart';
 import 'package:onis_viewer/core/dicom/dicom_tags.dart';
 import 'package:onis_viewer/core/dicom/image_region.dart';
 import 'package:onis_viewer/core/error_codes.dart';
@@ -80,6 +80,7 @@ class ImageDicomInfo {
 
 /// Opened patient entity with studies
 class Patient {
+  String guid = UUIDv4().toString();
   database.Patient? _patient;
   final List<Study> _studies = [];
 
@@ -195,25 +196,28 @@ class Patient {
 
   Map<String, dynamic> toJson() {
     return <String, dynamic>{
+      'guid': guid,
       'databaseInfo': _patient?.toJson(),
-      'studies':
-          _studies.map((s) => s.toJson()).toList(growable: false),
+      'studies': _studies.map((s) => s.toJson()).toList(growable: false),
     };
   }
 
-  factory Patient.fromJson(Map<String, dynamic> map) {
+  factory Patient.fromJson(bool includeGuid, Map<String, dynamic> map) {
     final patient = Patient();
     final dbRaw = map['databaseInfo'];
     if (dbRaw is Map) {
-      patient.databaseInfo = database.Patient.fromJson(
-          Map<String, dynamic>.from(dbRaw));
+      patient.databaseInfo =
+          database.Patient.fromJson(Map<String, dynamic>.from(dbRaw));
+    }
+    if (includeGuid) {
+      patient.guid = map['guid'];
     }
     final studies = map['studies'];
     if (studies is List) {
       for (final rawStudy in studies) {
         if (rawStudy is! Map) continue;
         patient.addStudy(
-            Study.fromJson(Map<String, dynamic>.from(rawStudy)));
+            Study.fromJson(includeGuid, Map<String, dynamic>.from(rawStudy)));
       }
     }
     return patient;
@@ -295,25 +299,28 @@ class Study {
 
   Map<String, dynamic> toJson() {
     return <String, dynamic>{
+      'guid': guid,
       'databaseInfo': _study?.toJson(),
-      'series':
-          _series.map((s) => s.toJson()).toList(growable: false),
+      'series': _series.map((s) => s.toJson()).toList(growable: false),
     };
   }
 
-  factory Study.fromJson(Map<String, dynamic> map) {
+  factory Study.fromJson(bool includeGuid, Map<String, dynamic> map) {
     final study = Study();
     final dbRaw = map['databaseInfo'];
     if (dbRaw is Map) {
       study.databaseInfo =
           database.Study.fromJson(Map<String, dynamic>.from(dbRaw));
     }
+    if (includeGuid) {
+      study.guid = map['guid'];
+    }
     final seriesList = map['series'];
     if (seriesList is List) {
       for (final rawSeries in seriesList) {
         if (rawSeries is! Map) continue;
         study.addSeries(
-            Series.fromJson(Map<String, dynamic>.from(rawSeries)));
+            Series.fromJson(includeGuid, Map<String, dynamic>.from(rawSeries)));
       }
     }
     return study;
@@ -356,7 +363,7 @@ class Series {
   }
 
   // Operations:
-  void prepareForDownload(int imageCount) {
+  /*void prepareForDownload(int imageCount) {
     if (imageCount > images.length) {
       int count = imageCount - images.length;
       for (int i = 0; i < count; i++) {
@@ -366,20 +373,35 @@ class Series {
         addImage(image);
       }
     }
+  }*/
+  void prepareForDownload(List<String> imageGuids) {
+    if (imageGuids.length <= images.length) return;
+    int count = imageGuids.length - images.length;
+    for (int i = 0; i < count; i++) {
+      final image = Image();
+      image.guid = imageGuids[i];
+      image.loadStatus.status = ResultStatus.pending;
+      image.loadIndex = images.length;
+      addImage(image);
+    }
   }
 
   Map<String, dynamic> toJson() {
     return <String, dynamic>{
+      'guid': guid,
       'databaseInfo': _series?.toJson(),
     };
   }
 
-  factory Series.fromJson(Map<String, dynamic> map) {
+  factory Series.fromJson(bool includeGuid, Map<String, dynamic> map) {
     final series = Series();
     final dbRaw = map['databaseInfo'];
     if (dbRaw is Map) {
       series.databaseInfo =
           database.Series.fromJson(Map<String, dynamic>.from(dbRaw));
+    }
+    if (includeGuid) {
+      series.guid = map['guid'];
     }
     return series;
   }
@@ -390,12 +412,13 @@ class Series {
 ///////////////////////////////////////////////////////////////////////
 
 class Image {
+  String guid = UUIDv4().toString();
   database.Image? _image;
   WeakReference<Series>? _wSeries;
   final bool _highestQuality = false;
   OsResult loadStatus = OsResult();
   int loadIndex = 0;
-  DicomFile? _dcm;
+  DicomBridgeFile? _dicomBridge;
   ImageDicomInfo? _dicomInfo;
   int _frameCount = 0;
 
@@ -414,16 +437,15 @@ class Image {
   }
 
   //-----------------------------------------------------------------------
-  //dicom file
+  //dicom file (native backend session)
   //-----------------------------------------------------------------------
 
-  DicomFile? get dicomFile {
-    return _dcm;
-  }
+  DicomBridgeFile? get dicomBridgeFile => _dicomBridge;
 
-  set dicomFile(DicomFile? dcm) {
-    if (identical(_dcm, dcm)) return;
-    _dcm = dcm;
+  set dicomBridgeFile(DicomBridgeFile? value) {
+    if (identical(_dicomBridge, value)) return;
+    _dicomBridge?.dispose();
+    _dicomBridge = value;
     _dicomInfo = ImageDicomInfo();
     loadInformationFromDicomFile();
   }
@@ -435,15 +457,15 @@ class Image {
     return _frameCount;
   }
 
-  DicomFrame? extractFrame(int frameIndex, OsResult? result) {
-    if (_dcm == null) {
+  DicomBridgeFrame? extractFrame(int frameIndex, OsResult? result) {
+    if (_dicomBridge == null) {
       if (result != null) {
         result.status = ResultStatus.failure;
         result.reason = OnisErrorCodes.noFile;
       }
       return null;
     }
-    return _dcm!.extractFrame(frameIndex, result);
+    return _dicomBridge!.extractFrame(frameIndex, result);
   }
 
   //-----------------------------------------------------------------------
@@ -531,24 +553,24 @@ class Image {
     return ret;
   }
 
-  bool getRegionsForFrame(DicomFrame frame, List<ImageRegion> list) {
+  bool getRegionsForFrame(DicomBridgeFrame frame, List<ImageRegion> list) {
     ImageRegionInfo? info = getRegionInfo();
     if (info != null) {
-      (int width, int height)? widthHeight = frame.getDimensions();
-      if (widthHeight != null) {
-        if (info.dimensions[0] == widthHeight.$1 &&
-            info.dimensions[1] == widthHeight.$2) {
+      DicomFrameResolution? resolution = frame.getResolution();
+      if (resolution != null) {
+        if (info.dimensions[0] == resolution.width &&
+            info.dimensions[1] == resolution.height) {
           for (int i = 0; i < info.regions.length; i++) {
             list.add(info.regions[i]);
           }
           return false;
         } else {
-          if (widthHeight.$1 > 0 &&
-              widthHeight.$2 > 0 &&
+          if (resolution.width > 0 &&
+              resolution.height > 0 &&
               info.dimensions[0] > 0 &&
               info.dimensions[1] > 0) {
-            double factorx = widthHeight.$1 / info.dimensions[0];
-            double factory = widthHeight.$2 / info.dimensions[1];
+            double factorx = resolution.width / info.dimensions[0];
+            double factory = resolution.height / info.dimensions[1];
             for (int i = 0; i < info.regions.length; i++) {
               ImageRegion region = info.regions[i].clone();
               region.originalSpacing[0] /= factorx;
@@ -563,10 +585,10 @@ class Image {
               int fx1 = x1.floor();
               int fy0 = y0.floor();
               int fy1 = y1.floor();
-              if (fx0 > widthHeight.$1 - 1) fx0 = widthHeight.$1 - 1;
-              if (fx1 > widthHeight.$1 - 1) fx1 = widthHeight.$1 - 1;
-              if (fy0 > widthHeight.$2 - 1) fy0 = widthHeight.$2 - 1;
-              if (fy1 > widthHeight.$2 - 1) fy1 = widthHeight.$2 - 1;
+              if (fx0 > resolution.width - 1) fx0 = resolution.width - 1;
+              if (fx1 > resolution.width - 1) fx1 = resolution.width - 1;
+              if (fy0 > resolution.height - 1) fy0 = resolution.height - 1;
+              if (fy1 > resolution.height - 1) fy1 = resolution.height - 1;
               region.x0 = fx0;
               region.x1 = fx1;
               region.y0 = fy0;
@@ -644,33 +666,36 @@ class Image {
   }
 
   void loadInformationFromDicomFile() {
-    if (_dcm == null || _dicomInfo == null) return;
+    final bridge = _dicomBridge;
+    if (bridge == null || _dicomInfo == null) {
+      return;
+    }
 
-    //don't test the following line, it does not work for dicom created without file path, like secondary capture files
-    //if (_dcm->is_loaded()) {
+    String tag(String ggEe, String vr) => bridge.readStringElement(ggEe, vr);
+
     _dicomInfo!.loaded = true;
     _dicomInfo!.originalImageOrientationMatrix = null;
     _dicomInfo!.calibratedImageOrientationMatrix = null;
-    _dicomInfo!.sop = _dcm!.getStringElement('0008:0018', null, null);
-    _dicomInfo!.modality = _dcm!.getStringElement('0008:0060', null, null);
-    String str = _dcm!.getStringElement('0020:0013', null, null);
+    _dicomInfo!.sop = tag('0008:0018', 'UI');
+    _dicomInfo!.modality = tag('0008:0060', 'CS');
+    String str = tag('0020:0013', 'IS');
     if (str.isEmpty) {
       _dicomInfo!.instanceNum = 0x7FFFFFFF;
     } else {
       _dicomInfo!.instanceNum = int.parse(str);
     }
-    str = _dcm!.getStringElement('0020:1041', null, null);
+    str = tag('0020:1041', 'DS');
     if (str.isEmpty) {
       _dicomInfo!.originalSliceLocation = double.infinity;
     } else {
       _dicomInfo!.originalSliceLocation = double.parse(str);
     }
 
-    List<double> position = [0, 0, 0];
-    bool haveImagePosition = false;
-    str = _dcm!.getStringElement(DicomTags.tagImagePositionPatient, null, null);
+    final List<double> position = [0, 0, 0];
+    var haveImagePosition = false;
+    str = tag(DicomTags.tagImagePositionPatient, 'DS');
     if (str.isNotEmpty) {
-      var data = str.split('\\');
+      final data = str.split('\\');
       if (data.length == 3) {
         haveImagePosition = true;
         position[0] = double.parse(data[0]);
@@ -678,34 +703,13 @@ class Image {
         position[2] = double.parse(data[2]);
       }
     }
-    String simageOrientation = _dcm!
-        .getStringElement(DicomTags.tagImageOrientationPatient, null, null);
+    final simageOrientation = tag(DicomTags.tagImageOrientationPatient, 'DS');
     if (simageOrientation.isNotEmpty) {
-      var data = simageOrientation.split('\\');
+      final data = simageOrientation.split('\\');
       if (data.length == 6) {
-        List<double> imageOrientation = [0, 0, 0, 0, 0, 0];
-        for (int i = 0; i < 6; i++) {
+        final imageOrientation = <double>[0, 0, 0, 0, 0, 0];
+        for (var i = 0; i < 6; i++) {
           imageOrientation[i] = double.parse(data[i]);
-        }
-        int axe = 0;
-        double maxValue = imageOrientation[0];
-        if (imageOrientation[1].abs() > maxValue.abs()) {
-          axe = 1;
-          maxValue = imageOrientation[1];
-        }
-        if (imageOrientation[2].abs() > maxValue.abs()) {
-          axe = 2;
-          maxValue = imageOrientation[2];
-        }
-        axe = 0;
-        maxValue = imageOrientation[3];
-        if (imageOrientation[4].abs() > maxValue.abs()) {
-          axe = 1;
-          maxValue = imageOrientation[4];
-        }
-        if (imageOrientation[5].abs() > maxValue.abs()) {
-          axe = 2;
-          maxValue = imageOrientation[5];
         }
         if (haveImagePosition) {
           _dicomInfo!.originalImageOrientationMatrix = OsMatrix();
@@ -724,11 +728,10 @@ class Image {
           _dicomInfo!.originalImageOrientationMatrix!.mat[12] = position[0];
           _dicomInfo!.originalImageOrientationMatrix!.mat[13] = position[1];
           _dicomInfo!.originalImageOrientationMatrix!.mat[14] = position[2];
-          double l1 = OsVec3D.normalizeMatVec(
+          final l1 = OsVec3D.normalizeMatVec(
               _dicomInfo!.originalImageOrientationMatrix!, 0);
-          double l2 = OsVec3D.normalizeMatVec(
+          final l2 = OsVec3D.normalizeMatVec(
               _dicomInfo!.originalImageOrientationMatrix!, 4);
-          //make sure that the vectors are not too close to the null vector:
           if (l1 > 0.1 && l2 > 0.1) {
             OsVec3D.vectorialProductFromMat(
                 _dicomInfo!.originalImageOrientationMatrix!, 0, 4, 8);
@@ -745,41 +748,43 @@ class Image {
       }
     }
 
-    str = _dcm!.getStringElement(DicomTags.tagColumns, null, null);
-    if (str.isNotEmpty) _dicomInfo!.width = int.parse(str);
-    str = _dcm!.getStringElement(DicomTags.tagRows, null, null);
-    if (str.isNotEmpty) _dicomInfo!.height = int.parse(str);
+    str = tag(DicomTags.tagColumns, 'US');
+    if (str.isNotEmpty) {
+      _dicomInfo!.width = int.parse(str);
+    }
+    str = tag(DicomTags.tagRows, 'US');
+    if (str.isNotEmpty) {
+      _dicomInfo!.height = int.parse(str);
+    }
     _dicomInfo!.regionInfo = ImageRegionInfo();
     _dicomInfo!.regionInfo!.dimensions[0] = _dicomInfo!.width;
     _dicomInfo!.regionInfo!.dimensions[1] = _dicomInfo!.height;
-    _dicomInfo!.regionInfo!.regions = _dcm!.getRegions();
-    _frameCount = 1;
-    str = _dcm!.getStringElement(
-        DicomTags.tagTransferSyntaxUid, null, null); //transfer syntax
+    _dicomInfo!.regionInfo!.regions = bridge.readRegions();
+
+    var frameCount = 1;
+    str = tag(DicomTags.tagTransferSyntaxUid, 'UI');
     if (str.isNotEmpty) {
-      if (str != "1.2.840.10008.1.2.4.100" &&
-          str != "1.2.840.10008.1.2.4.101" &&
-          str != "1.2.840.10008.1.2.4.102" &&
-          str != "1.2.840.10008.1.2.4.103") {
-        str =
-            _dcm!.getStringElement('0028:0008', null, null); //number of frames
+      if (str != '1.2.840.10008.1.2.4.100' &&
+          str != '1.2.840.10008.1.2.4.101' &&
+          str != '1.2.840.10008.1.2.4.102' &&
+          str != '1.2.840.10008.1.2.4.103') {
+        str = tag('0028:0008', 'IS');
         if (str.isNotEmpty) {
-          _frameCount = int.parse(str);
-          if (_frameCount < 1 || _frameCount >= 50000) _frameCount = 1;
+          frameCount = int.parse(str);
+          if (frameCount < 1 || frameCount >= 50000) {
+            frameCount = 1;
+          }
         }
       }
     }
+    _frameCount = frameCount;
 
-    //ACQUISITION DATE:
-    String date =
-        _dcm!.getStringElement(DicomTags.tagAcquisitionDate, null, null);
-    String time =
-        _dcm!.getStringElement(DicomTags.tagAcquisitionTime, null, null);
+    String date = tag(DicomTags.tagAcquisitionDate, 'DA');
+    String time = tag(DicomTags.tagAcquisitionTime, 'TM');
     _dicomInfo!.acquisitionDate = DateUtils.createDateTimeFromDicom(date, time);
 
-    //CONTENT DATE:
-    date = _dcm!.getStringElement(DicomTags.tagContentDate, null, null);
-    time = _dcm!.getStringElement(DicomTags.tagContentTime, null, null);
+    date = tag(DicomTags.tagContentDate, 'DA');
+    time = tag(DicomTags.tagContentTime, 'TM');
     _dicomInfo!.imageDateTime = DateUtils.createDateTimeFromDicom(date, time);
   }
 }

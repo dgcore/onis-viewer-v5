@@ -1,9 +1,11 @@
 #pragma once
 
 #include <json/json.h>
+#include <cstddef>
 #include <functional>
 #include <memory>
 #include <mutex>
+#include <type_traits>
 
 #include "./sessions/request_session.hpp"
 
@@ -31,6 +33,8 @@ typedef std::shared_ptr<request_data> request_data_ptr;
 
 class request_data {
 public:
+  using stream_reader_fn = std::function<std::size_t(char*, std::size_t)>;
+
   // static constructor
   static request_data_ptr create(request_type type);
 
@@ -56,14 +60,29 @@ public:
   template <typename Func>
   void write_output(Func&& func) {
     std::lock_guard<std::mutex> lock(output_mutex_);
-    func(output_json_, output_binary_);
+    if constexpr (std::is_invocable_v<Func, stream_reader_fn&>) {
+      func(output_stream_);
+    } else if constexpr (std::is_invocable_v<Func, json&,
+                                             std::vector<std::uint8_t>&,
+                                             stream_reader_fn&>) {
+      func(output_json_, output_binary_, output_stream_);
+    } else {
+      func(output_json_, output_binary_);
+    }
   }
 
-  // Method to read from output_json using a lambda (thread-safe)
   template <typename Func>
   void read_output(Func&& func) const {
     std::lock_guard<std::mutex> lock(output_mutex_);
-    func(output_json_, output_binary_);
+    if constexpr (std::is_invocable_v<Func, const json&,
+                                      const std::vector<std::uint8_t>&,
+                                      const stream_reader_fn&>) {
+      func(output_json_, output_binary_, output_stream_);
+    } else if constexpr (std::is_invocable_v<Func, const stream_reader_fn&>) {
+      func(output_stream_);
+    } else {
+      func(output_json_, output_binary_);
+    }
   }
 
   request_session_ptr session;
@@ -72,5 +91,6 @@ private:
   request_type type_;
   json output_json_;
   std::vector<std::uint8_t> output_binary_;
+  stream_reader_fn output_stream_;
   mutable std::mutex output_mutex_;
 };

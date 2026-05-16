@@ -1,14 +1,12 @@
-import 'dart:convert';
-import 'dart:typed_data';
+import 'dart:async' show unawaited;
+import 'dart:io';
 
-import 'package:image/image.dart' as img;
+import 'package:flutter/foundation.dart';
 import 'package:onis_viewer/api/ov_api.dart';
 import 'package:onis_viewer/api/request/async_request.dart';
 import 'package:onis_viewer/api/services/message_codes.dart';
 import 'package:onis_viewer/core/database_source.dart';
-import 'package:onis_viewer/core/dicom/dicom_file.dart';
-import 'package:onis_viewer/core/dicom/intermediate_pixel_data.dart';
-import 'package:onis_viewer/core/dicom/raw_palette.dart';
+import 'package:onis_viewer/core/dicom/dicom_bridge_file.dart';
 import 'package:onis_viewer/core/error_codes.dart';
 import 'package:onis_viewer/core/graphics/container/container_wnd.dart';
 import 'package:onis_viewer/core/graphics/container/controllers/container_controller.dart';
@@ -18,8 +16,8 @@ import 'package:onis_viewer/core/models/entities/patient.dart' as entities;
 import 'package:onis_viewer/core/result/result.dart';
 import 'package:onis_viewer/plugins/database/controller/download/download_candidate.dart';
 import 'package:onis_viewer/plugins/database/controller/download/download_container.dart';
-import 'package:onis_viewer/plugins/database/controller/download/download_performance.dart';
 import 'package:onis_viewer/plugins/database/controller/download/download_series.dart';
+import 'package:onis_viewer/plugins/database/controller/download/onis_download_stream_parser.dart';
 import 'package:onis_viewer/plugins/database/public/database_api.dart';
 import 'package:onis_viewer/plugins/database/public/download_controller_interface.dart';
 
@@ -29,8 +27,14 @@ class DownloadController extends IDownloadController {
   final List<DownloadSeries> _waitingList = [];
   final List<DownloadSeries> _downloadingList = [];
   int _maxConcurrentDownload = 4;
-  final List<DownloadPerformance> _performanceSources = [];
+  int _dicomImageMemoryThresholdBytes = 8 * 1024 * 1024;
+
+  /// Site-server stream item type for raw Part 10 (`download_item.hpp`).
+  static const int _kStreamItemDicomFile = 0;
+  //final List<DownloadPerformance> _performanceSources = [];
+  //final Map<entities.Image, _DicomChunkState> _dicomChunks = {};
   int _containerIndex = -1;
+  int? _messageSubscription;
   //final List<OsJ2kDecodeItem> _j2kItems = [];
   //final List<OsJ2kDecoder> _j2kDecoders = [];
 
@@ -48,7 +52,111 @@ class DownloadController extends IDownloadController {
   //private _maxImageDecoders:number = 2;
 
   DownloadController() {
+    _messageSubscription = OVApi().messages.subscribe(onReceivedMessage);
     // for (let iinnumber = 0; i<this._maxImageDecoders; i++) _j2kDecoders.push(OsJ2kDecoder(this));
+  }
+
+  void onReceivedMessage(int id, dynamic data) {
+    final payload = _coerceMessageMap(data);
+    if (payload.isEmpty) {
+      return;
+    }
+
+    if (id == OSMSG.cmdDownloadSeries ||
+        id == OSMSG.syncInitSeriesDownloadInfo) {
+      final dbApi =
+          OVApi().plugins.getPublicApi<DatabaseApi>('onis_database_plugin');
+      final patientGuid = payload['patient']?.toString() ?? '';
+      final studyGuid = payload['study']?.toString() ?? '';
+      final seriesGuid = payload['series']?.toString() ?? '';
+      final series = dbApi?.patientController.findSeriesByGuids(
+        patientGuid,
+        studyGuid,
+        seriesGuid,
+      );
+      if (series == null) {
+        return;
+      }
+      if (id == OSMSG.cmdDownloadSeries) {
+        addSeriesToLoadingQueue(series, true);
+      } else if (id == OSMSG.syncInitSeriesDownloadInfo) {
+        try {
+          series.prepareForDownload(_coerceStringList(payload['images']));
+        } catch (e, st) {
+          debugPrint(
+            'DownloadController: _onInitSeriesDownloadInfo: error: $e\n$st',
+          );
+        }
+      }
+    } else if (id == OSMSG.syncImageDownloadUpdate) {
+      final dbApi =
+          OVApi().plugins.getPublicApi<DatabaseApi>('onis_database_plugin');
+      final patientGuid = payload['patient']?.toString() ?? '';
+      final studyGuid = payload['study']?.toString() ?? '';
+      final seriesGuid = payload['series']?.toString() ?? '';
+      final imageGuid = payload['image']?.toString() ?? '';
+      final image = dbApi?.patientController.findImageByGuids(
+        patientGuid,
+        studyGuid,
+        seriesGuid,
+        imageGuid,
+      );
+      if (image == null) {
+        return;
+      }
+
+      final rawId = payload['dicomFileId'];
+      final dicomFileId =
+          rawId is int ? rawId : (rawId is num ? rawId.toInt() : null);
+      if (dicomFileId == null || dicomFileId <= 0) {
+        return;
+      }
+
+      final existing = image.dicomBridgeFile;
+      if (existing != null &&
+          existing.backendId == dicomFileId &&
+          !existing.isReleased) {
+        return;
+      }
+
+      final displayOwnsRelease = payload['displayOwnsRelease'] == true;
+      final releaseOnDispose =
+          displayOwnsRelease ? OVApi().flutterEngineInstanceId > 0 : true;
+      final loadPath = payload['loadPath']?.toString();
+      image.dicomBridgeFile = DicomBridgeFile.adopt(
+        dicomFileId,
+        unlinkPathAfterRelease:
+            loadPath != null && loadPath.isNotEmpty ? loadPath : null,
+        releaseOnDispose: releaseOnDispose,
+      );
+
+      image.loadStatus.status = ResultStatus.success;
+      image.loadStatus.reason = OnisErrorCodes.none;
+    }
+  }
+
+  /// Cross-window [StandardMessageCodec] yields [Map] / [List<Object?>], not typed collections.
+  static Map<String, dynamic> _coerceMessageMap(dynamic data) {
+    if (data is Map<String, dynamic>) {
+      return data;
+    }
+    if (data is Map) {
+      return Map<String, dynamic>.from(data);
+    }
+    return const {};
+  }
+
+  static List<String> _coerceStringList(dynamic value) {
+    if (value is List<String>) {
+      return value;
+    }
+    if (value is List) {
+      return [
+        for (final element in value)
+          if (element != null) element.toString(),
+      ];
+    }
+    return const [];
   }
 
   /*public destroy() {
@@ -80,12 +188,19 @@ class DownloadController extends IDownloadController {
     }*/
 
   get maxConcurrentDownload => _maxConcurrentDownload;
+  int get dicomImageMemoryThresholdBytes => _dicomImageMemoryThresholdBytes;
   //get maxImageDecoders => _maxImageDecoders;
 
   set maxConcurrentDownload(count) {
     if (count >= 1 && count <= 10) {
       _maxConcurrentDownload = count;
       processLoadingQueue();
+    }
+  }
+
+  set dicomImageMemoryThresholdBytes(int value) {
+    if (value > 0) {
+      _dicomImageMemoryThresholdBytes = value;
     }
   }
 
@@ -211,16 +326,23 @@ class DownloadController extends IDownloadController {
 
   bool _startDownload(DownloadSeries info) {
     entities.Series? series = info.getSeries();
-    series?.loadStatus.status = ResultStatus.waiting;
     final source = info.getSource();
+
+    String guid = OVApi().guid;
+    print('DownloadController: _startDownload: guid: $guid');
+
     if (source == null) return false;
+    series?.loadStatus.status = ResultStatus.waiting;
     Map<String, dynamic> data = {
       "series": [series]
     };
     info.request = source.createRequest(RequestType.initSeriesDownload, data);
     if (info.request != null) {
-      info.request?.send().then((response) {
+      info.request!.send().then((response) {
         _onInitSeriesDownloadResponse(info, response);
+      }).catchError((Object error, StackTrace stackTrace) {
+        _handleDownloadException(info, error, stackTrace,
+            phase: 'initSeriesDownload');
       });
     }
     return info.request != null;
@@ -266,6 +388,7 @@ class DownloadController extends IDownloadController {
   //-----------------------------------------------------
   // download images
   //-----------------------------------------------------
+
   void _downloadImages(DownloadSeries info) {
     if (!_downloadingList.contains(info) || info.request != null) return;
     entities.Series? series = info.getSeries();
@@ -274,44 +397,242 @@ class DownloadController extends IDownloadController {
       return;
     }
     DownloadCandidates? candidates = _getImagesToDownload(info);
-    if (candidates == null) return;
-    DatabaseSource source = candidates.source;
+    if (candidates == null) {
+      processLoadingQueue();
+      return;
+    }
+    if (candidates.images.isEmpty) {
+      processLoadingQueue();
+      return;
+    }
 
-    List<Map<String, dynamic>> items = [];
-    for (int j = 0; j < candidates.images.length; j++) {
-      entities.Image image = candidates.images[j];
-      DicomFile? dcm = image.dicomFile;
-      if (dcm == null) {
-        items.add(
-            {"dl": info.downloadSeq, "index": image.loadIndex, "from": -1});
-      } else {
-        IntermediatePixelData? interData = dcm.getIntermediatePixelData(0);
-        if (interData != null) {
-          items.add({
-            "dl": info.downloadSeq,
-            "index": image.loadIndex,
-            "from": interData.resIndex
+    final DatabaseSource source = candidates.source;
+    final items = <Map<String, dynamic>>[];
+    for (final image in candidates.images) {
+      items.add({'dl': info.downloadSeq, 'index': image.loadIndex});
+    }
+
+    final data = <String, dynamic>{
+      'images': items,
+      'max_bytes': info.maxBytes,
+    };
+
+    info.request = source.createRequest(RequestType.downloadImages, data);
+    if (info.request == null) {
+      processLoadingQueue();
+      return;
+    }
+
+    final imagesByLoadIndex = <int, entities.Image>{
+      for (final img in candidates.images) img.loadIndex: img,
+    };
+    unawaited(_runImageDownloadStream(info, imagesByLoadIndex));
+  }
+
+  Future<void> _runImageDownloadStream(
+    DownloadSeries info,
+    Map<int, entities.Image> imagesByLoadIndex,
+  ) async {
+    final req = info.request;
+    if (req == null) return;
+
+    final completedImages = <entities.Image>[];
+    final delayNextDownload = <bool>[false];
+    var streamCompletedWithoutError = false;
+
+    final parser = OnisDownloadStreamParser(
+      memoryThresholdBytes: _dicomImageMemoryThresholdBytes,
+      onItem: (item) async {
+        await _handleStreamDownloadItemSync(
+          info,
+          imagesByLoadIndex,
+          item,
+          completedImages,
+          delayNextDownload,
+        );
+      },
+    );
+
+    try {
+      await req.sendStreaming(parser.feed);
+      streamCompletedWithoutError = true;
+    } catch (e, st) {
+      debugPrint(
+        'DownloadController: image stream HTTP error: $e\n$st',
+      );
+      final series = info.getSeries();
+      if (series != null) {
+        _interruptSeriesDownload(
+          series,
+          ResultStatus.failure,
+          OnisErrorCodes.invalidResponse,
+          completedImages,
+        );
+      }
+    } finally {
+      parser.end();
+      if (streamCompletedWithoutError && parser.failed) {
+        final series = info.getSeries();
+        if (series != null &&
+            series.loadStatus.status == ResultStatus.waiting) {
+          _interruptSeriesDownload(
+            series,
+            ResultStatus.failure,
+            OnisErrorCodes.invalidResponse,
+            completedImages,
+          );
+        }
+      }
+
+      info.request = null;
+
+      final series = info.getSeries();
+      if (series != null && series.loadStatus.status == ResultStatus.waiting) {
+        if (!delayNextDownload[0]) {
+          _downloadImages(info);
+        } else {
+          Future.delayed(const Duration(milliseconds: 500), () {
+            _downloadImages(info);
           });
         }
       }
-    }
-    if (items.isNotEmpty) {
-      //let sp:DownloadPerformance|null = this._getSourcePerformance(source, true);
-      //info.tm = performance.now();
 
-      Map<String, dynamic> data = {
-        "images": items,
-        "pendingRanges": candidates.pendingRanges,
-        "max_bytes": info.maxBytes,
-      };
-      info.request = source.createRequest(RequestType.downloadImages, data);
-      if (info.request != null) {
-        info.request?.send().then((response) {
-          _onDownloadImagesResponse(info, response);
+      processLoadingQueue();
+      List<Map<String, dynamic>> completedImagesMaps = [];
+      for (final image in completedImages) {
+        completedImagesMaps.add({
+          'image': image.guid,
+          'series': image.series?.guid,
+          'study': image.series?.study?.guid,
+          'patient': image.series?.study?.patient?.guid
         });
       }
+      OVApi().messages.sendMessage(
+          OSMSG.seriesImagesDownloadCompleted, completedImagesMaps);
+    }
+  }
 
-      //info.request = this._onis.viewerService.downloadImages(server, source.session, source.subType, source.sourceId, items, candidates.pendingRanges, info.maxBytes, _onDownloadImagesResponse, this, info.guid);
+  Future<void> _handleStreamDownloadItemSync(
+    DownloadSeries info,
+    Map<int, entities.Image> imagesByLoadIndex,
+    OnisDlStreamItem item,
+    List<entities.Image> completedImages,
+    List<bool> delayNextDownload,
+  ) async {
+    if (item.downloadSeq != info.downloadSeq) {
+      return Future.value();
+    }
+    final image = imagesByLoadIndex[item.loadIndex];
+    if (image == null) {
+      return Future.value();
+    }
+
+    if (item.resultCode != OnisErrorCodes.none) {
+      if (item.resultCode == OnisErrorCodes.notFound && !info.completed) {
+        delayNextDownload[0] = true;
+        return;
+      }
+      _setImageLoadStatus(
+        info,
+        image,
+        completedImages,
+        ResultStatus.failure,
+        item.resultCode,
+        '',
+      );
+      return;
+    }
+
+    if (item.itemType != _kStreamItemDicomFile) {
+      _setImageLoadStatus(
+        info,
+        image,
+        completedImages,
+        ResultStatus.failure,
+        OnisErrorCodes.noSupport,
+        '',
+      );
+      return Future.value();
+    }
+
+    final parserPath = item.tempFilePath;
+    File? memTemp;
+    var tempPathHandedToBridge = false;
+    try {
+      late final String loadPath;
+      if (parserPath != null) {
+        loadPath = parserPath;
+      } else if (item.fileBytes != null && item.fileBytes!.isNotEmpty) {
+        memTemp = File(
+          '${Directory.systemTemp.path}/onis_dl_${DateTime.now().microsecondsSinceEpoch}.dcm',
+        );
+        memTemp.writeAsBytesSync(item.fileBytes!);
+        loadPath = memTemp.path;
+      } else {
+        _setImageLoadStatus(
+          info,
+          image,
+          completedImages,
+          ResultStatus.failure,
+          OnisErrorCodes.noFile,
+          '',
+        );
+        return Future.value();
+      }
+
+      final id = OVApi().backend.loadDicomFile(loadPath);
+      tempPathHandedToBridge = true;
+
+      _setImageLoadStatus(
+        info,
+        image,
+        completedImages,
+        ResultStatus.success,
+        OnisErrorCodes.none,
+        'loaded',
+      );
+
+      // Shared process-wide backend: peers adopt [id] via syncImageDownloadUpdate.
+      await OVApi().openedPatients.notifyImageDownloadUpdate(
+            image,
+            OnisErrorCodes.none,
+            id,
+            loadPath: loadPath,
+          );
+
+      unawaited(
+        OVApi().messages.sendMessage(OSMSG.seriesImagesReceived, [
+          {
+            'image': image.guid,
+            'series': image.series?.guid,
+            'study': image.series?.study?.guid,
+            'patient': image.series?.study?.patient?.guid,
+          },
+        ]),
+      );
+    } catch (e, st) {
+      debugPrint(
+        'DownloadController: stream item DICOM load failed: $e\n$st',
+      );
+      _setImageLoadStatus(
+        info,
+        image,
+        completedImages,
+        ResultStatus.failure,
+        OnisErrorCodes.invalidResponse,
+        '',
+      );
+    } finally {
+      if (!tempPathHandedToBridge) {
+        try {
+          memTemp?.deleteSync();
+        } catch (_) {}
+        if (parserPath != null) {
+          try {
+            File(parserPath).deleteSync();
+          } catch (_) {}
+        }
+      }
     }
   }
 
@@ -457,6 +778,208 @@ class DownloadController extends IDownloadController {
     return candidates;
   }
 
+  /*void _downloadImages(DownloadSeries info) {
+    if (!_downloadingList.contains(info) || info.request != null) return;
+    entities.Series? series = info.getSeries();
+    if (series == null || series.loadStatus.status != ResultStatus.waiting) {
+      processLoadingQueue();
+      return;
+    }
+    DownloadCandidates? candidates = _getImagesToDownload(info);
+    if (candidates == null) return;
+    DatabaseSource source = candidates.source;
+
+    List<Map<String, dynamic>> items = [];
+    for (int j = 0; j < candidates.images.length; j++) {
+      entities.Image image = candidates.images[j];
+      DicomFile? dcm = image.dicomFile;
+      if (dcm == null) {
+        final chunkState = _dicomChunks[image];
+        final item = <String, dynamic>{
+          "dl": info.downloadSeq,
+          "index": image.loadIndex,
+          "from": -1
+        };
+        if (chunkState != null && chunkState.nextOffset > 0) {
+          item["byte_offset"] = chunkState.nextOffset;
+        }
+        items.add(item);
+      } else {
+        IntermediatePixelData? interData = dcm.getIntermediatePixelData(0);
+        if (interData != null) {
+          items.add({
+            "dl": info.downloadSeq,
+            "index": image.loadIndex,
+            "from": interData.resIndex
+          });
+        }
+      }
+    }
+    if (items.isNotEmpty) {
+      //let sp:DownloadPerformance|null = this._getSourcePerformance(source, true);
+      //info.tm = performance.now();
+
+      Map<String, dynamic> data = {
+        "images": items,
+        "pendingRanges": candidates.pendingRanges,
+        "max_bytes": info.maxBytes,
+      };
+      info.request = source.createRequest(RequestType.downloadImages, data);
+      if (info.request != null) {
+        info.request!.send().then((response) {
+          _onDownloadImagesResponse(info, response);
+        }).catchError((Object error, StackTrace stackTrace) {
+          _handleDownloadException(info, error, stackTrace,
+              phase: 'downloadImages');
+        });
+      }
+
+      //info.request = this._onis.viewerService.downloadImages(server, source.session, source.subType, source.sourceId, items, candidates.pendingRanges, info.maxBytes, _onDownloadImagesResponse, this, info.guid);
+    }
+  }*/
+
+  /*DownloadCandidates? _getImagesToDownload(DownloadSeries info) {
+    DownloadCandidates? candidates;
+
+    //make sure all containers are valid:
+    _cleanContainers();
+    //we alternate the first container to analyze, to make the download more balanced.
+    entities.Series? series = info.getSeries();
+    final source = info.getSource();
+    if (source == null) return null;
+    candidates = DownloadCandidates(source);
+
+    if (_containers.length > 1) {
+      _containerIndex = (_containerIndex + 1) % _containers.length;
+    } else {
+      _containerIndex = 0;
+    }
+
+    //prepare container information.
+    List<Map<String, dynamic>> contInfo = [];
+    for (int k = 0; k < 2; k++) {
+      int start = k == 0 ? _containerIndex : 0;
+      int stop = k == 0 ? _containers.length : _containerIndex;
+      for (int i = start; i < stop; i++) {
+        OsContainerWnd? container = _containers[i].getContainer();
+        OsContainerController? controller = container?.controller;
+        if (controller == null) continue;
+        if (!controller.isSeriesDisplayed(series!)) continue;
+        List<OsRenderer> renderers = controller.rendererElements;
+        if (renderers.isEmpty) continue;
+
+        List<int> rowCol = container!.getImageMatrix();
+        int count = rowCol[0] * rowCol[1];
+        int startIndex = container.currentPage;
+        if (container.pageMode) startIndex *= count;
+        int firstPos = container.findStartingPosition(renderers, startIndex);
+        if (firstPos == -1) continue;
+        int lastPos = firstPos;
+        if (count > 1) {
+          for (int j = firstPos; j < renderers.length; j++) {
+            if (identical(
+                renderers[j], container.getImageBoxRenderer(count - 1))) {
+              lastPos = j;
+              break;
+            }
+          }
+        }
+        contInfo.add({
+          "container": _containers[i],
+          "renderers": renderers,
+          "firstPos": firstPos,
+          "lastPos": lastPos,
+          "done": false,
+        });
+      }
+    }
+
+    //search within displayed images:
+    for (int i = 0; i < _containers.length; i++) {
+      OsContainerWnd? container = _containers[i].getContainer();
+      OsContainerController? controller = container?.controller;
+      if (controller == null || !controller.isSeriesDisplayed(series!)) {
+        continue;
+      }
+
+      //get all candidates:
+      List<int> rowCol = container!.getImageMatrix();
+      int count = rowCol[0] * rowCol[1];
+      for (int j = 0; j < count; j++) {
+        OsRenderer? render = container.getImageBoxRenderer(j);
+        if (render == null) continue;
+        List<(entities.Series?, entities.Image?)> data =
+            _getRenderInfo(candidates, series, render);
+        if (data[0].$1 != null) {
+          candidates.registerCandidate(data[0].$1!, data[0].$2);
+        }
+      }
+    }
+    candidates.analyzeCandidates(true);
+
+    //now, search within undisplayed images:
+    if (contInfo.isNotEmpty) {
+      int done = 0;
+      int index = 0;
+      while (true) {
+        if (!contInfo[index]["done"]) {
+          contInfo[index]["firstPos"]--;
+          contInfo[index]["lastPos"]++;
+          if (contInfo[index]["firstPos"] < 0 &&
+              contInfo[index]["lastPos"] >=
+                  contInfo[index]["renderers"].length) {
+            contInfo[index]["done"] = true;
+            done++;
+          } else {
+            if (contInfo[index]["lastPos"] <
+                contInfo[index]["renderers"].length) {
+              List<(entities.Series?, entities.Image?)> info = _getRenderInfo(
+                  candidates,
+                  series,
+                  contInfo[index]["renderers"][contInfo[index]["lastPos"]]);
+              if (info[0].$1 != null) {
+                candidates.registerCandidate(info[0].$1!, info[0].$2);
+              }
+            }
+            if (contInfo[index]["firstPos"] >= 0) {
+              List<(entities.Series?, entities.Image?)> info = _getRenderInfo(
+                  candidates,
+                  series,
+                  contInfo[index]["renderers"][contInfo[index]["firstPos"]]);
+              if (info[0].$1 != null) {
+                candidates.registerCandidate(info[0].$1!, info[0].$2);
+              }
+            }
+          }
+        }
+        if (done == contInfo.length) break;
+        index = (index + 1) % contInfo.length;
+      }
+      candidates.analyzeCandidates(false);
+    }
+
+    if (candidates.images.isEmpty &&
+        series!.loadStatus.status == ResultStatus.waiting) {
+      for (int i = 0; i < series.images.length; i++) {
+        //ignore if the image download is completed:
+        entities.Image image = series.images[i];
+        if (image.loadStatus.status != ResultStatus.pending &&
+            image.loadStatus.status != ResultStatus.streaming) {
+          continue;
+        }
+        if (!candidates.registerCandidate(series, image)) break;
+      }
+      candidates.analyzeCandidates(false);
+    }
+
+    //indicate the range of images we can download:
+    for (var elt in info.pendingRanges) {
+      candidates.pendingRanges.add([elt[0], elt[1]]);
+    }
+
+    return candidates;
+  }*/
+
   List<(entities.Series?, entities.Image?)> _getRenderInfo(
       DownloadCandidates candidates,
       entities.Series? from,
@@ -501,25 +1024,33 @@ class DownloadController extends IDownloadController {
   //-----------------------------------------------------
 
   void _onInitSeriesDownloadResponse(
-      DownloadSeries info, AsyncResponse response) {
+      DownloadSeries info, AsyncResponse response) async {
     final series = info.getSeries();
     if (response.isSuccess && response.data != null) {
       try {
         String downloadSeq = response.data!["data"][0]['seq'] as String;
         int imageCount = response.data!["data"][0]['image_count'] as int;
         info.downloadSeq = downloadSeq;
-        if (imageCount == -1) {
+
+        await OVApi()
+            .openedPatients
+            .notifyInitialSeriesDownloadInfo(series!, imageCount, '');
+        info.pendingRanges = [
+          [0, 0xFFFFFF]
+        ];
+
+        /*if (imageCount == -1) {
           //don't know yet how many images there is in the series, we prepare just one:
-          series?.prepareForDownload(1);
+          series.prepareForDownload(1);
           info.pendingRanges = [
             [0, 0xFFFFFF]
           ];
         } else {
-          series?.prepareForDownload(imageCount);
+          series.prepareForDownload(imageCount);
           info.pendingRanges = [
             [0, 0xFFFFFF]
           ];
-        }
+        }*/
 
         /*let properties:{} = null;
         if ('properties' in data.data[0]) {
@@ -538,8 +1069,12 @@ class DownloadController extends IDownloadController {
             }
         }*/
 
-        OVApi().messages.sendMessage(OSMSG.seriesDownloadReceivedInfo,
-            {"series": series, "properties": null});
+        OVApi().messages.sendMessage(OSMSG.seriesDownloadReceivedInfo, {
+          "patient": series.study?.patient?.guid ?? '',
+          "study": series.study?.guid ?? '',
+          "series": series.guid,
+          "properties": null,
+        });
       } catch (e) {
         series?.loadStatus.setStatus(
             ResultStatus.failure, OnisErrorCodes.invalidResponse, "");
@@ -574,7 +1109,7 @@ class DownloadController extends IDownloadController {
       }
     }*/
 
-  void _onDownloadImagesResponse(DownloadSeries info, AsyncResponse response) {
+  /*void _onDownloadImagesResponse(DownloadSeries info, AsyncResponse response) {
     if (!_downloadingList.contains(info)) return;
     entities.Series? series = info.getSeries();
     bool delayNextDownload = false;
@@ -595,6 +1130,15 @@ class DownloadController extends IDownloadController {
       } else {
         //we got some binary data to analyze.
         Uint8List bytes = response.data!['binary'] as Uint8List;
+        if (bytes.length < 8) {
+          _interruptSeriesDownload(series, ResultStatus.failure,
+              OnisErrorCodes.invalidResponse, completedImages);
+          if (info.request != null) {
+            info.request!.cancel();
+            info.request = null;
+          }
+          return;
+        }
 
         int offset = 0;
         //this._analyzeBandwidth(srinfo, series, bytes);
@@ -632,8 +1176,86 @@ class DownloadController extends IDownloadController {
             } else {
               //read the images information:
               while (offset < bytes.length) {
-                if (offset == -1)
+                //read image information:
+                List<dynamic> imageInfo =
+                    _readImageInformation(series, bytes, offset);
+                offset = imageInfo[0];
+                if (offset == -1) {
+                  _interruptSeriesDownload(series, ResultStatus.failure,
+                      OnisErrorCodes.invalidResponse, completedImages);
+                  break;
+                }
+
+                entities.Image image = imageInfo[2];
+                int imageIndex = imageInfo[3];
+                int imageResult = imageInfo[4];
+
+                //update the download range index (to prevent to redownload the same image twice)
+                _updateImageRangeIndex(info, imageIndex);
+                //analyze the image result:
+                if (imageResult != 0) {
+                  //if the image is not found but the download is not complete, the server may need more time to get the image (this is no an error in this case, we will have to resend the download request later)
+                  if (imageResult == OnisErrorCodes.notFound &&
+                      !info.completed) {
+                    delayNextDownload = true;
+                  } else {
+                    _setImageLoadStatus(info, image, completedImages,
+                        ResultStatus.failure, imageResult, "");
+                  }
+                } else {
+                  final dicomChunkState = _dicomChunks[image];
+                  if (dicomChunkState == null) {
+                    //read the format of the image:
+                    int imageFormat = ((bytes[offset + 3] << 24) |
+                            (bytes[offset + 2] << 16) |
+                            (bytes[offset + 1] << 8) |
+                            bytes[offset]) >>>
+                        0;
+                    offset += 4;
+
+                    if (imageFormat == 0) {
+                      offset = _readDicomChunkData(
+                        info,
+                        image,
+                        bytes,
+                        offset,
+                        completedImages,
+                        startsWithTotalSize: true,
+                      );
+                      if (offset == -1) {
+                        offset = _interruptSeriesDownload(
+                            series,
+                            ResultStatus.failure,
+                            OnisErrorCodes.invalidResponse,
+                            completedImages);
+                        break;
+                      }
+                    } else {
+                      _interruptSeriesDownload(series, ResultStatus.failure,
+                          OnisErrorCodes.invalidResponse, completedImages);
+                      break;
+                    }
+                  } else {
+                    offset = _readDicomChunkData(
+                      info,
+                      image,
+                      bytes,
+                      offset,
+                      completedImages,
+                    );
+                    if (offset == -1) {
+                      offset = _interruptSeriesDownload(
+                          series,
+                          ResultStatus.failure,
+                          OnisErrorCodes.invalidResponse,
+                          completedImages);
+                    }
+                  }
+                }
+
+                /*if (offset == -1) {
                   break; //offset equals -1 when an error occurred.
+                }
                 List<dynamic> imageInfo =
                     _readImageInformation(series, bytes, offset);
                 offset = imageInfo[0];
@@ -664,6 +1286,26 @@ class DownloadController extends IDownloadController {
                     DicomFile? dcm = image!.dicomFile;
                     if (dcm == null) {
                       //we don't have a dicom file yet
+                      final dicomChunkState = _dicomChunks[image];
+                      if (dicomChunkState != null &&
+                          dicomChunkState.nextOffset > 0) {
+                        offset = _readDicomChunkData(
+                          info,
+                          image,
+                          bytes,
+                          offset,
+                          completedImages,
+                        );
+                        if (offset == -1) {
+                          offset = _interruptSeriesDownload(
+                              series,
+                              ResultStatus.failure,
+                              OnisErrorCodes.invalidResponse,
+                              completedImages);
+                        }
+                        continue;
+                      }
+
                       //read the format of the image:
                       int imageFormat = ((bytes[offset + 3] << 24) |
                               (bytes[offset + 2] << 16) |
@@ -671,6 +1313,24 @@ class DownloadController extends IDownloadController {
                               bytes[offset]) >>>
                           0;
                       offset += 4;
+                      if (imageFormat == 0) {
+                        offset = _readDicomChunkData(
+                          info,
+                          image,
+                          bytes,
+                          offset,
+                          completedImages,
+                          startsWithTotalSize: true,
+                        );
+                        if (offset == -1) {
+                          offset = _interruptSeriesDownload(
+                              series,
+                              ResultStatus.failure,
+                              OnisErrorCodes.invalidResponse,
+                              completedImages);
+                        }
+                        continue;
+                      }
                       EncodedFormat encodedFormat =
                           EncodedFormatExtension.fromInt(imageFormat);
                       if (encodedFormat != EncodedFormat.raw &&
@@ -817,7 +1477,7 @@ class DownloadController extends IDownloadController {
                         if (offset == -1) offset = this._interruptSeriesDownload(series, RESULT.OSRSP_FAILURE, RESULT.EOS_INVALID_RESPONSE, completedImages);*/
                     }
                   }
-                }
+                }*/
               }
             }
           }
@@ -836,11 +1496,12 @@ class DownloadController extends IDownloadController {
     OVApi()
         .messages
         .sendMessage(OSMSG.seriesImagesDownloadCompleted, completedImages);
-  }
+  }*/
 
   int _interruptSeriesDownload(entities.Series series, ResultStatus status,
       int reason, List<entities.Image> completedImages) {
     for (entities.Image image in series.images) {
+      //_removeDicomChunkState(image);
       if (image.loadStatus.status == ResultStatus.pending) {
         image.loadStatus.status = status;
         image.loadStatus.reason = reason;
@@ -850,6 +1511,34 @@ class DownloadController extends IDownloadController {
     series.loadStatus.status = status;
     series.loadStatus.reason = reason;
     return -1;
+  }
+
+  void _handleDownloadException(
+    DownloadSeries info,
+    Object error,
+    StackTrace stackTrace, {
+    required String phase,
+  }) {
+    final series = info.getSeries();
+    debugPrint(
+      'DownloadController: uncaught exception during $phase: $error\n$stackTrace',
+    );
+
+    // Ensure request is released so queue processing can continue.
+    try {
+      info.request?.cancel();
+    } catch (_) {}
+    info.request = null;
+
+    if (series != null) {
+      _interruptSeriesDownload(
+        series,
+        ResultStatus.failure,
+        OnisErrorCodes.invalidResponse,
+        <entities.Image>[],
+      );
+    }
+    processLoadingQueue();
   }
 
   void _setImageLoadStatus(
@@ -873,7 +1562,7 @@ class DownloadController extends IDownloadController {
     }
   }
 
-  int _readSeriesInformation(DownloadSeries info, entities.Series series,
+  /*int _readSeriesInformation(DownloadSeries info, entities.Series series,
       Uint8List bytes, int offset) {
     bool valid = true;
     //read the series uid:
@@ -929,9 +1618,9 @@ class DownloadController extends IDownloadController {
       // }
     }
     return valid ? offset : -1;
-  }
+  }*/
 
-  List<dynamic> _readImageInformation(
+  /*List<dynamic> _readImageInformation(
       entities.Series series, Uint8List bytes, int offset) {
     bool valid = true;
     String str = '';
@@ -978,9 +1667,9 @@ class DownloadController extends IDownloadController {
     return valid
         ? [offset, str, image, imageIndex, imageResult]
         : [-1, '', null, -1, -1];
-  }
+  }*/
 
-  void _updateImageRangeIndex(DownloadSeries info, int imageIndex) {
+  /*void _updateImageRangeIndex(DownloadSeries info, int imageIndex) {
     for (int i = 0; i < info.pendingRanges.length; i++) {
       if (imageIndex >= info.pendingRanges[i][0] &&
           imageIndex <= info.pendingRanges[i][1]) {
@@ -1001,9 +1690,9 @@ class DownloadController extends IDownloadController {
         break;
       }
     }
-  }
+  }*/
 
-  int _readDicomFileInformation(
+  /*int _readDicomFileInformation(
       entities.Image image, Uint8List bytes, int offset) {
     bool valid = true;
     int tagsLength = ((bytes[offset + 3] << 24) |
@@ -1084,9 +1773,115 @@ class DownloadController extends IDownloadController {
       }
     }
     return valid ? offset : -1;
-  }
+  }*/
 
-  int _readMonochromeRawData(entities.Image image, int width, int height,
+  /*int _readDicomChunkData(
+    DownloadSeries srinfo,
+    entities.Image image,
+    Uint8List bytes,
+    int offset,
+    List<entities.Image> completedImages, {
+    bool startsWithTotalSize = false,
+  }) {
+    if (offset + 8 > bytes.length) {
+      return -1;
+    }
+
+    final state = _dicomChunks.putIfAbsent(image, _DicomChunkState.new);
+
+    if (startsWithTotalSize) {
+      if (offset + 4 > bytes.length) {
+        return -1;
+      }
+      state.totalSize = ((bytes[offset + 3] << 24) |
+              (bytes[offset + 2] << 16) |
+              (bytes[offset + 1] << 8) |
+              bytes[offset]) >>>
+          0;
+      debugPrint(
+        'DICOM chunk header: imageIndex=${image.loadIndex}, '
+        'downloadSeq=${srinfo.downloadSeq}, totalSize=${state.totalSize}, '
+        'offset=$offset, packetBytes=${bytes.length}',
+      );
+      offset += 4;
+      if (state.totalSize <= 0) {
+        debugPrint(
+          'DICOM chunk invalid totalSize: imageIndex=${image.loadIndex}, '
+          'downloadSeq=${srinfo.downloadSeq}, totalSize=${state.totalSize}',
+        );
+        return -1;
+      }
+      state.memoryThresholdBytes = _dicomImageMemoryThresholdBytes;
+      try {
+        state.resetData();
+      } catch (_) {
+        return -1;
+      }
+    }
+
+    if (offset + 8 > bytes.length) {
+      return -1;
+    }
+
+    final int nextOffset = ((bytes[offset + 3] << 24) |
+            (bytes[offset + 2] << 16) |
+            (bytes[offset + 1] << 8) |
+            bytes[offset]) >>>
+        0;
+    offset += 4;
+    final int dataLen = ((bytes[offset + 3] << 24) |
+            (bytes[offset + 2] << 16) |
+            (bytes[offset + 1] << 8) |
+            bytes[offset]) >>>
+        0;
+    offset += 4;
+    debugPrint(
+      'DICOM chunk payload: imageIndex=${image.loadIndex}, '
+      'downloadSeq=${srinfo.downloadSeq}, nextOffset=$nextOffset, '
+      'dataLen=$dataLen, totalSize=${state.totalSize}',
+    );
+
+    if (dataLen < 0 || offset + dataLen > bytes.length) {
+      return -1;
+    }
+
+    if (dataLen > 0) {
+      try {
+        state.appendData(bytes, offset, dataLen);
+      } catch (_) {
+        return -1;
+      }
+      offset += dataLen;
+    }
+
+    state.nextOffset = nextOffset;
+
+    if (state.totalSize > 0 && state.nextOffset >= state.totalSize) {
+      _removeDicomChunkState(image);
+      _setImageLoadStatus(
+        srinfo,
+        image,
+        completedImages,
+        ResultStatus.success,
+        OnisErrorCodes.none,
+        "",
+      );
+    } else {
+      image.loadStatus.status = ResultStatus.streaming;
+      image.loadStatus.reason = OnisErrorCodes.none;
+    }
+
+    return offset;
+  }*/
+
+  /*void _removeDicomChunkState(entities.Image image) {
+    final state = _dicomChunks.remove(image);
+    if (state != null) {
+      state.dispose();
+    }
+  }*/
+
+  /*int _readMonochromeRawData(entities.Image image, int width, int height,
       Uint8List bytes, int offset, List<entities.Image> firstTimeImages) {
     bool valid = true;
     int representation = ((bytes[offset + 1] << 8) | bytes[offset]) >>> 0;
@@ -1372,7 +2167,7 @@ class DownloadController extends IDownloadController {
       }
     }
     return valid ? offset : -1;
-  }
+  }*/
 
   /*private _readJ2kData(srinfo:DownloadSeries, image:OsOpenedImage, imageBytes:Uint8Array, offset:number, minValue:number, maxValue:number, firstTimeImages:OsOpenedImage[], completedImages:OsOpenedImage[]):number {
       let valid:boolean = true;
@@ -1961,3 +2756,83 @@ class DownloadController extends IDownloadController {
         this._retrieveNextIcons();
     }*/
 }
+
+/*class _DicomChunkState {
+  int memoryThresholdBytes = 8 * 1024 * 1024;
+  int totalSize = -1;
+  int nextOffset = 0;
+  final BytesBuilder _receivedData = BytesBuilder(copy: false);
+  File? _tempFile;
+  RandomAccessFile? _tempHandle;
+  int _memoryBytes = 0;
+
+  void resetData() {
+    _receivedData.clear();
+    _memoryBytes = 0;
+    _closeTempHandle();
+    final file = _tempFile;
+    _tempFile = null;
+    if (file != null && file.existsSync()) {
+      file.deleteSync();
+    }
+  }
+
+  void appendData(Uint8List bytes, int offset, int length) {
+    if (length <= 0) {
+      return;
+    }
+
+    if (_tempHandle == null && _memoryBytes + length > memoryThresholdBytes) {
+      _promoteToTempFile();
+    }
+
+    if (_tempHandle != null) {
+      _tempHandle!.writeFromSync(bytes, offset, offset + length);
+      return;
+    }
+
+    _receivedData.add(Uint8List.view(
+      bytes.buffer,
+      bytes.offsetInBytes + offset,
+      length,
+    ));
+    _memoryBytes += length;
+  }
+
+  void _promoteToTempFile() {
+    final tempDir = Directory.systemTemp.path;
+    final tmpPath =
+        '$tempDir/onis_dicom_${DateTime.now().microsecondsSinceEpoch}_${identityHashCode(this)}.tmp';
+    final tmpFile = File(tmpPath);
+    final handle = tmpFile.openSync(mode: FileMode.writeOnlyAppend);
+    final inMemory = _receivedData.toBytes();
+    if (inMemory.isNotEmpty) {
+      handle.writeFromSync(inMemory);
+    }
+    _receivedData.clear();
+    _memoryBytes = 0;
+    _tempFile = tmpFile;
+    _tempHandle = handle;
+  }
+
+  void _closeTempHandle() {
+    final handle = _tempHandle;
+    _tempHandle = null;
+    if (handle != null) {
+      handle.closeSync();
+    }
+  }
+
+  void dispose() {
+    _closeTempHandle();
+    final file = _tempFile;
+    _tempFile = null;
+    if (file != null && file.existsSync()) {
+      file.deleteSync();
+    }
+    _receivedData.clear();
+    _memoryBytes = 0;
+    totalSize = -1;
+    nextOffset = 0;
+  }
+}*/
